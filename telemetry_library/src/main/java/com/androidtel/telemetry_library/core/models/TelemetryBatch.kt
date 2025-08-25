@@ -1,4 +1,4 @@
-package com.androidtel.android_telemetry.core.models
+package com.androidtel.telemetry_library.core.models
 
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName

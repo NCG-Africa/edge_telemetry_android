@@ -1,4 +1,4 @@
-package com.androidtel.android_telemetry.core
+package com.androidtel.telemetry_library.core
 
 // This is the core class responsible for collecting, batching, and sending telemetry data.
 
@@ -12,13 +12,13 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.navigation.NavController
 import com.google.gson.Gson
-import com.androidtel.android_telemetry.core.models.AppInfo
-import com.androidtel.android_telemetry.core.models.DeviceInfo
-import com.androidtel.android_telemetry.core.models.EventAttributes
-import com.androidtel.android_telemetry.core.models.SessionInfo
-import com.androidtel.android_telemetry.core.models.TelemetryBatch
-import com.androidtel.android_telemetry.core.models.TelemetryEvent
-import com.androidtel.android_telemetry.core.models.UserInfo
+import com.androidtel.telemetry_library.core.models.AppInfo
+import com.androidtel.telemetry_library.core.models.DeviceInfo
+import com.androidtel.telemetry_library.core.models.EventAttributes
+import com.androidtel.telemetry_library.core.models.SessionInfo
+import com.androidtel.telemetry_library.core.models.TelemetryBatch
+import com.androidtel.telemetry_library.core.models.TelemetryEvent
+import com.androidtel.telemetry_library.core.models.UserInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

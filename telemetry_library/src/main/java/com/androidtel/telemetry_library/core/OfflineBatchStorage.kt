@@ -1,8 +1,8 @@
-package com.androidtel.android_telemetry.core
+package com.androidtel.telemetry_library.core
 
 
 import android.content.Context
-import com.androidtel.android_telemetry.core.models.TelemetryBatch
+import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers

@@ -1,4 +1,4 @@
-package com.androidtel.android_telemetry.core
+package com.androidtel.telemetry_library.core
 
 import okhttp3.Interceptor
 import okhttp3.Response

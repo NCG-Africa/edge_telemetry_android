@@ -1,7 +1,7 @@
-package com.androidtel.android_telemetry.core
+package com.androidtel.telemetry_library.core
 
 import android.util.Log
-import com.androidtel.android_telemetry.core.models.TelemetryBatch
+import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.google.gson.Gson
 import kotlinx.coroutines.delay
 import okhttp3.MediaType.Companion.toMediaType

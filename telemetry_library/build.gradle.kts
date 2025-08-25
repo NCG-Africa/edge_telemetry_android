@@ -1,17 +1,19 @@
 plugins {
-    id("com.android.library") // <-- Change to this for a library
+    alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("maven-publish") // <-- Add this plugin
 }
 
 android {
-    namespace = "com.androidtel.android_telemetry"
-    compileSdk = 35
+    namespace = "com.androidtel.telemetry_library"
+    compileSdk = 34
 
     defaultConfig {
-         minSdk = 24
+        minSdk = 24
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        consumerProguardFiles("consumer-rules.pro")
     }
 
     buildTypes {
@@ -23,11 +25,6 @@ android {
             )
         }
     }
-
-    buildFeatures {
-        compose = true
-    }
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -36,7 +33,6 @@ android {
         jvmTarget = "17"
     }
 }
-
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
@@ -79,3 +75,15 @@ afterEvaluate {
         }
     }
 }
+
+
+/*
+dependencies {
+
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.material)
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+}*/

@@ -1,4 +1,4 @@
-package com.androidtel.android_telemetry.core
+package com.androidtel.telemetry_library.core
 
 import android.app.Activity
 import android.app.Application
@@ -9,7 +9,7 @@ import androidx.annotation.RequiresApi
 import androidx.fragment.app.FragmentActivity
 import java.time.Instant
 
-class TelemetryActivityLifecycleObserver(private val telemetryManager: TelemetryManager = TelemetryManager.getInstance() ) : Application.ActivityLifecycleCallbacks {
+class TelemetryActivityLifecycleObserver(private val telemetryManager: TelemetryManager = TelemetryManager.getInstance()) : Application.ActivityLifecycleCallbacks {
 
     private val screenTimingTracker = ScreenTimingTracker()
 
