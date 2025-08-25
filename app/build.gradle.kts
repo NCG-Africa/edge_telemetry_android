@@ -41,40 +41,40 @@ android {
 
 dependencies {
 
-//    implementation(libs.androidx.core.ktx)
-//    implementation(libs.androidx.lifecycle.runtime.ktx)
-//    implementation(libs.androidx.activity.compose)
-//    implementation(platform(libs.androidx.compose.bom))
-//    implementation(libs.androidx.ui)
-//    implementation(libs.androidx.ui.graphics)
-//    implementation(libs.androidx.ui.tooling.preview)
-//    implementation(libs.androidx.material3)
-//    testImplementation(libs.junit)
-//    androidTestImplementation(libs.androidx.junit)
-//    androidTestImplementation(libs.androidx.espresso.core)
-//
-//    androidTestImplementation(platform(libs.androidx.compose.bom))
-//    androidTestImplementation(libs.androidx.ui.test.junit4)
-//    debugImplementation(libs.androidx.ui.tooling)
-//    debugImplementation(libs.androidx.ui.test.manifest)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.ui)
+    implementation(libs.androidx.ui.graphics)
+    implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.androidx.material3)
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.ui.test.junit4)
+    debugImplementation(libs.androidx.ui.tooling)
+    debugImplementation(libs.androidx.ui.test.manifest)
 
 
-//    implementation(libs.androidx.lifecycle.process)
-//    implementation(libs.androidx.navigation.runtime.android)
-//    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.lifecycle.process)
+    implementation(libs.androidx.navigation.runtime.android)
+    implementation(libs.androidx.navigation.compose)
 
-    // Android core dependencies
-//    implementation("androidx.core:core-ktx:1.12.0")
-//    implementation("androidx.appcompat:appcompat:1.6.1")
+//     Android core dependencies
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.appcompat:appcompat:1.6.1")
 
-//    // Dependencies for JSON serialization and network requests
-//    implementation("com.google.code.gson:gson:2.10.1")
-//    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-//    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    // Dependencies for JSON serialization and network requests
+    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
 //    implementation(libs.okhttp)
 
-    // Required for desugaring on older API levels
-//    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+//     Required for desugaring on older API levels
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
 }

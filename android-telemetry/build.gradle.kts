@@ -1,19 +1,28 @@
 plugins {
+    id("com.android.library") // <-- Change to this for a library
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+    id("maven-publish") // <-- Add this plugin
+}
+
+/*
+plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
+*/
 
 android {
     namespace = "com.androidtel.android_telemetry"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.androidtel.android_telemetry"
+//        applicationId = "com.androidtel.android_telemetry"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+//        versionCode = 1
+//        versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -69,4 +78,17 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+}
+afterEvaluate {
+    publishing {
+        publications {
+            create<MavenPublication>("release") {
+                groupId = "com.github.KiplangatSang"
+                artifactId = "Telemetry" // Usually your repository name
+                version = "1.0.2"
+
+                from(components["release"])
+            }
+        }
+    }
 }
