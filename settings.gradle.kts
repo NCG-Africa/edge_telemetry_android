@@ -25,7 +25,7 @@ dependencyResolutionManagement {
         maven { url = uri("https://jitpack.io") }
     }
 }
-rootProject.name = "Telemetry"
+rootProject.name = "android_telemetry"
 include(":app")
 include(":android-telemetry")
 include(":telemetry_library")
