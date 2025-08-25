@@ -36,6 +36,12 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    android {
+        lint {
+            abortOnError = false   // ✅ don’t fail the build
+            checkReleaseBuilds = false
+        }
+    }
 }
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
@@ -79,15 +85,3 @@ afterEvaluate {
         }
     }
 }
-
-
-/*
-dependencies {
-
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.material)
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-}*/

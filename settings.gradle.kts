@@ -11,21 +11,16 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
-//dependencyResolutionManagement {
-//    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-//    repositories {
-//        google()
-//        mavenCentral()
-//    }
-//}
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        google()
         mavenCentral()
         maven { url = uri("https://jitpack.io") }
     }
 }
-rootProject.name = "android_telemetry"
-include(":app")
-include(":android-telemetry")
+rootProject.name = "Telemetry"
+//include(":app")
+//include(":android-telemetry")
 include(":telemetry_library")
