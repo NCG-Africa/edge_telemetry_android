@@ -73,9 +73,6 @@ dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }
 
-dependencies {
-    implementation("com.github.KiplangatSang:android_telemetry:1.0.9")
-}
 
 afterEvaluate {
     publishing {
