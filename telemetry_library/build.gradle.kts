@@ -72,13 +72,18 @@ dependencies {
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }
+
+dependencies {
+    implementation("com.github.KiplangatSang:android_telemetry:1.0.9")
+}
+
 afterEvaluate {
     publishing {
         publications {
             create<MavenPublication>("release") {
                 groupId = "com.github.KiplangatSang"
                 artifactId = "Telemetry" // Usually your repository name
-                version = "1.0.2"
+                version = "1.0.9"
 
                 from(components["release"])
             }
