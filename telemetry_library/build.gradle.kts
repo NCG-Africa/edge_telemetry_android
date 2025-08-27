@@ -86,7 +86,7 @@ afterEvaluate {
             create<MavenPublication>("release") {
                 groupId = "com.github.KiplangatSang"
                 artifactId = "android_telemetry"
-                version = "1.0.10"
+                version = "1.0.11"
                 from(components["release"])
             }
         }
