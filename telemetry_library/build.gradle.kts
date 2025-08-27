@@ -72,22 +72,20 @@ dependencies {
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
-    // ✅ ensure Kotlin is provided by the app, not bundled
+    // ✅ don't package kotlin stdlib, let apps provide it
     compileOnly("org.jetbrains.kotlin:kotlin-stdlib")
     compileOnly("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
-
-    // ✅ align Kotlin versions automatically
     api(platform("org.jetbrains.kotlin:kotlin-bom"))
 }
 
+// ✅ publishing block for JitPack
 afterEvaluate {
     publishing {
         publications {
             create<MavenPublication>("release") {
                 groupId = "com.github.KiplangatSang"
-                artifactId = "Telemetry"
-                version = "1.0.10" // bump when publishing
-
+                artifactId = "android_telemetry"
+                version = "1.0.10"
                 from(components["release"])
             }
         }
