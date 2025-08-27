@@ -2,7 +2,7 @@
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
-    // ❌ Do NOT apply kotlin-compose plugin in a library
+    id("org.jetbrains.kotlin.plugin.compose") // ⬅️ required in Kotlin 2.0+
     id("maven-publish")
 }
 
@@ -60,7 +60,7 @@ android {
 }
 
 dependencies {
-    // Compose BOM — provided by consumer app, so mark as `api`
+    // Compose BOM — let apps override if needed
     api(platform(libs.androidx.compose.bom))
 
     // AndroidX core + UI
@@ -89,9 +89,9 @@ dependencies {
     // Desugaring
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
-    // Don’t package Kotlin stdlib inside the AAR
-    compileOnly("org.jetbrains.kotlin:kotlin-stdlib")
-    compileOnly("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
+    // ❌ REMOVE kotlin-stdlib from compileOnly — let apps provide it
+    // compileOnly("org.jetbrains.kotlin:kotlin-stdlib")
+    // compileOnly("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
 
     // Tests
     testImplementation(libs.junit)
@@ -102,6 +102,7 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
 }
 
+
 // JitPack publishing
 afterEvaluate {
     publishing {
@@ -110,7 +111,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.KiplangatSang"
                 artifactId = "android_telemetry"
-                version = "1.0.11"
+                version = "1.0.12"
             }
         }
     }
