@@ -40,6 +40,7 @@ android {
     lint {
         abortOnError = false
         checkReleaseBuilds = false
+        warningsAsErrors = false
     }
 }
 
@@ -91,8 +92,6 @@ afterEvaluate {
         }
     }
 }
-
-
 
 /*
 plugins {
