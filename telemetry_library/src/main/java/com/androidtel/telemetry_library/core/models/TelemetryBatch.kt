@@ -28,9 +28,9 @@ data class TelemetryBatch(
     val events: List<TelemetryEvent>
 ) {
     // Convenience method for JSON serialization.
-    fun toJson(): String {
-        return Gson().toJson(this)
-    }
+//    fun toJson(): String {
+//        return Gson().toJson(this)
+//    }
 }
 
 // Data class to represent a single telemetry event.

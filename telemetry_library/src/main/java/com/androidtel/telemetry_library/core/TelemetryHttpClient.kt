@@ -27,7 +27,7 @@ class ClientException(code: Int, message: String) : IOException("Client error $c
 class ServerException(code: Int, message: String) : IOException("Server error $code: $message")
 class UnknownException(code: Int) : IOException("Unknown HTTP error code: $code")
 
-class TelemetryHttpClient(private val telemetryUrl:String, private val debugMode: Boolean ) {
+class TelemetryHttpClient(private val telemetryUrl: String, private val debugMode: Boolean) {
 
 
     private val okHttpClient = OkHttpClient.Builder()
@@ -42,12 +42,12 @@ class TelemetryHttpClient(private val telemetryUrl:String, private val debugMode
 
     // Public method to send a batch with built-in retry logic.
     suspend fun sendBatch(batch: TelemetryBatch): Result<Unit> {
-        return sendWithRetry(batch.toPayload(), maxRetries = 3)
+        return sendWithRetry(batch.toTelemetryPayload(), maxRetries = 3)
     }
 
 
     // Implementation of the retry strategy with exponential backoff.
-    private suspend fun sendWithRetry( batch: TelemetryPayload, maxRetries: Int): Result<Unit> {
+    private suspend fun sendWithRetry(batch: TelemetryPayload, maxRetries: Int): Result<Unit> {
         repeat(maxRetries) { attempt ->
             try {
                 val jsonPayload = batch.toJson()
@@ -111,6 +111,15 @@ class TelemetryHttpClient(private val telemetryUrl:String, private val debugMode
         return okHttpClient.newCall(request).execute()
     }
 
+    fun TelemetryBatch.toTelemetryPayload(): TelemetryPayload {
+        return TelemetryPayload(
+            timestamp = this.timestamp,
+            data = TelemetryData(
+                batchSize = this.batchSize,
+                events = this.events
+            )
+        )
+    }
 
     fun TelemetryBatch.toPayload(): TelemetryPayload {
         return TelemetryPayload(
