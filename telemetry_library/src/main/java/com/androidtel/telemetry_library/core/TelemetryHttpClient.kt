@@ -1,15 +1,11 @@
 package com.androidtel.telemetry_library.core
 
 import android.util.Log
-import com.androidtel.telemetry_library.core.models.AppInfo
-import com.androidtel.telemetry_library.core.models.DeviceInfo
 import com.androidtel.telemetry_library.core.models.EventAttributes
-import com.androidtel.telemetry_library.core.models.SessionInfo
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
-import com.androidtel.telemetry_library.core.models.TelemetryData
-import com.androidtel.telemetry_library.core.models.TelemetryEvent
+import com.androidtel.telemetry_library.core.models.TelemetryDataOut
+import com.androidtel.telemetry_library.core.models.TelemetryEventOut
 import com.androidtel.telemetry_library.core.models.TelemetryPayload
-import com.androidtel.telemetry_library.core.models.UserInfo
 import kotlinx.coroutines.delay
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -42,7 +38,7 @@ class TelemetryHttpClient(private val telemetryUrl: String, private val debugMod
 
     // Public method to send a batch with built-in retry logic.
     suspend fun sendBatch(batch: TelemetryBatch): Result<Unit> {
-        return sendWithRetry(batch.toTelemetryPayload(), maxRetries = 3)
+        return sendWithRetry(batch.toPayload(), maxRetries = 3)
     }
 
 
@@ -111,65 +107,66 @@ class TelemetryHttpClient(private val telemetryUrl: String, private val debugMod
         return okHttpClient.newCall(request).execute()
     }
 
-    fun TelemetryBatch.toTelemetryPayload(): TelemetryPayload {
-        return TelemetryPayload(
-            timestamp = this.timestamp,
-            data = TelemetryData(
-                batchSize = this.batchSize,
-                events = this.events
-            )
-        )
-    }
-
+    // ---- Extension: Convert Batch -> Payload ----
     fun TelemetryBatch.toPayload(): TelemetryPayload {
         return TelemetryPayload(
             timestamp = this.timestamp,
-            data = TelemetryData(
-                batchSize = this.batchSize,
+            data = TelemetryDataOut(
+                type = "batch",
+                batch_size = this.batchSize,
+                timestamp = this.timestamp,
                 events = this.events.map { event ->
-                    TelemetryEvent(
+                    TelemetryEventOut(
                         type = event.type,
                         eventName = event.eventName,
                         metricName = event.metricName,
                         value = event.value,
                         timestamp = event.timestamp,
-                        attributes = EventAttributes(
-                            app = AppInfo(
-                                appBuildNumber = event.attributes.app.appBuildNumber,
-                                appName = event.attributes.app.appName,
-                                appPackageName = event.attributes.app.appPackageName,
-                                appVersion = event.attributes.app.appVersion
-                            ),
-                            device = DeviceInfo(
-                                androidRelease = event.attributes.device.androidRelease,
-                                androidSdk = event.attributes.device.androidSdk,
-                                brand = event.attributes.device.brand,
-                                deviceId = event.attributes.device.deviceId,
-                                fingerprint = event.attributes.device.fingerprint,
-                                hardware = event.attributes.device.hardware,
-                                manufacturer = event.attributes.device.manufacturer,
-                                model = event.attributes.device.model,
-                                platform = event.attributes.device.platform,
-                                platformVersion = event.attributes.device.platformVersion,
-                                product = event.attributes.device.product
-                            ),
-                            session = SessionInfo(
-                                sessionId = event.attributes.session.sessionId,
-                                startTime = event.attributes.session.startTime
-                            ),
-                            user = UserInfo(
-                                email = event.attributes.user.email,
-                                name = event.attributes.user.name,
-                                phone = event.attributes.user.phone,
-                                profileVersion = event.attributes.user.profileVersion,
-                                userId = event.attributes.user.userId
-                            ),
-                            customAttributes = event.attributes.customAttributes
-                        )
+                        attributes = flattenAttributes(event.attributes)
                     )
                 }
             )
         )
+    }
+
+    // ---- Helper: Flatten attributes into map ----
+    private fun flattenAttributes(attrs: EventAttributes): Map<String, Any?> {
+        val flat = mutableMapOf<String, Any?>()
+
+        // App
+        flat["app.name"] = attrs.app.appName
+        flat["app.version"] = attrs.app.appVersion
+        flat["app.build_number"] = attrs.app.appBuildNumber
+        flat["app.package_name"] = attrs.app.appPackageName
+
+        // Device
+        flat["device.id"] = attrs.device.deviceId
+        flat["device.platform"] = attrs.device.platform
+        flat["device.platform_version"] = attrs.device.platformVersion
+        flat["device.model"] = attrs.device.model
+        flat["device.manufacturer"] = attrs.device.manufacturer
+        flat["device.brand"] = attrs.device.brand
+        flat["device.android_sdk"] = attrs.device.androidSdk
+        flat["device.android_release"] = attrs.device.androidRelease
+        flat["device.fingerprint"] = attrs.device.fingerprint
+        flat["device.hardware"] = attrs.device.hardware
+        flat["device.product"] = attrs.device.product
+
+        // User
+        flat["user.id"] = attrs.user.userId
+        flat["user.name"] = attrs.user.name
+        flat["user.email"] = attrs.user.email
+        flat["user.phone"] = attrs.user.phone
+        flat["user.profile_version"] = attrs.user.profileVersion
+
+        // Session
+        flat["session.id"] = attrs.session.sessionId
+        flat["session.start_time"] = attrs.session.startTime
+
+        // Custom
+        flat.putAll(attrs.customAttributes)
+
+        return flat
     }
 
 }
