@@ -10,7 +10,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
 import java.time.Instant
 
-class TelemetryFragmentLifecycleObserver(private val telemetryManager: TelemetryManager) :
+class TelemetryFragmentLifecycleObserver(private val telemetryManager: TelemetryManager = TelemetryManager.getInstance()) :
     FragmentManager.FragmentLifecycleCallbacks() {
 
     private val screenTimingTracker = ScreenTimingTracker()

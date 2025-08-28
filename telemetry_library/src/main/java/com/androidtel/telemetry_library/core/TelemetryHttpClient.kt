@@ -2,6 +2,8 @@ package com.androidtel.telemetry_library.core
 
 import android.util.Log
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
+import com.androidtel.telemetry_library.core.models.TelemetryData
+import com.androidtel.telemetry_library.core.models.TelemetryPayload
 import com.google.gson.Gson
 import kotlinx.coroutines.delay
 import okhttp3.MediaType.Companion.toMediaType
@@ -20,11 +22,8 @@ class ClientException(code: Int, message: String) : IOException("Client error $c
 class ServerException(code: Int, message: String) : IOException("Server error $code: $message")
 class UnknownException(code: Int) : IOException("Unknown HTTP error code: $code")
 
-class TelemetryHttpClient {
+class TelemetryHttpClient(private val telemetryUrl:String, private val debugMode: Boolean ) {
 
-    private val gson = Gson()
-    private val telemetryUrl = "https://edgetelemetry.ncgafrica.com/collector/telemetry"
-    private val debugMode = true // Set to false in production.
 
     private val okHttpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
@@ -38,15 +37,25 @@ class TelemetryHttpClient {
 
     // Public method to send a batch with built-in retry logic.
     suspend fun sendBatch(batch: TelemetryBatch): Result<Unit> {
-        return sendWithRetry(batch, maxRetries = 3)
+        return sendWithRetry(batch.toPayload(), maxRetries = 3)
+    }
+
+    fun TelemetryBatch.toPayload(): TelemetryPayload {
+        return TelemetryPayload(
+            timestamp = this.timestamp,
+            data = TelemetryData(
+                batchSize = this.batchSize,
+                events = this.events
+            )
+        )
     }
 
     // Implementation of the retry strategy with exponential backoff.
-    private suspend fun sendWithRetry(batch: TelemetryBatch, maxRetries: Int): Result<Unit> {
+    private suspend fun sendWithRetry( batch: TelemetryPayload, maxRetries: Int): Result<Unit> {
         repeat(maxRetries) { attempt ->
             try {
                 val jsonPayload = batch.toJson()
-                val response = makeHttpRequest(jsonPayload)
+                val response = makeHttpRequest(jsonPayload, telemetryUrl)
 
                 return when (response.code) {
                     in 200..299 -> Result.success(Unit)
@@ -96,7 +105,7 @@ class TelemetryHttpClient {
     }
 
     // Performs the actual HTTP request.
-    private fun makeHttpRequest(jsonPayload: String): Response {
+    private fun makeHttpRequest(jsonPayload: String, telemetryUrl: String): Response {
         val request = Request.Builder()
             .url(telemetryUrl)
             .post(jsonPayload.toRequestBody("application/json".toMediaType()))
