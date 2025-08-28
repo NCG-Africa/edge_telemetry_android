@@ -30,7 +30,7 @@ android {
         // Java 11 is the safest for compatibility
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
-        isCoreLibraryDesugaringEnabled = true
+//        isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions {
         jvmTarget = "11"
@@ -87,7 +87,8 @@ dependencies {
     api("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
     // Desugaring
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+//    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    implementation("com.android.tools:desugar_jdk_libs:2.0.4")
 
     // ❌ REMOVE kotlin-stdlib from compileOnly — let apps provide it
     // compileOnly("org.jetbrains.kotlin:kotlin-stdlib")
@@ -111,7 +112,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.KiplangatSang"
                 artifactId = "android_telemetry"
-                version = "1.0.12"
+                version = "1.0.13"
             }
         }
     }
