@@ -6,6 +6,7 @@ import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.androidtel.telemetry_library.core.models.TelemetryDataOut
 import com.androidtel.telemetry_library.core.models.TelemetryEventOut
 import com.androidtel.telemetry_library.core.models.TelemetryPayload
+import com.google.gson.Gson
 import kotlinx.coroutines.delay
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -38,12 +39,12 @@ class TelemetryHttpClient(private val telemetryUrl: String, private val debugMod
 
     // Public method to send a batch with built-in retry logic.
     suspend fun sendBatch(batch: TelemetryBatch): Result<Unit> {
-        return sendWithRetry(batch.toPayload(), maxRetries = 3)
+        return sendWithRetry(batch , maxRetries = 3)
     }
 
 
     // Implementation of the retry strategy with exponential backoff.
-    private suspend fun sendWithRetry(batch: TelemetryPayload, maxRetries: Int): Result<Unit> {
+    private suspend fun sendWithRetry(batch: TelemetryBatch, maxRetries: Int): Result<Unit> {
         repeat(maxRetries) { attempt ->
             try {
                 val jsonPayload = batch.toJson()
@@ -106,6 +107,28 @@ class TelemetryHttpClient(private val telemetryUrl: String, private val debugMod
             .build()
         return okHttpClient.newCall(request).execute()
     }
+
+
+    // --- Extension: Convert Batch -> Outgoing JSON ---
+    fun TelemetryBatch.toJson(): String {
+        val out = TelemetryDataOut(
+            type = "batch",
+            batch_size = this.batchSize,
+            timestamp = this.timestamp,
+            events = this.events.map { event ->
+                TelemetryEventOut(
+                    type = event.type,
+                    eventName = event.eventName,
+                    metricName = event.metricName,
+                    value = event.value,
+                    timestamp = event.timestamp,
+                    attributes = flattenAttributes(event.attributes)
+                )
+            }
+        )
+        return Gson().toJson(out)
+    }
+
 
     // ---- Extension: Convert Batch -> Payload ----
     fun TelemetryBatch.toPayload(): TelemetryPayload {
