@@ -112,7 +112,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.KiplangatSang"
                 artifactId = "android_telemetry"
-                version = "1.0.13"
+                version = "1.0.14"
             }
         }
     }

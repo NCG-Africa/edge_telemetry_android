@@ -1,10 +1,15 @@
 package com.androidtel.telemetry_library.core
 
 import android.util.Log
+import com.androidtel.telemetry_library.core.models.AppInfo
+import com.androidtel.telemetry_library.core.models.DeviceInfo
+import com.androidtel.telemetry_library.core.models.EventAttributes
+import com.androidtel.telemetry_library.core.models.SessionInfo
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.androidtel.telemetry_library.core.models.TelemetryData
+import com.androidtel.telemetry_library.core.models.TelemetryEvent
 import com.androidtel.telemetry_library.core.models.TelemetryPayload
-import com.google.gson.Gson
+import com.androidtel.telemetry_library.core.models.UserInfo
 import kotlinx.coroutines.delay
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -40,15 +45,6 @@ class TelemetryHttpClient(private val telemetryUrl:String, private val debugMode
         return sendWithRetry(batch.toPayload(), maxRetries = 3)
     }
 
-    fun TelemetryBatch.toPayload(): TelemetryPayload {
-        return TelemetryPayload(
-            timestamp = this.timestamp,
-            data = TelemetryData(
-                batchSize = this.batchSize,
-                events = this.events
-            )
-        )
-    }
 
     // Implementation of the retry strategy with exponential backoff.
     private suspend fun sendWithRetry( batch: TelemetryPayload, maxRetries: Int): Result<Unit> {
@@ -114,4 +110,57 @@ class TelemetryHttpClient(private val telemetryUrl:String, private val debugMode
             .build()
         return okHttpClient.newCall(request).execute()
     }
+
+
+    fun TelemetryBatch.toPayload(): TelemetryPayload {
+        return TelemetryPayload(
+            timestamp = this.timestamp,
+            data = TelemetryData(
+                batchSize = this.batchSize,
+                events = this.events.map { event ->
+                    TelemetryEvent(
+                        type = event.type,
+                        eventName = event.eventName,
+                        metricName = event.metricName,
+                        value = event.value,
+                        timestamp = event.timestamp,
+                        attributes = EventAttributes(
+                            app = AppInfo(
+                                appBuildNumber = event.attributes.app.appBuildNumber,
+                                appName = event.attributes.app.appName,
+                                appPackageName = event.attributes.app.appPackageName,
+                                appVersion = event.attributes.app.appVersion
+                            ),
+                            device = DeviceInfo(
+                                androidRelease = event.attributes.device.androidRelease,
+                                androidSdk = event.attributes.device.androidSdk,
+                                brand = event.attributes.device.brand,
+                                deviceId = event.attributes.device.deviceId,
+                                fingerprint = event.attributes.device.fingerprint,
+                                hardware = event.attributes.device.hardware,
+                                manufacturer = event.attributes.device.manufacturer,
+                                model = event.attributes.device.model,
+                                platform = event.attributes.device.platform,
+                                platformVersion = event.attributes.device.platformVersion,
+                                product = event.attributes.device.product
+                            ),
+                            session = SessionInfo(
+                                sessionId = event.attributes.session.sessionId,
+                                startTime = event.attributes.session.startTime
+                            ),
+                            user = UserInfo(
+                                email = event.attributes.user.email,
+                                name = event.attributes.user.name,
+                                phone = event.attributes.user.phone,
+                                profileVersion = event.attributes.user.profileVersion,
+                                userId = event.attributes.user.userId
+                            ),
+                            customAttributes = event.attributes.customAttributes
+                        )
+                    )
+                }
+            )
+        )
+    }
+
 }
