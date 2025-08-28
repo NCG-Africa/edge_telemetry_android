@@ -3,37 +3,41 @@ package com.androidtel.telemetry_library.core.models
 import com.google.gson.Gson
 import java.util.UUID
 
-
-// Final payload structure
+// ---- Payload + Data ----
 data class TelemetryPayload(
     val timestamp: String,
-    val data: TelemetryData
+    val data: TelemetryDataOut
 ) {
     fun toJson(): String = Gson().toJson(this)
 }
 
-// Inside `data` node
-data class TelemetryData(
-    val batchSize: Int,
-    val events: List<TelemetryEvent>
+data class TelemetryDataOut(
+    val type: String = "batch",
+    val events: List<TelemetryEventOut>,
+    val batch_size: Int,
+    val timestamp: String
 )
 
+// ---- Flattened Event ----
+data class TelemetryEventOut(
+    val type: String,
+    val eventName: String? = null,
+    val metricName: String? = null,
+    val value: Double? = null,
+    val timestamp: String,
+    val attributes: Map<String, Any?>
+)
 
-// Data class to represent a batch of telemetry events.
+// ---- Original Batch ----
 data class TelemetryBatch(
     val id: String = UUID.randomUUID().toString(),
     val type: String = "telemetry_batch",
     val batchSize: Int,
     val timestamp: String,
     val events: List<TelemetryEvent>
-) {
-    // Convenience method for JSON serialization.
-//    fun toJson(): String {
-//        return Gson().toJson(this)
-//    }
-}
+)
 
-// Data class to represent a single telemetry event.
+// ---- Original Event ----
 data class TelemetryEvent(
     val type: String,
     val metricName: String? = null,
@@ -43,7 +47,7 @@ data class TelemetryEvent(
     val attributes: EventAttributes
 )
 
-// Data class to hold all event attributes, including app, device, user, and session info.
+// ---- Original Attributes ----
 data class EventAttributes(
     val app: AppInfo,
     val device: DeviceInfo,
@@ -52,7 +56,6 @@ data class EventAttributes(
     val customAttributes: Map<String, Any>
 )
 
-// Data class for application information.
 data class AppInfo(
     val appName: String,
     val appVersion: String,
@@ -60,7 +63,6 @@ data class AppInfo(
     val appPackageName: String
 )
 
-// Data class for device information.
 data class DeviceInfo(
     val deviceId: String,
     val platform: String,
@@ -75,7 +77,6 @@ data class DeviceInfo(
     val product: String
 )
 
-// Data class for user information.
 data class UserInfo(
     val userId: String? = null,
     val name: String? = null,
@@ -84,8 +85,70 @@ data class UserInfo(
     val profileVersion: Int? = null
 )
 
-// Data class for session information.
 data class SessionInfo(
     val sessionId: String,
     val startTime: String? = null
 )
+
+
+// ---- Extension: Convert Batch -> Payload ----
+fun TelemetryBatch.toPayload(): TelemetryPayload {
+    return TelemetryPayload(
+        timestamp = this.timestamp,
+        data = TelemetryDataOut(
+            type = "batch",
+            batch_size = this.batchSize,
+            timestamp = this.timestamp,
+            events = this.events.map { event ->
+                TelemetryEventOut(
+                    type = event.type,
+                    eventName = event.eventName,
+                    metricName = event.metricName,
+                    value = event.value,
+                    timestamp = event.timestamp,
+                    attributes = flattenAttributes(event.attributes)
+                )
+            }
+        )
+    )
+}
+
+// ---- Helper: Flatten attributes into map ----
+private fun flattenAttributes(attrs: EventAttributes): Map<String, Any?> {
+    val flat = mutableMapOf<String, Any?>()
+
+    // App
+    flat["app.name"] = attrs.app.appName
+    flat["app.version"] = attrs.app.appVersion
+    flat["app.build_number"] = attrs.app.appBuildNumber
+    flat["app.package_name"] = attrs.app.appPackageName
+
+    // Device
+    flat["device.id"] = attrs.device.deviceId
+    flat["device.platform"] = attrs.device.platform
+    flat["device.platform_version"] = attrs.device.platformVersion
+    flat["device.model"] = attrs.device.model
+    flat["device.manufacturer"] = attrs.device.manufacturer
+    flat["device.brand"] = attrs.device.brand
+    flat["device.android_sdk"] = attrs.device.androidSdk
+    flat["device.android_release"] = attrs.device.androidRelease
+    flat["device.fingerprint"] = attrs.device.fingerprint
+    flat["device.hardware"] = attrs.device.hardware
+    flat["device.product"] = attrs.device.product
+
+    // User
+    flat["user.id"] = attrs.user.userId
+    flat["user.name"] = attrs.user.name
+    flat["user.email"] = attrs.user.email
+    flat["user.phone"] = attrs.user.phone
+    flat["user.profile_version"] = attrs.user.profileVersion
+
+    // Session
+    flat["session.id"] = attrs.session.sessionId
+    flat["session.start_time"] = attrs.session.startTime
+
+    // Custom
+    flat.putAll(attrs.customAttributes)
+
+    return flat
+}
