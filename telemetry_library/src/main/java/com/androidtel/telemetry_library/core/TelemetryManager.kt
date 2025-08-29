@@ -159,6 +159,8 @@ class TelemetryManager private constructor(
             // Handle uncaught exception synchronously-ish: persist, attempt short send, then delegate to default handler
             handleUncaughtException(thread, throwable, defaultHandler)
         }
+
+        trackActivities()
     }
 
     private fun handleUncaughtException(
