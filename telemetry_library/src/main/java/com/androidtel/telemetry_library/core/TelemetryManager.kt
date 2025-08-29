@@ -42,7 +42,7 @@ class TelemetryManager private constructor(
     private val httpClient: TelemetryHttpClient,
     private val offlineStorage: OfflineBatchStorage,
     private val screenTimingTracker: ScreenTimingTracker,
-    private val batchSize: Int
+    private val batchSize: Int,
 ) : DefaultLifecycleObserver {
 
     private val gson = Gson()
@@ -88,7 +88,8 @@ class TelemetryManager private constructor(
             application: Application,
             batchSize: Int = 5,
             endpoint: String = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
-            debugMode: Boolean = false
+            debugMode: Boolean = false,
+
         ): TelemetryManager {
             return instance ?: synchronized(this) {
                 instance ?: TelemetryManager(
@@ -161,6 +162,7 @@ class TelemetryManager private constructor(
         }
 
         trackActivities()
+        trackMemoryUsage()
     }
 
     private fun handleUncaughtException(
@@ -398,6 +400,11 @@ class TelemetryManager private constructor(
 
     fun trackActivities() {
         TelemetryActivityLifecycleObserver(this)
+    }
+
+    fun trackMemoryUsage() {
+        TelemetryMemoryUsage(this)
+
     }
 
     // --- Screen Navigation Tracking ---
