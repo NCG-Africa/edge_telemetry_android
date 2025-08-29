@@ -3,10 +3,12 @@ package com.androidtel.telemetry_library.core
 import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.os.Build
 import android.util.Log
 import androidx.compose.runtime.Composable
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
@@ -736,15 +738,30 @@ class TelemetryManager private constructor(
     @SuppressLint("MissingPermission")
     @Suppress("DEPRECATION")
     private fun getNetworkType(context: Context): String {
-        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val activeNetwork = cm.activeNetworkInfo ?: return "unknown"
+        return try {
+            if (ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.ACCESS_NETWORK_STATE
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                return "unknown" // App did not declare permission
+            }
 
-        return when (activeNetwork.type) {
-            ConnectivityManager.TYPE_WIFI -> "wifi"
-            ConnectivityManager.TYPE_MOBILE -> "cellular"
-            else -> "other"
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val activeNetwork = cm.activeNetworkInfo ?: return "unknown"
+
+            when (activeNetwork.type) {
+                ConnectivityManager.TYPE_WIFI -> "wifi"
+                ConnectivityManager.TYPE_MOBILE -> "cellular"
+                else -> "other"
+            }
+        } catch (e: SecurityException) {
+            "unknown" // Prevent crash if permission check fails
+        } catch (e: Exception) {
+            "unknown"
         }
     }
+
 
 
 }
