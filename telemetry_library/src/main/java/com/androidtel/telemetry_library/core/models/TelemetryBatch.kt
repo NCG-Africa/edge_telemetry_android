@@ -86,6 +86,27 @@ data class UserInfo(
 )
 
 data class SessionInfo(
-    val sessionId: String,
-    val startTime: String? = null
+    val sessionId: String,                       // "session.id"
+    val startTime: String? = null,               // "session.start_time"
+    val durationMs: Long? = null,                // "session.duration_ms"
+    val eventCount: Int? = null,                 // "session.event_count"
+    val metricCount: Int? = null,                // "session.metric_count"
+    val screenCount: Int? = null,                // "session.screen_count"
+    val visitedScreens: String? = null,          // "session.visited_screens"
+    val isFirstSession: Boolean? = null,         // "session.is_first_session"
+    val totalSessions: Int? = null,              // "session.total_sessions"
+    val networkType: String? = null              // "network.type"
 )
+
+data class MemoryEventInfo(
+    val usageMb: Double,                // "memory.usage_mb"
+    val pressureLevel: String,          // "memory.pressure_level"
+    val timestamp: String               // "memory.timestamp"
+)
+
+data class MemoryMetricInfo(
+    val unit: String,                   // "metric.unit"
+    val type: String,                   // "memory.type"
+    val source: String                  // "memory.source"
+)
+

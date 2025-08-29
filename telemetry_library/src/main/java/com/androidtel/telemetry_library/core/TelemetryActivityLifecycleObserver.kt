@@ -9,13 +9,19 @@ import androidx.annotation.RequiresApi
 import androidx.fragment.app.FragmentActivity
 import java.time.Instant
 
-class TelemetryActivityLifecycleObserver(private val telemetryManager: TelemetryManager = TelemetryManager.getInstance()) : Application.ActivityLifecycleCallbacks {
+class TelemetryActivityLifecycleObserver(
+    private val telemetryManager: TelemetryManager = TelemetryManager.getInstance()
+) : Application.ActivityLifecycleCallbacks {
 
     private val screenTimingTracker = ScreenTimingTracker()
+    private val frameDropCollector = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+        TelemetryFrameDropCollector(telemetryManager)
+    } else null
 
     override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
         Log.d("TelemetryObserver", "Activity Created: ${activity.javaClass.simpleName}")
-        // Register Fragment observer for this activity
+
+        // Register Fragment observer
         if (activity is FragmentActivity) {
             activity.supportFragmentManager.registerFragmentLifecycleCallbacks(
                 TelemetryFragmentLifecycleObserver(telemetryManager),
@@ -33,10 +39,13 @@ class TelemetryActivityLifecycleObserver(private val telemetryManager: Telemetry
         val screenName = getScreenName(activity)
         Log.d("TelemetryObserver", "Activity Resumed: $screenName")
 
-        // Start tracking screen duration for this screen
+        // Start tracking screen duration
         screenTimingTracker.startScreen(screenName)
 
-        // Record a navigation event, similar to Flutter's navigation observer
+        // Start collecting frame drops if supported
+        frameDropCollector?.start(activity)
+
+        // Record navigation event
         telemetryManager.recordEvent(
             eventName = "navigation.route_change",
             attributes = mapOf(
@@ -53,7 +62,7 @@ class TelemetryActivityLifecycleObserver(private val telemetryManager: Telemetry
         val screenName = getScreenName(activity)
         Log.d("TelemetryObserver", "Activity Paused: $screenName")
 
-        // End the screen timing and record the screen duration
+        // End timing
         val durationMs = screenTimingTracker.endScreen(screenName)
         if (durationMs != null) {
             telemetryManager.recordMetric(
@@ -69,18 +78,64 @@ class TelemetryActivityLifecycleObserver(private val telemetryManager: Telemetry
     }
 
     override fun onActivityStopped(activity: Activity) {
+        val screenName = getScreenName(activity)
         Log.d("TelemetryObserver", "Activity Stopped: ${activity.javaClass.simpleName}")
+
+        // End timing
+        val durationMs = screenTimingTracker.endScreen(screenName)
+        if (durationMs != null) {
+            telemetryManager.recordMetric(
+                metricName = "performance.screen_duration",
+                value = durationMs.toDouble(),
+                attributes = mapOf(
+                    "screen.name" to screenName,
+                    "navigation.exit_method" to "closed",
+                    "metric.unit" to "milliseconds"
+                )
+            )
+        }
     }
 
     override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {
         Log.d("TelemetryObserver", "Activity SaveInstanceState: ${activity.javaClass.simpleName}")
+
+        val screenName = getScreenName(activity)
+
+        // End timing
+        val durationMs = screenTimingTracker.endScreen(screenName)
+        if (durationMs != null) {
+            telemetryManager.recordMetric(
+                metricName = "performance.screen_duration",
+                value = durationMs.toDouble(),
+                attributes = mapOf(
+                    "screen.name" to screenName,
+                    "navigation.exit_method" to "saved state",
+                    "metric.unit" to "milliseconds"
+                )
+            )
+        }
     }
 
     override fun onActivityDestroyed(activity: Activity) {
+
+        val screenName = getScreenName(activity)
         Log.d("TelemetryObserver", "Activity Destroyed: ${activity.javaClass.simpleName}")
+
+        // End timing
+        val durationMs = screenTimingTracker.endScreen(screenName)
+        if (durationMs != null) {
+            telemetryManager.recordMetric(
+                metricName = "performance.screen_duration",
+                value = durationMs.toDouble(),
+                attributes = mapOf(
+                    "screen.name" to screenName,
+                    "navigation.exit_method" to "destroyed",
+                    "metric.unit" to "milliseconds"
+                )
+            )
+        }
     }
 
-    // Helper method to get a clean screen name from the Activity title or class name.
     private fun getScreenName(activity: Activity): String {
         return if (activity.title.isNotEmpty()) {
             activity.title.toString()

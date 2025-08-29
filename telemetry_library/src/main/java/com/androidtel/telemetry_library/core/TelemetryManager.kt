@@ -1,7 +1,9 @@
 package com.androidtel.telemetry_library.core
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
+import android.net.ConnectivityManager
 import android.os.Build
 import android.util.Log
 import androidx.compose.runtime.Composable
@@ -9,7 +11,6 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.navigation.NavController
-import com.google.gson.Gson
 import com.androidtel.telemetry_library.core.models.AppInfo
 import com.androidtel.telemetry_library.core.models.DeviceInfo
 import com.androidtel.telemetry_library.core.models.EventAttributes
@@ -17,6 +18,7 @@ import com.androidtel.telemetry_library.core.models.SessionInfo
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.androidtel.telemetry_library.core.models.TelemetryEvent
 import com.androidtel.telemetry_library.core.models.UserInfo
+import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -41,13 +43,12 @@ class TelemetryManager private constructor(
     private val offlineStorage: OfflineBatchStorage,
     private val screenTimingTracker: ScreenTimingTracker,
     private val batchSize: Int
-) : DefaultLifecycleObserver
-{
+) : DefaultLifecycleObserver {
 
     private val gson = Gson()
     private val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
     private val scope = CoroutineScope(Dispatchers.IO)
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+    val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
     private var batchSendJob: Job? = null
 
     // Core attributes for every event
@@ -57,11 +58,19 @@ class TelemetryManager private constructor(
     private var sessionId = generateDeviceId()
     private var sessionStartTime = System.currentTimeMillis()
     private var userId: String? = null
+
     // Add additional user profile fields
     private var userName: String? = null
     private var userEmail: String? = null
     private var userPhone: String? = null
     private var userProfileVersion: Int? = null
+
+    // Session tracking state
+    private var eventCount: Int = 0
+    private var metricCount: Int = 0
+    private var totalSessions: Int = 0
+    private val visitedScreens: MutableSet<String> = mutableSetOf()
+
 
     // file name for persisted fatal crash batch
     private val persistedCrashFileName = "telemetry_pending_crash.json"
@@ -75,14 +84,19 @@ class TelemetryManager private constructor(
         /**
          * Call this once in Application.onCreate()
          */
-        fun init(application: Application,
-                 batchSize: Int = 5,
-                 telemetryUrl:String = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
-                 debugMode:Boolean = false): TelemetryManager {
+        fun initialize(
+            application: Application,
+            batchSize: Int = 5,
+            endpoint: String = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
+            debugMode: Boolean = false
+        ): TelemetryManager {
             return instance ?: synchronized(this) {
                 instance ?: TelemetryManager(
                     application,
-                    httpClient = TelemetryHttpClient(telemetryUrl = telemetryUrl, debugMode = debugMode),
+                    httpClient = TelemetryHttpClient(
+                        telemetryUrl = endpoint,
+                        debugMode = debugMode
+                    ),
                     offlineStorage = OfflineBatchStorage(application.applicationContext),
                     screenTimingTracker = ScreenTimingTracker(),
                     batchSize = batchSize,
@@ -108,8 +122,6 @@ class TelemetryManager private constructor(
     }
 
 
-
-
     private fun register() {
         // Attach lifecycle observer
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
@@ -119,10 +131,28 @@ class TelemetryManager private constructor(
             try {
                 sendPersistedCrashIfAny()
             } catch (e: Exception) {
-                Log.e("TelemetryManager", "Error while sending persisted crash on init: ${e.localizedMessage}", e)
+                Log.e(
+                    "TelemetryManager",
+                    "Error while sending persisted crash on init: ${e.localizedMessage}",
+                    e
+                )
             }
         }
 
+        scope.launch {
+            try {
+                val prefs = context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE)
+                totalSessions = prefs.getInt("total_sessions", 0) + 1
+                prefs.edit().putInt("total_sessions", totalSessions).apply()
+
+            } catch (e: Exception) {
+                Log.e(
+                    "TelemetryManager",
+                    "Errror storing events sessions: ${e.localizedMessage}",
+                    e
+                )
+            }
+        }
         // Setup uncaught exception handler
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
@@ -183,22 +213,34 @@ class TelemetryManager private constructor(
                         deletePersistedBatch()
                     } else {
                         // if we couldn't send now, schedule to offline storage after process restarts (persisted file remains)
-                        Log.w("TelemetryManager", "Immediate crash send did not succeed — persisted for next launch.")
+                        Log.w(
+                            "TelemetryManager",
+                            "Immediate crash send did not succeed — persisted for next launch."
+                        )
                     }
                 } catch (e: Exception) {
-                    Log.w("TelemetryManager", "Exception while attempting immediate crash send: ${e.localizedMessage}")
+                    Log.w(
+                        "TelemetryManager",
+                        "Exception while attempting immediate crash send: ${e.localizedMessage}"
+                    )
                     // leave persisted file for next launch
                 }
             } else {
                 // If buildAttributes failed for some reason, persist a minimal JSON so it can be inspected & uploaded later.
-                persistRawCrashSync(mapOf(
-                    "timestamp" to dateFormat.format(Date()),
-                    "message" to (throwable.message ?: ""),
-                    "stacktrace" to sw.toString()
-                ))
+                persistRawCrashSync(
+                    mapOf(
+                        "timestamp" to dateFormat.format(Date()),
+                        "message" to (throwable.message ?: ""),
+                        "stacktrace" to sw.toString()
+                    )
+                )
             }
         } catch (e: Exception) {
-            Log.e("TelemetryManager", "Failed while handling uncaught exception: ${e.localizedMessage}", e)
+            Log.e(
+                "TelemetryManager",
+                "Failed while handling uncaught exception: ${e.localizedMessage}",
+                e
+            )
         } finally {
             // Let the original handler proceed (will terminate the process)
             defaultHandler?.uncaughtException(thread, throwable)
@@ -221,7 +263,10 @@ class TelemetryManager private constructor(
             "session_duration_ms" to durationMs
         )
         recordEvent(eventName = "session_end", attributes = attributes)
-        Log.i("TelemetryManager", "App moved to background. Session ID: $sessionId ended after $durationMs ms.")
+        Log.i(
+            "TelemetryManager",
+            "App moved to background. Session ID: $sessionId ended after $durationMs ms."
+        )
 
         // Flush any remaining events to the offline storage when the app goes to the background.
         scope.launch {
@@ -238,6 +283,7 @@ class TelemetryManager private constructor(
         value: Double,
         attributes: Map<String, Any> = emptyMap()
     ) {
+        metricCount++
         val event = buildAttributes(attributes)?.let {
             TelemetryEvent(
                 type = "metric|event",
@@ -256,6 +302,7 @@ class TelemetryManager private constructor(
         eventName: String,
         attributes: Map<String, Any> = emptyMap()
     ) {
+        eventCount++
         val event = buildAttributes(attributes)?.let {
             TelemetryEvent(
                 type = "event",
@@ -267,6 +314,8 @@ class TelemetryManager private constructor(
         event?.let { eventQueue.add(it) }
         maybeSendBatch()
     }
+
+
 
     // --- Network Request Tracking ---
     fun recordNetworkRequest(
@@ -346,11 +395,12 @@ class TelemetryManager private constructor(
     }
 
     fun trackActivities() {
-        TelemetryActivityLifecycleObserver( this)
+        TelemetryActivityLifecycleObserver(this)
     }
 
     // --- Screen Navigation Tracking ---
     fun recordScreenView(screenName: String) {
+        visitedScreens.add(screenName)
         val attributes = mapOf(
             "screen_name" to screenName
         )
@@ -403,7 +453,7 @@ class TelemetryManager private constructor(
 
 
     fun generateRandomString(length: Int): String {
-        val charPool : List<Char> = ('a'..'z') + ('A'..'Z') + ('0'..'9')
+        val charPool: List<Char> = ('a'..'z') + ('A'..'Z') + ('0'..'9')
         val random = SecureRandom()
         return (1..length)
             .map { charPool[random.nextInt(charPool.size)] }
@@ -493,14 +543,20 @@ class TelemetryManager private constructor(
         Log.i("TelemetryManager", "Checking for stored batches to send.")
         val storedBatches = offlineStorage.getStoredBatches()
         if (storedBatches.isNotEmpty()) {
-            Log.i("TelemetryManager", "Found ${storedBatches.size} stored batches. Attempting to send.")
+            Log.i(
+                "TelemetryManager",
+                "Found ${storedBatches.size} stored batches. Attempting to send."
+            )
             storedBatches.forEach { batch ->
                 val result = httpClient.sendBatch(batch)
                 if (result.isSuccess) {
                     Log.i("TelemetryManager", "Successfully re-sent stored batch.")
                     offlineStorage.removeBatch(batch.id)
                 } else {
-                    Log.e("TelemetryManager", "Failed to re-send stored batch. Will try again later.")
+                    Log.e(
+                        "TelemetryManager",
+                        "Failed to re-send stored batch. Will try again later."
+                    )
                 }
             }
         }
@@ -537,7 +593,11 @@ class TelemetryManager private constructor(
             val text = persistedCrashFile.readText()
             gson.fromJson(text, TelemetryBatch::class.java)
         } catch (e: Exception) {
-            Log.e("TelemetryManager", "Failed to read persisted crash batch: ${e.localizedMessage}", e)
+            Log.e(
+                "TelemetryManager",
+                "Failed to read persisted crash batch: ${e.localizedMessage}",
+                e
+            )
             null
         }
     }
@@ -549,7 +609,11 @@ class TelemetryManager private constructor(
                 Log.i("TelemetryManager", "Deleted persisted crash file.")
             }
         } catch (e: Exception) {
-            Log.e("TelemetryManager", "Failed to delete persisted crash file: ${e.localizedMessage}", e)
+            Log.e(
+                "TelemetryManager",
+                "Failed to delete persisted crash file: ${e.localizedMessage}",
+                e
+            )
         }
     }
 
@@ -567,12 +631,19 @@ class TelemetryManager private constructor(
                 Log.i("TelemetryManager", "Successfully sent persisted crash batch.")
                 deletePersistedBatch()
             } else {
-                Log.e("TelemetryManager", "Failed to send persisted crash batch; moving to offline storage.")
+                Log.e(
+                    "TelemetryManager",
+                    "Failed to send persisted crash batch; moving to offline storage."
+                )
                 offlineStorage.storeBatch(batch)
                 deletePersistedBatch()
             }
         } catch (e: Exception) {
-            Log.e("TelemetryManager", "Error sending persisted crash batch: ${e.localizedMessage}", e)
+            Log.e(
+                "TelemetryManager",
+                "Error sending persisted crash batch: ${e.localizedMessage}",
+                e
+            )
             // leave file for next attempt
         }
     }
@@ -626,12 +697,47 @@ class TelemetryManager private constructor(
     }
 
     // Tracks session information. Note that this is a simplified example.
+    /*    private fun getSessionInfo(): SessionInfo {
+            return SessionInfo(
+                sessionId = sessionId,
+                startTime = dateFormat.format(Date(sessionStartTime))
+            )
+        }*/
+
+    // Example: Collects session information
     private fun getSessionInfo(): SessionInfo {
+        val now = System.currentTimeMillis()
+        val duration = now - sessionStartTime
+
         return SessionInfo(
             sessionId = sessionId,
-            startTime = dateFormat.format(Date(sessionStartTime))
+            startTime = dateFormat.format(Date(sessionStartTime)),
+            durationMs = duration,
+            eventCount = eventCount,
+            metricCount = metricCount,
+            screenCount = visitedScreens.size,
+            visitedScreens = visitedScreens.joinToString(","),
+            isFirstSession = totalSessions == 1,
+            totalSessions = totalSessions,
+            networkType = getNetworkType(context)
         )
     }
+
+
+    @SuppressLint("MissingPermission")
+    @Suppress("DEPRECATION")
+    private fun getNetworkType(context: Context): String {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val activeNetwork = cm.activeNetworkInfo ?: return "unknown"
+
+        return when (activeNetwork.type) {
+            ConnectivityManager.TYPE_WIFI -> "wifi"
+            ConnectivityManager.TYPE_MOBILE -> "cellular"
+            else -> "other"
+        }
+    }
+
+
 }
 
 

@@ -129,29 +129,6 @@ class TelemetryHttpClient(private val telemetryUrl: String, private val debugMod
         return Gson().toJson(out)
     }
 
-
-    // ---- Extension: Convert Batch -> Payload ----
-    fun TelemetryBatch.toPayload(): TelemetryPayload {
-        return TelemetryPayload(
-            timestamp = this.timestamp,
-            data = TelemetryDataOut(
-                type = "batch",
-                batch_size = this.batchSize,
-                timestamp = this.timestamp,
-                events = this.events.map { event ->
-                    TelemetryEventOut(
-                        type = event.type,
-                        eventName = event.eventName,
-                        metricName = event.metricName,
-                        value = event.value,
-                        timestamp = event.timestamp,
-                        attributes = flattenAttributes(event.attributes)
-                    )
-                }
-            )
-        )
-    }
-
     // ---- Helper: Flatten attributes into map ----
     private fun flattenAttributes(attrs: EventAttributes): Map<String, Any?> {
         val flat = mutableMapOf<String, Any?>()
@@ -182,9 +159,19 @@ class TelemetryHttpClient(private val telemetryUrl: String, private val debugMod
         flat["user.phone"] = attrs.user.phone
         flat["user.profile_version"] = attrs.user.profileVersion
 
-        // Session
+        // Session (extended)
         flat["session.id"] = attrs.session.sessionId
         flat["session.start_time"] = attrs.session.startTime
+        flat["session.duration_ms"] = attrs.session.durationMs
+        flat["session.event_count"] = attrs.session.eventCount
+        flat["session.metric_count"] = attrs.session.metricCount
+        flat["session.screen_count"] = attrs.session.screenCount
+        flat["session.visited_screens"] = attrs.session.visitedScreens
+        flat["session.is_first_session"] = attrs.session.isFirstSession
+        flat["session.total_sessions"] = attrs.session.totalSessions
+        flat["network.type"] = attrs.session.networkType
+
+
 
         // Custom
         flat.putAll(attrs.customAttributes)
