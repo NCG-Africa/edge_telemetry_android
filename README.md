@@ -3,6 +3,99 @@
 ## Overview
 Your backend expects telemetry data in a specific JSON batch format. This document outlines the exact structure and all data points your Android SDK must send to maintain compatibility.
 
+## Initialization
+
+### Application Class
+
+```kotlin
+class MyApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+
+        // Initialize Telemetry
+        TelemetryManager.initialize(
+            application = this,
+            batchSize = 10,
+            debugMode = true,
+            endpoint = "https://com.example.com"
+
+        )
+    }
+}
+```
+
+## Usage
+
+### Setting User Identity
+
+```kotlin
+val telemetry = TelemetryManager.getInstance()
+
+telemetry.setUserId("user12345")
+telemetry.setUserProfile(
+    name = "John Doe",
+    email = "john.doe@example.com",
+    phone = "+1-555-123-4567",
+    profileVersion = 1
+)
+```
+
+### Recording Events
+```kotlin
+telemetry.recordEvent(
+    eventName = "ecommerce.purchase_completed",
+    attributes = mapOf(
+        "order_id" to "ORD-98765",
+        "total_amount" to 250.50,
+        "payment_method" to "credit_card",
+        "item_count" to 2
+    )
+)
+```
+
+### Recording Metrics
+```kotlin
+telemetry.recordMetric(
+    metricName = "performance.screen_duration",
+    value = 3250.0,
+    attributes = mapOf(
+        "screen.name" to "HomeScreen",
+        "metric.unit" to "milliseconds"
+    )
+)
+```
+
+## Navigation Tracking
+```kotlin
+### Jetpack Compose
+@Composable
+fun AppNavigation() {
+    val navController = rememberNavController()
+
+    // Track screen navigation automatically
+    TelemetryManager.getInstance().trackComposeScreens(navController)
+
+    NavHost(navController, startDestination = "home") {
+        composable("home") { HomeScreen { navController.navigate("details") } }
+        composable("details") { DetailsScreen { navController.popBackStack() } }
+    }
+}
+```
+## Lifecycle Tracking
+
+### Activity & Fragment
+
+- TelemetryActivityLifecycleObserver automatically tracks:
+  - Activity created, started, resumed, paused, stopped, destroyed
+  - Screen duration
+  - Navigation events
+  - Frame drops
+- TelemetryFragmentLifecycleObserver tracks:
+  - Fragment navigation
+  - Screen engagement
+
+Registration happens automatically during initialization.
+
 ## Top-Level Batch Structure
 
 ```json
