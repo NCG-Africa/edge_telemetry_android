@@ -110,8 +110,8 @@ afterEvaluate {
         publications {
             create<MavenPublication>("release") {
                 from(components["release"])
-                groupId = "com.github.KiplangatSang"
-                artifactId = "android_telemetry"
+                groupId = "com.github.NCG-Africa"
+                artifactId = "edge-telemetry-sdk"
                 version = "1.0.15"
             }
         }
