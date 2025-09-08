@@ -57,9 +57,9 @@ class TelemetryManager private constructor(
     private val deviceId: String = getOrCreateDeviceId()
     private val appInfo = collectAppInfo()
     private val deviceInfo = collectDeviceInfo()
-    private var sessionId = generateDeviceId()
+    private var sessionId = generateSessionId()
     private var sessionStartTime = System.currentTimeMillis()
-    private var userId: String? = null
+    private var userId: String = "" // Will be set during initialization
 
     // Add additional user profile fields
     private var userName: String? = null
@@ -105,6 +105,7 @@ class TelemetryManager private constructor(
                     batchSize = batchSize,
                 ).also { manager ->
                     instance = manager
+                    manager.initializeUserId() // Initialize user ID first
                     manager.register() // lifecycle + crash handling
                 }
             }
@@ -124,6 +125,34 @@ class TelemetryManager private constructor(
         }
     }
 
+    /**
+     * Initializes the user ID automatically during SDK setup.
+     * Creates a new user ID if none exists, or loads existing one from SharedPreferences.
+     * This ensures permanent user identity across app lifecycle with zero developer intervention.
+     */
+    private fun initializeUserId() {
+        try {
+            val prefs = context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE)
+            val existingUserId = prefs.getString("sdk_managed_user_id", null)
+            
+            if (existingUserId != null) {
+                // Load existing user ID
+                userId = existingUserId
+                Log.i("TelemetryManager", "Loaded existing user ID: $userId")
+            } else {
+                // Generate new user ID and store it permanently
+                userId = generateUserId()
+                prefs.edit().putString("sdk_managed_user_id", userId).apply()
+                Log.i("TelemetryManager", "Generated new user ID: $userId")
+            }
+        } catch (e: Exception) {
+            // Handle SharedPreferences failures gracefully
+            Log.e("TelemetryManager", "Failed to initialize user ID from SharedPreferences: ${e.localizedMessage}", e)
+            // Fallback: generate user ID but don't persist (will be regenerated on next launch)
+            userId = generateUserId()
+            Log.w("TelemetryManager", "Using fallback user ID (not persisted): $userId")
+        }
+    }
 
     private fun register() {
         // Attach lifecycle observer
@@ -172,6 +201,7 @@ class TelemetryManager private constructor(
         throwable: Throwable,
         defaultHandler: Thread.UncaughtExceptionHandler?
     ) {
+        val startTime = System.currentTimeMillis()
         try {
             // Build the crash attributes (stringified stacktrace etc.)
             val sw = StringWriter()
@@ -203,34 +233,10 @@ class TelemetryManager private constructor(
 
                 // Persist to disk synchronously — survives process death
                 persistBatchSync(batch)
-
-                // Best-effort synchronous send with short timeout (2 seconds). If success, delete file.
-                try {
-                    val resultWasSuccess = runBlocking(Dispatchers.IO) {
-                        // try for up to 2 seconds
-                        withTimeoutOrNull(2000) {
-                            val result = httpClient.sendBatch(batch)
-                            result.isSuccess
-                        }
-                    } == true
-
-                    if (resultWasSuccess) {
-                        // remove persisted file because it was delivered
-                        deletePersistedBatch()
-                    } else {
-                        // if we couldn't send now, schedule to offline storage after process restarts (persisted file remains)
-                        Log.w(
-                            "TelemetryManager",
-                            "Immediate crash send did not succeed — persisted for next launch."
-                        )
-                    }
-                } catch (e: Exception) {
-                    Log.w(
-                        "TelemetryManager",
-                        "Exception while attempting immediate crash send: ${e.localizedMessage}"
-                    )
-                    // leave persisted file for next launch
-                }
+                Log.i(
+                    "TelemetryManager",
+                    "Crash data persisted successfully. Will be sent on next app launch."
+                )
             } else {
                 // If buildAttributes failed for some reason, persist a minimal JSON so it can be inspected & uploaded later.
                 persistRawCrashSync(
@@ -248,6 +254,11 @@ class TelemetryManager private constructor(
                 e
             )
         } finally {
+            val executionTime = System.currentTimeMillis() - startTime
+            Log.i(
+                "TelemetryManager",
+                "Crash handler completed in ${executionTime}ms"
+            )
             // Let the original handler proceed (will terminate the process)
             defaultHandler?.uncaughtException(thread, throwable)
         }
@@ -451,12 +462,14 @@ class TelemetryManager private constructor(
 
 
     // Sets the user ID for all subsequent events in the session.
-    fun setUserId(id: String) {
+    // Made private - SDK manages user ID automatically
+    private fun setUserId(id: String) {
         this.userId = id
     }
 
     // Expected format: user_1704067200123_abcd1234
-    fun generateUserId(): String {
+    // Made private - SDK manages user ID automatically
+    private fun generateUserId(): String {
         val timestamp = System.currentTimeMillis()
         val randomPart = generateRandomString(8)
         return "user_${timestamp}_$randomPart"
@@ -474,14 +487,24 @@ class TelemetryManager private constructor(
     // Expected format: device_1704067200000_a8b9c2d1_android
     private fun generateDeviceId(): String {
         val timestamp = System.currentTimeMillis()
-        val randomPart = generateRandomString(8) // 8 chars, alphanumeric lowercase
-        val platform = "android" // Must be lowercase
+        val randomPart = generateRandomString(8)
+        val platform = "android"
 
         return "device_${timestamp}_${randomPart}_$platform"
     }
 
+    // Expected format: session_1704067200000_x9y8z7w6_android
+    private fun generateSessionId(): String {
+        val timestamp = System.currentTimeMillis()
+        val randomPart = generateRandomString(8)
+        val platform = "android"
+
+        return "session_${timestamp}_${randomPart}_$platform"
+    }
+
     // A new method to set additional user profile information.
-    fun setUserProfile(name: String, email: String, phone: String, profileVersion: Int) {
+    // Made private - SDK manages user profile automatically
+    private fun setUserProfile(name: String, email: String, phone: String, profileVersion: Int) {
         this.userName = name
         this.userEmail = email
         this.userPhone = phone
@@ -496,7 +519,7 @@ class TelemetryManager private constructor(
                 app = it,
                 device = deviceInfo,
                 user = UserInfo(
-                    userId = userId,
+                    userId = userId, // Now guaranteed to be non-null after initialization
                     name = userName,
                     email = userEmail,
                     phone = userPhone,
@@ -660,12 +683,12 @@ class TelemetryManager private constructor(
     }
 
 
-    // Generates a UUID and stores it persistently in SharedPreferences.
+    // Generates a structured device ID and stores it persistently in SharedPreferences.
     private fun getOrCreateDeviceId(): String {
         val prefs = context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE)
         var deviceId = prefs.getString("device.id", null)
         if (deviceId == null) {
-            deviceId = UUID.randomUUID().toString()
+            deviceId = generateDeviceId()
             prefs.edit().putString("device.id", deviceId).apply()
         }
         return deviceId

@@ -50,14 +50,14 @@ class TelemetryHttpClient(private val telemetryUrl: String, private val debugMod
                 val jsonPayload = batch.toJson()
                 val response = makeHttpRequest(jsonPayload, telemetryUrl)
 
-                return when (response.code) {
-                    in 200..299 -> Result.success(Unit)
+                when (response.code) {
+                    in 200..299 -> return Result.success(Unit)
                     in 400..499 -> {
                         Log.e(
                             "TelemetryHttpClient",
                             "Client error ${response.code}: ${response.message}"
                         )
-                        Result.failure(ClientException(response.code, response.message))
+                        return Result.failure(ClientException(response.code, response.message))
                     }
 
                     in 500..599 -> {
@@ -66,14 +66,16 @@ class TelemetryHttpClient(private val telemetryUrl: String, private val debugMod
                             "Server error ${response.code}: ${response.message}. Retrying..."
                         )
 
-                        while (attempt < maxRetries - 1) {
+                        if (attempt < maxRetries - 1) {
                             delay(calculateBackoffDelay(attempt))
+                            // Continue to next retry attempt
+                        } else {
+                            // Last attempt - return failure
+                            return Result.failure(ServerException(response.code, response.message))
                         }
-
-                        return Result.failure(ServerException(response.code, response.message))
                     }
 
-                    else -> Result.failure(UnknownException(response.code))
+                    else -> return Result.failure(UnknownException(response.code))
                 }
             } catch (e: Exception) {
                 Log.e(
