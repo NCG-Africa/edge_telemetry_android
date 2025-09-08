@@ -62,6 +62,9 @@ class TelemetryActivityLifecycleObserver(
         val screenName = getScreenName(activity)
         Log.d("TelemetryObserver", "Activity Paused: $screenName")
 
+        // Stop frame drop collection to prevent memory leaks
+        frameDropCollector?.stop()
+
         // End timing
         val durationMs = screenTimingTracker.endScreen(screenName)
         if (durationMs != null) {
@@ -117,9 +120,11 @@ class TelemetryActivityLifecycleObserver(
     }
 
     override fun onActivityDestroyed(activity: Activity) {
-
         val screenName = getScreenName(activity)
         Log.d("TelemetryObserver", "Activity Destroyed: ${activity.javaClass.simpleName}")
+
+        // Stop frame drop collection to prevent memory leaks
+        frameDropCollector?.stop()
 
         // End timing
         val durationMs = screenTimingTracker.endScreen(screenName)
