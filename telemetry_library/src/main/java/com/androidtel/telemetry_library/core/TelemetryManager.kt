@@ -201,6 +201,7 @@ class TelemetryManager private constructor(
         throwable: Throwable,
         defaultHandler: Thread.UncaughtExceptionHandler?
     ) {
+        val startTime = System.currentTimeMillis()
         try {
             // Build the crash attributes (stringified stacktrace etc.)
             val sw = StringWriter()
@@ -232,34 +233,10 @@ class TelemetryManager private constructor(
 
                 // Persist to disk synchronously — survives process death
                 persistBatchSync(batch)
-
-                // Best-effort synchronous send with short timeout (2 seconds). If success, delete file.
-                try {
-                    val resultWasSuccess = runBlocking(Dispatchers.IO) {
-                        // try for up to 2 seconds
-                        withTimeoutOrNull(2000) {
-                            val result = httpClient.sendBatch(batch)
-                            result.isSuccess
-                        }
-                    } == true
-
-                    if (resultWasSuccess) {
-                        // remove persisted file because it was delivered
-                        deletePersistedBatch()
-                    } else {
-                        // if we couldn't send now, schedule to offline storage after process restarts (persisted file remains)
-                        Log.w(
-                            "TelemetryManager",
-                            "Immediate crash send did not succeed — persisted for next launch."
-                        )
-                    }
-                } catch (e: Exception) {
-                    Log.w(
-                        "TelemetryManager",
-                        "Exception while attempting immediate crash send: ${e.localizedMessage}"
-                    )
-                    // leave persisted file for next launch
-                }
+                Log.i(
+                    "TelemetryManager",
+                    "Crash data persisted successfully. Will be sent on next app launch."
+                )
             } else {
                 // If buildAttributes failed for some reason, persist a minimal JSON so it can be inspected & uploaded later.
                 persistRawCrashSync(
@@ -277,6 +254,11 @@ class TelemetryManager private constructor(
                 e
             )
         } finally {
+            val executionTime = System.currentTimeMillis() - startTime
+            Log.i(
+                "TelemetryManager",
+                "Crash handler completed in ${executionTime}ms"
+            )
             // Let the original handler proceed (will terminate the process)
             defaultHandler?.uncaughtException(thread, throwable)
         }
