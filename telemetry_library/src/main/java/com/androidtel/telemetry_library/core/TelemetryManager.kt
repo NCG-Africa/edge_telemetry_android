@@ -57,7 +57,7 @@ class TelemetryManager private constructor(
     private val deviceId: String = getOrCreateDeviceId()
     private val appInfo = collectAppInfo()
     private val deviceInfo = collectDeviceInfo()
-    private var sessionId = generateDeviceId()
+    private var sessionId = generateSessionId()
     private var sessionStartTime = System.currentTimeMillis()
     private var userId: String = "" // Will be set during initialization
 
@@ -505,10 +505,19 @@ class TelemetryManager private constructor(
     // Expected format: device_1704067200000_a8b9c2d1_android
     private fun generateDeviceId(): String {
         val timestamp = System.currentTimeMillis()
-        val randomPart = generateRandomString(8) // 8 chars, alphanumeric lowercase
-        val platform = "android" // Must be lowercase
+        val randomPart = generateRandomString(8)
+        val platform = "android"
 
         return "device_${timestamp}_${randomPart}_$platform"
+    }
+
+    // Expected format: session_1704067200000_x9y8z7w6_android
+    private fun generateSessionId(): String {
+        val timestamp = System.currentTimeMillis()
+        val randomPart = generateRandomString(8)
+        val platform = "android"
+
+        return "session_${timestamp}_${randomPart}_$platform"
     }
 
     // A new method to set additional user profile information.
@@ -692,12 +701,12 @@ class TelemetryManager private constructor(
     }
 
 
-    // Generates a UUID and stores it persistently in SharedPreferences.
+    // Generates a structured device ID and stores it persistently in SharedPreferences.
     private fun getOrCreateDeviceId(): String {
         val prefs = context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE)
         var deviceId = prefs.getString("device.id", null)
         if (deviceId == null) {
-            deviceId = UUID.randomUUID().toString()
+            deviceId = generateDeviceId()
             prefs.edit().putString("device.id", deviceId).apply()
         }
         return deviceId
