@@ -8,10 +8,11 @@ plugins {
 
 android {
     namespace = "com.androidtel.telemetry_library"
-    compileSdk = 35
+    compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {
-        minSdk = 26
+        minSdk = libs.versions.minSdk.get().toInt()
+        targetSdk = libs.versions.targetSdk.get().toInt()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
     }
@@ -112,7 +113,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.NCG-Africa"
                 artifactId = "edge-telemetry-sdk"
-                version = "1.0.15"
+                version = "1.1.0"
             }
         }
     }

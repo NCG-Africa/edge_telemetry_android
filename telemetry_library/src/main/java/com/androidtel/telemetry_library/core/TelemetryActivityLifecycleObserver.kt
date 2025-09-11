@@ -5,9 +5,7 @@ import android.app.Application
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import androidx.annotation.RequiresApi
 import androidx.fragment.app.FragmentActivity
-import java.time.Instant
 
 class TelemetryActivityLifecycleObserver(
     private val telemetryManager: TelemetryManager = TelemetryManager.getInstance()
@@ -34,7 +32,6 @@ class TelemetryActivityLifecycleObserver(
         Log.d("TelemetryObserver", "Activity Started: ${activity.javaClass.simpleName}")
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     override fun onActivityResumed(activity: Activity) {
         val screenName = getScreenName(activity)
         Log.d("TelemetryObserver", "Activity Resumed: $screenName")
@@ -52,7 +49,7 @@ class TelemetryActivityLifecycleObserver(
                 "navigation.to" to screenName,
                 "navigation.method" to "resumed",
                 "navigation.type" to "activity_change",
-                "navigation.timestamp" to Instant.now().toString(),
+                "navigation.timestamp" to System.currentTimeMillis().toString(),
                 "screen.type" to "activity"
             )
         )
