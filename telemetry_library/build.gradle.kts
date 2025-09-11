@@ -87,9 +87,8 @@ dependencies {
     api("com.squareup.okhttp3:okhttp:4.12.0")
     api("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
-    // Desugaring
-//    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
-    implementation("com.android.tools:desugar_jdk_libs:2.0.4")
+    // Desugaring - removed since we no longer use Java 8 time APIs
+    // implementation("com.android.tools:desugar_jdk_libs:2.0.4")
 
     // ❌ REMOVE kotlin-stdlib from compileOnly — let apps provide it
     // compileOnly("org.jetbrains.kotlin:kotlin-stdlib")
