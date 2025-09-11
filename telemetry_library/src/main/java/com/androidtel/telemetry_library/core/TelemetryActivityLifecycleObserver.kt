@@ -12,9 +12,8 @@ class TelemetryActivityLifecycleObserver(
 ) : Application.ActivityLifecycleCallbacks {
 
     private val screenTimingTracker = ScreenTimingTracker()
-    private val frameDropCollector = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-        TelemetryFrameDropCollector(telemetryManager)
-    } else null
+    // Frame drop collector - will check capabilities at runtime
+    private val frameDropCollector = TelemetryFrameDropCollector(telemetryManager)
 
     override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
         Log.d("TelemetryObserver", "Activity Created: ${activity.javaClass.simpleName}")
@@ -39,8 +38,8 @@ class TelemetryActivityLifecycleObserver(
         // Start tracking screen duration
         screenTimingTracker.startScreen(screenName)
 
-        // Start collecting frame drops if supported
-        frameDropCollector?.start(activity)
+        // Start collecting frame drops (will check capabilities internally)
+        frameDropCollector.start(activity)
 
         // Record navigation event
         telemetryManager.recordEvent(
@@ -60,7 +59,7 @@ class TelemetryActivityLifecycleObserver(
         Log.d("TelemetryObserver", "Activity Paused: $screenName")
 
         // Stop frame drop collection to prevent memory leaks
-        frameDropCollector?.stop()
+        frameDropCollector.stop()
 
         // End timing
         val durationMs = screenTimingTracker.endScreen(screenName)
@@ -121,7 +120,7 @@ class TelemetryActivityLifecycleObserver(
         Log.d("TelemetryObserver", "Activity Destroyed: ${activity.javaClass.simpleName}")
 
         // Stop frame drop collection to prevent memory leaks
-        frameDropCollector?.stop()
+        frameDropCollector.stop()
 
         // End timing
         val durationMs = screenTimingTracker.endScreen(screenName)

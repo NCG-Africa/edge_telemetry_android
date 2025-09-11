@@ -60,6 +60,11 @@ class TelemetryManager private constructor(
     private var sessionId = generateSessionId()
     private var sessionStartTime = System.currentTimeMillis()
     private var userId: String = "" // Will be set during initialization
+    
+    // Device capabilities for runtime feature detection
+    private lateinit var deviceCapabilities: DeviceCapabilities
+    private lateinit var networkCapabilityDetector: NetworkCapabilityDetector
+    private lateinit var memoryCapabilityTracker: MemoryCapabilityTracker
 
     // Add additional user profile fields
     private var userName: String? = null
@@ -105,7 +110,8 @@ class TelemetryManager private constructor(
                     batchSize = batchSize,
                 ).also { manager ->
                     instance = manager
-                    manager.initializeUserId() // Initialize user ID first
+                    manager.initializeCapabilities() // Initialize device capabilities first
+                    manager.initializeUserId() // Initialize user ID
                     manager.register() // lifecycle + crash handling
                 }
             }
@@ -694,6 +700,93 @@ class TelemetryManager private constructor(
         return deviceId
     }
 
+    /**
+     * Initialize device capabilities for runtime feature detection
+     */
+    private fun initializeCapabilities() {
+        deviceCapabilities = DeviceCapabilities.getInstance(context)
+        networkCapabilityDetector = NetworkCapabilityDetector(context, deviceCapabilities)
+        memoryCapabilityTracker = MemoryCapabilityTracker(context, deviceCapabilities)
+        
+        Log.i("TelemetryManager", "Device capabilities initialized for API ${deviceCapabilities.apiLevel}")
+        
+        // Log comprehensive capability information
+        logCapabilityDetails()
+        
+        // Record capability telemetry event
+        recordCapabilityTelemetry()
+    }
+    
+    /**
+     * Log detailed capability information for debugging
+     */
+    private fun logCapabilityDetails() {
+        Log.i("TelemetryManager", "=== Device Capability Report ===")
+        Log.i("TelemetryManager", "API Level: ${deviceCapabilities.apiLevel} (Android ${deviceCapabilities.androidVersion})")
+        
+        Log.i("TelemetryManager", "Performance Features:")
+        Log.i("TelemetryManager", "  Frame Metrics: ${if (deviceCapabilities.canCollectFrameMetrics) "✓ Enabled" else "✗ Disabled (API < 24)"}")
+        Log.i("TelemetryManager", "  Advanced Memory: ${if (deviceCapabilities.canCollectAdvancedMemoryMetrics) "✓ Enabled" else "✗ Basic Mode"}")
+        
+        Log.i("TelemetryManager", "Network Features:")
+        Log.i("TelemetryManager", "  Modern Networking: ${if (deviceCapabilities.canUseModernNetworkAPIs) "✓ Enabled" else "✗ Legacy Mode"}")
+        Log.i("TelemetryManager", "  Network Callbacks: ${if (deviceCapabilities.supportsNetworkCallback) "✓ Enabled" else "✗ Not Available"}")
+        
+        Log.i("TelemetryManager", "System Features:")
+        Log.i("TelemetryManager", "  Runtime Permissions: ${if (deviceCapabilities.canHandleRuntimePermissions) "✓ Enabled" else "✗ Manifest Only"}")
+        Log.i("TelemetryManager", "  Scoped Storage: ${if (deviceCapabilities.canUseScopedStorage) "✓ Enabled" else "✗ Legacy Storage"}")
+        Log.i("TelemetryManager", "  Notification Channels: ${if (deviceCapabilities.supportsNotificationChannels) "✓ Enabled" else "✗ Legacy Notifications"}")
+        
+        Log.i("TelemetryManager", "Hardware Features:")
+        Log.i("TelemetryManager", "  Camera: ${if (deviceCapabilities.hasCamera) "✓" else "✗"}")
+        Log.i("TelemetryManager", "  WiFi: ${if (deviceCapabilities.hasWifi) "✓" else "✗"}")
+        Log.i("TelemetryManager", "  Cellular: ${if (deviceCapabilities.hasTelephony) "✓" else "✗"}")
+        Log.i("TelemetryManager", "  GPS: ${if (deviceCapabilities.hasGps) "✓" else "✗"}")
+        
+        // Log current network status
+        val networkType = networkCapabilityDetector.getCurrentNetworkType()
+        val isConnected = networkCapabilityDetector.isConnected()
+        Log.i("TelemetryManager", "Current Network: $networkType (Connected: $isConnected)")
+        
+        // Log memory status
+        val memoryPressure = memoryCapabilityTracker.isUnderMemoryPressure()
+        Log.i("TelemetryManager", "Memory Pressure: ${if (memoryPressure) "High" else "Normal"}")
+        
+        Log.i("TelemetryManager", "=== End Capability Report ===")
+    }
+    
+    /**
+     * Record device capabilities as telemetry event for analytics
+     */
+    private fun recordCapabilityTelemetry() {
+        try {
+            val capabilitySummary = deviceCapabilities.getCapabilitiesSummary()
+            val networkSummary = networkCapabilityDetector.getNetworkCapabilitiesSummary()
+            val memorySummary = memoryCapabilityTracker.getMemoryUsageSummary()
+            
+            recordEvent(
+                eventName = "telemetry.capabilities_initialized",
+                attributes = mapOf(
+                    "device_capabilities" to capabilitySummary,
+                    "network_capabilities" to networkSummary,
+                    "memory_status" to memorySummary,
+                    "initialization_timestamp" to System.currentTimeMillis()
+                )
+            )
+            
+            Log.d("TelemetryManager", "Capability telemetry recorded")
+        } catch (e: Exception) {
+            Log.w("TelemetryManager", "Failed to record capability telemetry: ${e.localizedMessage}")
+        }
+    }
+    
+    /**
+     * Get device capabilities (safe access after initialization)
+     */
+    fun getDeviceCapabilities(): DeviceCapabilities? {
+        return if (::deviceCapabilities.isInitialized) deviceCapabilities else null
+    }
+
     // Gathers and formats app-related information.
     private fun collectAppInfo(): AppInfo? {
         val packageManager = context.packageManager
@@ -703,7 +796,7 @@ class TelemetryManager private constructor(
             AppInfo(
                 appName = context.getString(context.applicationInfo.labelRes),
                 appVersion = it,
-                appBuildNumber = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                appBuildNumber = if (::deviceCapabilities.isInitialized && deviceCapabilities.supportsLongVersionCode) {
                     packageInfo.longVersionCode.toString()
                 } else {
                     packageInfo.versionCode.toString()
