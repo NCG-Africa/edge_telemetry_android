@@ -1,0 +1,239 @@
+# Changelog
+
+All notable changes to the Edge Telemetry Android SDK will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.1.15] - 2025-01-11
+
+### 🚀 Major Features
+
+#### Enhanced Memory Tracking with API-Level Compatibility
+- **Progressive Memory Monitoring**: Comprehensive memory tracking that adapts to device capabilities across Android API levels 21-35
+- **Tiered Memory Collection**: 
+  - **Tier 1 (API 21+)**: Basic heap memory tracking via Runtime
+  - **Tier 2 (API 23+)**: System memory info via ActivityManager  
+  - **Tier 3 (API 26+)**: Detailed memory breakdown via Debug.MemoryInfo
+  - **Tier 4 (API 28+)**: Advanced memory classification and profiling
+- **Enhanced Memory Pressure Detection**: Intelligent pressure calculation using system memory state, heap ratios, and memory class
+- **Storage Usage Tracking**: Comprehensive storage monitoring with internal/external breakdown
+- **Memory Event Standardization**: Consistent telemetry structure across all API levels with progressive enhancement
+
+#### Unified Memory Tracking Architecture
+- **MemoryTracker Interface**: Factory pattern for automatic implementation selection based on device capabilities
+- **EnhancedMemoryTracker**: Uses MemoryCapabilityTracker for detailed insights on capable devices
+- **BasicMemoryTracker**: Runtime-based fallback ensuring compatibility on all API levels
+- **Graceful Degradation**: No crashes or missing functionality regardless of Android version
+
+### 🔧 Enhanced Components
+
+#### TelemetryMemoryUsage Class Overhaul
+- **API-Aware Implementation**: Automatically leverages enhanced tracking when available
+- **Consistent Event Structure**: Same core attributes across all implementations with API-specific enhancements
+- **Enhanced Pressure Calculation**: Multi-factor analysis including heap usage ratio and system pressure
+- **Storage Integration**: Added comprehensive storage usage monitoring
+- **Error Resilience**: Robust fallback mechanisms prevent memory tracking failures
+
+#### MemoryCapabilityTracker Integration
+- **Comprehensive Memory Analysis**: Detailed memory breakdown with native heap, PSS, and system totals
+- **Storage Information**: Internal/external storage tracking with capability awareness
+- **Memory Pressure Detection**: Advanced pressure detection using system thresholds
+- **Safe API Access**: Reflection-based access to deprecated fields with proper error handling
+
+### 📊 New Telemetry Events
+
+#### Enhanced Memory Events
+```kotlin
+eventName = "memory_pressure"
+attributes = {
+    "memory.pressure_level": String,        // "low", "moderate", "high"
+    "memory.heap_used_mb": Long,           // Always present
+    "memory.heap_max_mb": Long,            // Always present  
+    "memory.system_available_mb": Long?,   // API 16+ when available
+    "memory.native_heap_kb": Int?,         // API 26+ detailed breakdown
+    "memory.total_pss_kb": Int?,           // Process memory usage
+    "memory.tracking_method": String,      // "enhanced" or "basic"
+    "memory.api_level": Int,               // Device API level
+    "memory.under_system_pressure": Boolean // System-level pressure detection
+}
+```
+
+#### Storage Usage Events
+```kotlin
+eventName = "storage_usage"
+attributes = {
+    "storage.internal_total_mb": Long,
+    "storage.internal_free_mb": Long,
+    "storage.internal_usable_mb": Long,
+    "storage.external_total_mb": Long?,    // When available
+    "storage.api_level": Int
+}
+```
+
+### 🏗️ Architecture Improvements
+
+#### Factory Pattern Implementation
+- **MemoryTrackerFactory**: Automatic selection of appropriate memory tracker implementation
+- **Runtime Capability Detection**: Uses existing DeviceCapabilities system for intelligent selection
+- **Consistent Interface**: Unified API regardless of underlying implementation complexity
+- **Performance Optimized**: Lazy initialization and efficient capability detection
+
+#### TelemetryManager Integration
+- **getMemoryCapabilityTracker()**: Safe accessor method for enhanced memory tracking
+- **Capability Awareness**: Leverages existing runtime feature detection system
+- **Memory Safety**: Proper initialization checks and null handling throughout
+
+### 🔄 Performance Enhancements
+
+#### Memory Tracking Optimizations
+- **Sampling Control**: Configurable sampling rates to minimize overhead on legacy devices
+- **Efficient Collection**: Optimized memory info gathering with minimal performance impact
+- **Lazy Initialization**: Memory trackers created only when needed
+- **Error Handling**: Comprehensive error handling prevents tracking failures
+
+#### Enhanced Pressure Detection
+- **Multi-Factor Analysis**: Considers heap usage ratio, system memory state, and memory class
+- **System Integration**: Uses ActivityManager.MemoryInfo for accurate system-level pressure detection
+- **Threshold Intelligence**: Dynamic thresholds based on device memory class and available memory
+
+### 🛡️ Reliability & Compatibility
+
+#### Graceful Degradation
+- **No Breaking Changes**: Existing memory events maintain same structure with progressive enhancement
+- **API Compatibility**: Works reliably on all Android versions from 5.0 (API 21) to latest
+- **Fallback Mechanisms**: Automatic fallback to basic tracking when enhanced features unavailable
+- **Error Resilience**: Robust error handling ensures memory tracking never fails completely
+
+#### Memory Safety
+- **Leak Prevention**: Proper cleanup and lifecycle management for all memory tracking components
+- **Thread Safety**: Synchronized access to prevent concurrent modification issues
+- **Resource Management**: Efficient resource usage with proper cleanup on component destruction
+
+### 📈 Expected Behavior by API Level
+
+#### Modern Devices (API 26+)
+- Full memory breakdown with native heap, PSS, and system totals
+- Advanced pressure detection using system thresholds  
+- Storage tracking with internal/external breakdown
+- Enhanced memory classification and profiling data
+
+#### Mid-Range Devices (API 21-25)
+- System memory info via ActivityManager
+- Enhanced pressure detection with memory class consideration
+- Basic storage tracking with capability awareness
+- Graceful handling of unavailable advanced features
+
+#### Legacy Fallback (All APIs)
+- Runtime heap memory tracking guaranteed on all devices
+- Basic pressure calculation using heap usage ratios
+- Consistent event structure with core memory metrics
+- No feature loss, only progressive enhancement
+
+### 🔧 Developer Experience
+
+#### Automatic Implementation Selection
+- **Zero Configuration**: Memory tracking automatically adapts to device capabilities
+- **Transparent Operation**: Developers don't need to handle API level differences
+- **Consistent Events**: Same event names and core structure across all implementations
+- **Clear Attribution**: Tracking method clearly indicated in telemetry events
+
+#### Enhanced Logging
+- **Capability Detection**: Clear logging of memory tracking capabilities at initialization
+- **Implementation Selection**: Logs which memory tracker implementation is selected
+- **Performance Metrics**: Detailed logging of memory usage and pressure levels
+- **Error Reporting**: Comprehensive error logging with graceful degradation messages
+
+### 📋 Technical Details
+
+#### Memory Tracking Methods
+- **Enhanced Tracking**: Uses MemoryCapabilityTracker for comprehensive analysis
+- **Basic Tracking**: Runtime-based fallback for maximum compatibility
+- **Progressive Enhancement**: Additional data collected where APIs support it
+- **Consistent Structure**: Same core event format regardless of collection method
+
+#### Storage Monitoring
+- **Internal Storage**: Total, free, and usable space tracking
+- **External Storage**: Optional external storage monitoring when available
+- **Capability Aware**: Respects device storage capabilities and permissions
+- **Error Handling**: Graceful handling of storage access issues
+
+## [1.1.0] - 2024-12-15
+
+### 🚀 Major Features
+
+#### Extended Android Compatibility
+- **Minimum SDK Lowered**: Now supports Android 5.0 (API 21) through Android 14 (API 35)
+- **Runtime Feature Detection**: Comprehensive capability detection system for graceful degradation
+- **Progressive Enhancement**: Enhanced features on newer devices, reliable basics on older devices
+
+#### Conditional Frame Drop Collection with API-Level Fallbacks
+- **Modern Implementation (API 24+)**: Native FrameMetrics API for precise frame drop detection
+- **Legacy Implementation (API 21-23)**: Choreographer-based performance tracking with estimated metrics
+- **Unified Interface**: Same telemetry events regardless of tracking method
+- **Performance Optimized**: Sampling-based collection on older devices to minimize overhead
+
+#### Device Capabilities System
+- **DeviceCapabilities**: Central runtime detection of API levels, hardware features, and permissions
+- **NetworkCapabilityDetector**: API-aware network state detection with modern and legacy fallbacks
+- **MemoryCapabilityTracker**: Capability-aware memory tracking using appropriate APIs per Android version
+
+### 🔧 Enhanced Components
+
+#### Performance Tracking Architecture
+- **PerformanceTracker Interface**: Unified performance tracking across all API levels
+- **PerformanceTrackerFactory**: Automatic selection of appropriate implementation
+- **ModernPerformanceTracker**: Wraps TelemetryFrameDropCollector for API 24+
+- **LegacyPerformanceTracker**: Choreographer-based tracking for API 21-23
+
+#### Frame Drop Collection Improvements
+- **Runtime Capability Checks**: No more compile-time API restrictions
+- **Error Handling**: Comprehensive error handling and logging
+- **Memory Leak Prevention**: Proper cleanup with WeakReferences and synchronized methods
+- **Graceful Degradation**: No crashes on unsupported API levels
+
+### 🔄 Breaking Changes Avoided
+- **No API Changes**: All existing telemetry functionality preserved
+- **Same Event Structure**: Consistent telemetry event format across implementations
+- **Backward Compatible**: Existing integrations continue to work without modification
+
+### 🛡️ Reliability Improvements
+- **Java 8 Time API Removal**: Replaced with System.currentTimeMillis() for API 21+ compatibility
+- **Annotation Cleanup**: Removed @RequiresApi annotations that blocked older Android versions
+- **Build Compatibility**: Library builds successfully with minSdk 21
+
+### 📈 Performance Enhancements
+- **Sampling Control**: 10% sampling rate on legacy devices to reduce overhead
+- **Efficient Choreographer Usage**: Proper cleanup and memory management
+- **Configurable Thresholds**: Performance classification with adjustable frame timing thresholds
+
+## [1.0.15] - 2024-11-20
+
+### 🐛 Bug Fixes
+- **HTTP Retry Logic**: Fixed infinite loop in server error (5xx) retry handling
+- **Crash Handler Performance**: Eliminated ANR-causing blocking operations during crash handling
+- **Memory Leak Prevention**: Fixed frame metrics listener accumulation in TelemetryFrameDropCollector
+- **ID Format Consistency**: Standardized device and session ID formats
+
+### 🔧 Improvements
+- **Network Resilience**: Proper exponential backoff for server error retries
+- **Performance Optimization**: Crash handler execution time reduced to <100ms
+- **Memory Management**: Proper cleanup of listeners and observers
+- **User ID Management**: Automatic user ID generation with persistent storage
+
+### 📊 Enhanced Telemetry
+- **Consistent Event Structure**: Standardized telemetry event formats
+- **Improved Error Handling**: Better error reporting and graceful degradation
+- **Session Management**: Enhanced session tracking with proper ID generation
+
+---
+
+## Version History Summary
+
+- **1.1.15**: Enhanced memory tracking with API-level compatibility and progressive enhancement
+- **1.1.0**: Extended Android compatibility (API 21+) with runtime feature detection
+- **1.0.15**: Bug fixes for HTTP retry logic, crash handler performance, and memory leaks
+
+---
+
+**For detailed technical documentation, see [README.md](README.md)**
