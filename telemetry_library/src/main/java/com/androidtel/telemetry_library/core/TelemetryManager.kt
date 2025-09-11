@@ -786,6 +786,13 @@ class TelemetryManager private constructor(
     fun getDeviceCapabilities(): DeviceCapabilities? {
         return if (::deviceCapabilities.isInitialized) deviceCapabilities else null
     }
+    
+    /**
+     * Get memory capability tracker (safe access after initialization)
+     */
+    fun getMemoryCapabilityTracker(): MemoryCapabilityTracker? {
+        return if (::memoryCapabilityTracker.isInitialized) memoryCapabilityTracker else null
+    }
 
     // Gathers and formats app-related information.
     private fun collectAppInfo(): AppInfo? {

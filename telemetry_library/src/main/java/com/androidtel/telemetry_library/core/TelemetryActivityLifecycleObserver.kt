@@ -12,8 +12,8 @@ class TelemetryActivityLifecycleObserver(
 ) : Application.ActivityLifecycleCallbacks {
 
     private val screenTimingTracker = ScreenTimingTracker()
-    // Frame drop collector - will check capabilities at runtime
-    private val frameDropCollector = TelemetryFrameDropCollector(telemetryManager)
+    // Unified performance tracker - automatically selects appropriate implementation
+    private val performanceTracker: PerformanceTracker = PerformanceTrackerFactory.createPerformanceTracker(telemetryManager)
 
     override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
         Log.d("TelemetryObserver", "Activity Created: ${activity.javaClass.simpleName}")
@@ -38,8 +38,8 @@ class TelemetryActivityLifecycleObserver(
         // Start tracking screen duration
         screenTimingTracker.startScreen(screenName)
 
-        // Start collecting frame drops (will check capabilities internally)
-        frameDropCollector.start(activity)
+        // Start performance tracking (automatically uses appropriate implementation)
+        performanceTracker.start(activity)
 
         // Record navigation event
         telemetryManager.recordEvent(
@@ -58,8 +58,8 @@ class TelemetryActivityLifecycleObserver(
         val screenName = getScreenName(activity)
         Log.d("TelemetryObserver", "Activity Paused: $screenName")
 
-        // Stop frame drop collection to prevent memory leaks
-        frameDropCollector.stop()
+        // Stop performance tracking to prevent memory leaks
+        performanceTracker.stop()
 
         // End timing
         val durationMs = screenTimingTracker.endScreen(screenName)
@@ -119,8 +119,8 @@ class TelemetryActivityLifecycleObserver(
         val screenName = getScreenName(activity)
         Log.d("TelemetryObserver", "Activity Destroyed: ${activity.javaClass.simpleName}")
 
-        // Stop frame drop collection to prevent memory leaks
-        frameDropCollector.stop()
+        // Stop performance tracking to prevent memory leaks
+        performanceTracker.stop()
 
         // End timing
         val durationMs = screenTimingTracker.endScreen(screenName)
