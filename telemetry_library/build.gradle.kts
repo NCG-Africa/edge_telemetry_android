@@ -111,8 +111,8 @@ afterEvaluate {
             create<MavenPublication>("release") {
                 from(components["release"])
                 groupId = "com.github.NCG-Africa"
-                artifactId = "edge-telemetry-sdk"
-                version = "1.1.15"
+                artifactId = "edge_telemetry_android"
+                version = "1.1.16"
             }
         }
     }
