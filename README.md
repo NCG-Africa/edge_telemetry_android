@@ -3,6 +3,9 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![API](https://img.shields.io/badge/API-21%2B-brightgreen.svg?style=flat)](https://android-arsenal.com/api?level=21)
 [![JitPack](https://jitpack.io/v/NCG-Africa/edge-telemetry-sdk.svg)](https://jitpack.io/#NCG-Africa/edge-telemetry-sdk)
+[![APK Size](https://img.shields.io/badge/APK%20Size-~200KB-orange.svg)]()
+[![Memory](https://img.shields.io/badge/Memory-<5MB-green.svg)]()
+[![Battery Impact](https://img.shields.io/badge/Battery-Negligible-brightgreen.svg)]()
 
 A comprehensive, production-ready Android SDK for collecting and transmitting telemetry data including app performance metrics, user interactions, crash reports, and system analytics. Built with modern Android development practices and optimized for performance and reliability.
 
@@ -303,10 +306,10 @@ TelemetryManager (Main SDK Interface)
 
 ## 📈 Performance Impact
 
-- **APK Size**: ~200KB additional size
-- **Memory**: <5MB runtime memory usage
+- **APK Size**: ~200KB
+- **Memory**: <5MB runtime usage
+- **Battery**: Negligible impact
 - **CPU**: Minimal background processing
-- **Battery**: Negligible battery impact
 - **Network**: Efficient batching reduces requests
 
 ## 🔧 Troubleshooting
