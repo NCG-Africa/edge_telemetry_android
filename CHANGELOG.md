@@ -5,6 +5,42 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-01-16
+
+### 💥 Breaking Changes
+
+#### Minimum SDK Requirement Updated
+- **Minimum SDK**: Raised from Android 5.0 (API 21) to Android 7.0 (API 24)
+- **Target Audience**: Now supports Android 7.0+ through Android 14+ (API 24-35)
+- **Compatibility Impact**: Drops support for Android 5.0-6.x devices (API 21-23)
+
+### 🚀 Enhanced Features
+
+#### Frame Metrics Collection Now Standard
+- **Universal Frame Metrics**: All users now have access to precise FrameMetrics API-based performance tracking
+- **Simplified Architecture**: Removed legacy Choreographer-based fallback implementation
+- **Enhanced Performance Insights**: Consistent, detailed frame drop detection across all supported devices
+- **Notification Features**: Notification importance levels now available for all users
+
+### 🔧 Technical Improvements
+
+#### Simplified Codebase
+- **Reduced Complexity**: Eliminated conditional API 21-23 compatibility code paths
+- **Performance Optimization**: Removed overhead from legacy device support
+- **Enhanced Reliability**: Standardized on modern Android APIs for better stability
+
+### 📊 Impact Summary
+
+#### Positive Changes
+- **Better Performance Data**: All users get detailed frame metrics instead of estimated values
+- **Simplified Maintenance**: Reduced conditional code complexity
+- **Enhanced User Experience**: More accurate performance insights for app optimization
+
+#### Migration Notes
+- **App Integration**: Apps using this SDK must also update their minSdk to 24 or higher
+- **Device Coverage**: Verify your user base compatibility before upgrading
+- **Feature Parity**: All existing telemetry features remain unchanged, just with enhanced capabilities
+
 ## [1.1.15] - 2025-01-11
 
 ### 🚀 Major Features
@@ -230,6 +266,7 @@ attributes = {
 
 ## Version History Summary
 
+- **1.2.0**: Raised minimum SDK requirement from 21 to 24, simplified architecture, and enhanced performance insights
 - **1.1.15**: Enhanced memory tracking with API-level compatibility and progressive enhancement
 - **1.1.0**: Extended Android compatibility (API 21+) with runtime feature detection
 - **1.0.15**: Bug fixes for HTTP retry logic, crash handler performance, and memory leaks

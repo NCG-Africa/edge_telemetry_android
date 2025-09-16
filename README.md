@@ -1,7 +1,7 @@
 # Edge Telemetry Android SDK
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![API](https://img.shields.io/badge/API-21%2B-brightgreen.svg?style=flat)](https://android-arsenal.com/api?level=21)
+[![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg?style=flat)](https://android-arsenal.com/api?level=24)
 [![JitPack](https://jitpack.io/v/NCG-Africa/edge-telemetry-sdk.svg)](https://jitpack.io/#NCG-Africa/edge-telemetry-sdk)
 [![APK Size](https://img.shields.io/badge/APK%20Size-~200KB-orange.svg)]()
 [![Memory](https://img.shields.io/badge/Memory-<5MB-green.svg)]()
@@ -12,12 +12,12 @@ A comprehensive, production-ready Android SDK for collecting and transmitting te
 ## 🚀 Features
 
 ### Core Telemetry
-- **📊 Performance Monitoring**: API-aware frame drop detection, enhanced memory tracking, and app performance metrics
+- **📊 Performance Monitoring**: Precise FrameMetrics-based frame drop detection, enhanced memory tracking, and app performance metrics
 - **🔄 Session Management**: Automatic session tracking with detailed analytics
 - **📱 Screen Analytics**: Activity and Fragment lifecycle monitoring with timing data
 - **🎯 Custom Events**: Track custom business events and user interactions
 - **💥 Crash Reporting**: Comprehensive crash detection and reporting with stack traces
-- **🧠 Memory Intelligence**: Progressive memory tracking with API-level appropriate methods (API 21-35)
+- **🧠 Memory Intelligence**: Enhanced memory tracking with detailed insights (API 24+)
 
 ### Advanced Capabilities
 - **🌐 Network Resilience**: Robust HTTP client with exponential backoff retry logic
@@ -26,7 +26,7 @@ A comprehensive, production-ready Android SDK for collecting and transmitting te
 - **🎨 Jetpack Compose Support**: Native support for Compose screen tracking
 - **🔒 Privacy-First**: Automatic user ID generation with persistent storage
 - **⚡ Memory Efficient**: Optimized memory usage with proper lifecycle management
-- **📱 Device Compatibility**: Runtime feature detection with graceful degradation (Android 5.0+)
+- **📱 Device Compatibility**: Comprehensive feature support for Android 7.0+ devices
 
 ### Technical Highlights
 - **Thread-Safe**: Concurrent data collection with proper synchronization
@@ -34,8 +34,8 @@ A comprehensive, production-ready Android SDK for collecting and transmitting te
 - **Configurable**: Flexible configuration options for different use cases
 - **Lightweight**: Minimal impact on app performance and size
 - **Modern Architecture**: Built with Kotlin coroutines and modern Android APIs
-- **API-Level Adaptive**: Automatic selection of appropriate tracking methods based on device capabilities
-- **Progressive Enhancement**: Enhanced features on newer devices, reliable basics on older devices
+- **Enhanced Performance Insights**: Consistent, detailed frame metrics for all users
+- **Simplified Codebase**: Streamlined architecture with reduced complexity
 
 ## 📦 Installation
 
@@ -58,13 +58,13 @@ Add the dependency to your app's `build.gradle`:
 
 ```kotlin
 dependencies {
-    implementation 'com.github.NCG-Africa:edge-telemetry-sdk:1.1.15'
+    implementation 'com.github.NCG-Africa:edge-telemetry-sdk:1.2.0'
 }
 ```
 
 ### Requirements
 
-- **Minimum SDK**: Android API 21 (Android 5.0)
+- **Minimum SDK**: Android API 24 (Android 7.0)
 - **Target SDK**: Android API 35
 - **Kotlin**: 1.9.0+
 - **Java**: 11+
@@ -111,6 +111,60 @@ The SDK automatically starts collecting telemetry data once initialized:
 - ✅ Memory usage
 - ✅ Crash reports
 - ✅ User sessions
+
+### 4. Network Request Monitoring
+
+Track HTTP requests automatically using the TelemetryInterceptor with OkHttp:
+
+```kotlin
+// Add to your OkHttpClient
+val client = OkHttpClient.Builder()
+    .addInterceptor(TelemetryInterceptor())
+    .build()
+
+// Or manually track network requests
+TelemetryManager.getInstance().recordNetworkRequest(
+    url = "https://api.example.com/users",
+    method = "GET",
+    statusCode = 200,
+    durationMs = 245L,
+    requestBodySize = 0L,
+    responseBodySize = 1024L
+)
+```
+
+### 5. Navigation Monitoring
+
+#### For XML-based Navigation (Activities/Fragments)
+
+Activities are automatically tracked. For manual screen tracking:
+
+```kotlin
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        // Activities are automatically tracked by the SDK
+    }
+}
+```
+
+#### For Jetpack Compose Navigation
+
+```kotlin
+@Composable
+fun MyApp() {
+    val navController = rememberNavController()
+    val telemetry = TelemetryManager.getInstance()
+    telemetry.trackComposeScreens(navController)
+    
+    NavHost(navController = navController, startDestination = "home") {
+        composable("home") { HomeScreen() }
+        composable("profile") { ProfileScreen() }
+        composable("settings") { SettingsScreen() }
+    }
+}
+```
 
 ## 📖 Usage Examples
 
@@ -200,15 +254,15 @@ The SDK collects various event types:
 
 | Type | Description | Auto-Collected | API Support |
 |------|-------------|----------------|-------------|
-| `screen_view` | Screen/Activity transitions | ✅ | API 21+ |
-| `app_lifecycle` | App foreground/background | ✅ | API 21+ |
-| `performance` | Frame drops, memory usage | ✅ | API 21+ |
-| `frame_drop` | Frame performance tracking | ✅ | API 24+ (legacy fallback 21+) |
-| `memory_pressure` | Enhanced memory monitoring | ✅ | API 21+ (progressive) |
-| `storage_usage` | Storage usage tracking | ✅ | API 21+ |
-| `crash` | Application crashes | ✅ | API 21+ |
-| `custom_event` | Custom business events | Manual | API 21+ |
-| `custom_metric` | Custom performance metrics | Manual | API 21+ |
+| `screen_view` | Screen/Activity transitions | ✅ | API 24+ |
+| `app_lifecycle` | App foreground/background | ✅ | API 24+ |
+| `performance` | Frame drops, memory usage | ✅ | API 24+ |
+| `frame_drop` | Precise frame performance tracking | ✅ | API 24+ |
+| `memory_pressure` | Enhanced memory monitoring | ✅ | API 24+ |
+| `storage_usage` | Storage usage tracking | ✅ | API 24+ |
+| `crash` | Application crashes | ✅ | API 24+ |
+| `custom_event` | Custom business events | Manual | API 24+ |
+| `custom_metric` | Custom performance metrics | Manual | API 24+ |
 
 ### Data Schema
 
@@ -269,18 +323,14 @@ TelemetryManager (Main SDK Interface)
 ├── TelemetryHttpClient (Network Layer)
 ├── OfflineBatchStorage (Persistence)
 ├── ScreenTimingTracker (Performance)
-├── PerformanceTracker (Unified Performance - API Aware)
-│   ├── ModernPerformanceTracker (API 24+)
-│   └── LegacyPerformanceTracker (API 21-23)
-├── MemoryTracker (Unified Memory - API Aware)
-│   ├── EnhancedMemoryTracker (Enhanced Capabilities)
-│   └── BasicMemoryTracker (Fallback)
+├── TelemetryFrameDropCollector (FrameMetrics-based Performance)
+├── MemoryTracker (Enhanced Memory Tracking)
 ├── DeviceCapabilities (Runtime Feature Detection)
 ├── MemoryCapabilityTracker (Advanced Memory Analysis)
 ├── NetworkCapabilityDetector (Network State Management)
 ├── TelemetryActivityLifecycleObserver (Activity Tracking)
 ├── TelemetryFragmentLifecycleObserver (Fragment Tracking)
-└── TelemetryMemoryUsage (Memory Monitoring - Enhanced)
+└── TelemetryMemoryUsage (Memory Monitoring)
 ```
 
 ### Key Features
@@ -288,9 +338,9 @@ TelemetryManager (Main SDK Interface)
 - **Thread Safety**: Concurrent access protection with synchronized methods
 - **Performance Optimized**: <100ms crash handler execution time
 - **Robust Networking**: Retry logic with exponential backoff
-- **Runtime Capability Detection**: Automatic feature detection and graceful degradation
-- **API-Level Awareness**: Progressive enhancement based on Android version
-- **Unified Tracking Interfaces**: Consistent APIs across different implementation tiers
+- **Enhanced Frame Metrics**: Precise FrameMetrics API for all users
+- **Comprehensive Memory Tracking**: Detailed memory insights and pressure detection
+- **Simplified Architecture**: Streamlined codebase with modern Android APIs
 
 ## 🧪 Testing
 

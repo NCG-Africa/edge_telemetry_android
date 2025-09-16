@@ -22,15 +22,8 @@ object PerformanceTrackerFactory {
     private const val TAG = "PerformanceTrackerFactory"
     
     fun createPerformanceTracker(telemetryManager: TelemetryManager): PerformanceTracker {
-        val capabilities = telemetryManager.getDeviceCapabilities()
-        
-        return if (capabilities?.canCollectFrameMetrics == true) {
-            Log.d(TAG, "Creating FrameMetrics-based performance tracker for API ${Build.VERSION.SDK_INT}")
-            ModernPerformanceTracker(telemetryManager)
-        } else {
-            Log.d(TAG, "Creating legacy performance tracker for API ${Build.VERSION.SDK_INT}")
-            LegacyPerformanceTrackerWrapper(telemetryManager)
-        }
+        Log.d(TAG, "Creating FrameMetrics-based performance tracker for API ${Build.VERSION.SDK_INT}")
+        return ModernPerformanceTracker(telemetryManager)
     }
 }
 

@@ -33,8 +33,8 @@ class DeviceCapabilities private constructor(private val context: Context) {
     val apiLevel: Int = Build.VERSION.SDK_INT
     val androidVersion: String = Build.VERSION.RELEASE
     
-    // Frame metrics capabilities (API 24+)
-    val supportsFrameMetrics: Boolean = apiLevel >= Build.VERSION_CODES.N
+    // Frame metrics capabilities (API 24+ - always available with minSdk 24)
+    val supportsFrameMetrics: Boolean = true
     
     // Network capabilities
     val supportsModernNetworking: Boolean = apiLevel >= Build.VERSION_CODES.M // API 23
@@ -90,7 +90,7 @@ class DeviceCapabilities private constructor(private val context: Context) {
     
     // Composite capability checks
     val canCollectFrameMetrics: Boolean
-        get() = supportsFrameMetrics
+        get() = true // Always true with minSdk 24
     
     val canUseModernNetworkAPIs: Boolean
         get() = supportsModernNetworking
@@ -138,7 +138,7 @@ class DeviceCapabilities private constructor(private val context: Context) {
      */
     fun getFallbackStrategy(feature: String): String {
         return when (feature) {
-            "frame_metrics" -> if (supportsFrameMetrics) "native" else "disabled"
+            "frame_metrics" -> "native" // Always native with minSdk 24
             "networking" -> if (supportsModernNetworking) "modern" else "legacy"
             "memory_tracking" -> if (supportsAdvancedMemoryInfo) "advanced" else "basic"
             "storage" -> if (supportsScopedStorage) "scoped" else "legacy"
@@ -153,7 +153,7 @@ class DeviceCapabilities private constructor(private val context: Context) {
     private fun logCapabilities() {
         Log.i(TAG, "Device Capabilities Initialized:")
         Log.i(TAG, "  API Level: $apiLevel (Android $androidVersion)")
-        Log.i(TAG, "  Frame Metrics: ${if (supportsFrameMetrics) "✓" else "✗"}")
+        Log.i(TAG, "  Frame Metrics: Always Available (minSdk 24+)")
         Log.i(TAG, "  Modern Networking: ${if (supportsModernNetworking) "✓" else "✗"}")
         Log.i(TAG, "  Advanced Memory: ${if (supportsAdvancedMemoryInfo) "✓" else "✗"}")
         Log.i(TAG, "  Scoped Storage: ${if (supportsScopedStorage) "✓" else "✗"}")

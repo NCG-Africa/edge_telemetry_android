@@ -22,13 +22,6 @@ class TelemetryFrameDropCollector(
     
     @Synchronized
     fun start(activity: Activity) {
-        // Check device capability first
-        val capabilities = telemetryManager.getDeviceCapabilities()
-        if (capabilities == null || !capabilities.canCollectFrameMetrics) {
-            Log.d("TelemetryFrameDropCollector", "Frame metrics not supported on API ${Build.VERSION.SDK_INT}, skipping collection")
-            return
-        }
-        
         // Prevent duplicate listeners - stop existing listener first
         if (frameMetricsListener != null) {
             stop()
