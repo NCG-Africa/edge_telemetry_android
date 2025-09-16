@@ -8,10 +8,11 @@ plugins {
 
 android {
     namespace = "com.androidtel.telemetry_library"
-    compileSdk = 35
+    compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {
-        minSdk = 26
+        minSdk = libs.versions.minSdk.get().toInt()
+        targetSdk = libs.versions.targetSdk.get().toInt()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
     }
@@ -86,9 +87,8 @@ dependencies {
     api("com.squareup.okhttp3:okhttp:4.12.0")
     api("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
-    // Desugaring
-//    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
-    implementation("com.android.tools:desugar_jdk_libs:2.0.4")
+    // Desugaring - removed since we no longer use Java 8 time APIs
+    // implementation("com.android.tools:desugar_jdk_libs:2.0.4")
 
     // ❌ REMOVE kotlin-stdlib from compileOnly — let apps provide it
     // compileOnly("org.jetbrains.kotlin:kotlin-stdlib")
@@ -111,8 +111,8 @@ afterEvaluate {
             create<MavenPublication>("release") {
                 from(components["release"])
                 groupId = "com.github.NCG-Africa"
-                artifactId = "edge-telemetry-sdk"
-                version = "1.0.15"
+                artifactId = "edge_telemetry_android"
+                version = "1.2.0"
             }
         }
     }

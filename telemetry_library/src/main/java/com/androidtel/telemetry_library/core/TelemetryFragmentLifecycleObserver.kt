@@ -5,17 +5,14 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.View
-import androidx.annotation.RequiresApi
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
-import java.time.Instant
 
 class TelemetryFragmentLifecycleObserver(private val telemetryManager: TelemetryManager = TelemetryManager.getInstance()) :
     FragmentManager.FragmentLifecycleCallbacks() {
 
     private val screenTimingTracker = ScreenTimingTracker()
 
-    @RequiresApi(Build.VERSION_CODES.O)
     override fun onFragmentResumed(fm: FragmentManager, f: Fragment) {
         super.onFragmentResumed(fm, f)
         val fragmentName = f.javaClass.simpleName
@@ -31,7 +28,7 @@ class TelemetryFragmentLifecycleObserver(private val telemetryManager: Telemetry
                 "navigation.to" to fragmentName,
                 "navigation.method" to "resumed",
                 "navigation.type" to "fragment_change",
-                "navigation.timestamp" to Instant.now().toString(),
+                "navigation.timestamp" to System.currentTimeMillis().toString(),
                 "screen.type" to "fragment"
             )
         )

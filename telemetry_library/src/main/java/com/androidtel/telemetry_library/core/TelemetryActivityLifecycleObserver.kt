@@ -5,18 +5,15 @@ import android.app.Application
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import androidx.annotation.RequiresApi
 import androidx.fragment.app.FragmentActivity
-import java.time.Instant
 
 class TelemetryActivityLifecycleObserver(
     private val telemetryManager: TelemetryManager = TelemetryManager.getInstance()
 ) : Application.ActivityLifecycleCallbacks {
 
     private val screenTimingTracker = ScreenTimingTracker()
-    private val frameDropCollector = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-        TelemetryFrameDropCollector(telemetryManager)
-    } else null
+    // Unified performance tracker - automatically selects appropriate implementation
+    private val performanceTracker: PerformanceTracker = PerformanceTrackerFactory.createPerformanceTracker(telemetryManager)
 
     override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
         Log.d("TelemetryObserver", "Activity Created: ${activity.javaClass.simpleName}")
@@ -34,7 +31,6 @@ class TelemetryActivityLifecycleObserver(
         Log.d("TelemetryObserver", "Activity Started: ${activity.javaClass.simpleName}")
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     override fun onActivityResumed(activity: Activity) {
         val screenName = getScreenName(activity)
         Log.d("TelemetryObserver", "Activity Resumed: $screenName")
@@ -42,8 +38,8 @@ class TelemetryActivityLifecycleObserver(
         // Start tracking screen duration
         screenTimingTracker.startScreen(screenName)
 
-        // Start collecting frame drops if supported
-        frameDropCollector?.start(activity)
+        // Start performance tracking (automatically uses appropriate implementation)
+        performanceTracker.start(activity)
 
         // Record navigation event
         telemetryManager.recordEvent(
@@ -52,7 +48,7 @@ class TelemetryActivityLifecycleObserver(
                 "navigation.to" to screenName,
                 "navigation.method" to "resumed",
                 "navigation.type" to "activity_change",
-                "navigation.timestamp" to Instant.now().toString(),
+                "navigation.timestamp" to System.currentTimeMillis().toString(),
                 "screen.type" to "activity"
             )
         )
@@ -62,8 +58,8 @@ class TelemetryActivityLifecycleObserver(
         val screenName = getScreenName(activity)
         Log.d("TelemetryObserver", "Activity Paused: $screenName")
 
-        // Stop frame drop collection to prevent memory leaks
-        frameDropCollector?.stop()
+        // Stop performance tracking to prevent memory leaks
+        performanceTracker.stop()
 
         // End timing
         val durationMs = screenTimingTracker.endScreen(screenName)
@@ -123,8 +119,8 @@ class TelemetryActivityLifecycleObserver(
         val screenName = getScreenName(activity)
         Log.d("TelemetryObserver", "Activity Destroyed: ${activity.javaClass.simpleName}")
 
-        // Stop frame drop collection to prevent memory leaks
-        frameDropCollector?.stop()
+        // Stop performance tracking to prevent memory leaks
+        performanceTracker.stop()
 
         // End timing
         val durationMs = screenTimingTracker.endScreen(screenName)
