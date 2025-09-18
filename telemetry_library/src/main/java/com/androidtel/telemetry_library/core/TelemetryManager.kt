@@ -25,6 +25,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -45,6 +46,7 @@ class TelemetryManager private constructor(
     private val offlineStorage: OfflineBatchStorage,
     private val screenTimingTracker: ScreenTimingTracker,
     private val batchSize: Int,
+    private val telemetryEndpoint: String,
 ) : DefaultLifecycleObserver {
 
     private val gson = Gson()
@@ -108,6 +110,7 @@ class TelemetryManager private constructor(
                     offlineStorage = OfflineBatchStorage(application.applicationContext),
                     screenTimingTracker = ScreenTimingTracker(),
                     batchSize = batchSize,
+                    telemetryEndpoint = endpoint,
                 ).also { manager ->
                     instance = manager
                     manager.initializeCapabilities() // Initialize device capabilities first
@@ -128,6 +131,18 @@ class TelemetryManager private constructor(
         fun instance(): TelemetryManager {
             return instance
                 ?: throw IllegalStateException("TelemetryManager not initialized. Call init(application) first.")
+        }
+        
+        /**
+         * Creates a TelemetryInterceptor configured to avoid tracking SDK's own requests
+         * Use this method to get a properly configured interceptor for your OkHttpClient
+         */
+        fun createNetworkInterceptor(): TelemetryInterceptor {
+            val manager = getInstance()
+            return TelemetryInterceptor(
+                telemetryManager = manager,
+                telemetryEndpoint = manager.telemetryEndpoint
+            )
         }
     }
 

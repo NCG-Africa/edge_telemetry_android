@@ -117,9 +117,9 @@ The SDK automatically starts collecting telemetry data once initialized:
 Track HTTP requests automatically using the TelemetryInterceptor with OkHttp:
 
 ```kotlin
-// Add to your OkHttpClient
+// Add to your OkHttpClient - Use the factory method to avoid tracking SDK's own requests
 val client = OkHttpClient.Builder()
-    .addInterceptor(TelemetryInterceptor())
+    .addInterceptor(TelemetryManager.createNetworkInterceptor())
     .build()
 
 // Or manually track network requests
