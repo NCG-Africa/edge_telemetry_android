@@ -1,5 +1,6 @@
 package com.androidtel.telemetry_library.core
 
+import com.androidtel.telemetry_library.core.TelemetryManager
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
@@ -11,36 +12,81 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 @Composable
 fun TrackComposeScreen(
     navController: NavController,
+    screenName: String? = null,
+    additionalData: Map<String, String>? = null,
     telemetryManager: TelemetryManager = TelemetryManager.getInstance()
 ) {
-    // This effect runs whenever the current back stack entry changes.
-    // It is a simple way to track navigation events.
     val backStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = backStackEntry?.destination?.route
-
-    DisposableEffect(currentRoute) {
-        if (currentRoute != null) {
-            telemetryManager.recordComposeScreenView(currentRoute)
-        }
-        onDispose {
-            // Note: The screen end event is handled by the Lifecycle observer below.
-        }
-    }
-
-    // We can also use a lifecycle observer for more accurate session-based tracking.
-    // This tracks when the composable leaves the screen's active lifecycle.
     val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = object : LifecycleEventObserver {
-            override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
-                if (event == Lifecycle.Event.ON_STOP && currentRoute != null) {
-                    telemetryManager.recordComposeScreenEnd(currentRoute)
+    
+    DisposableEffect(backStackEntry) {
+        val route = backStackEntry?.destination?.route ?: "unknown"
+        val finalScreenName = screenName ?: route
+        val startTime = System.currentTimeMillis()
+        
+        // Track screen entry
+        val entryData = mutableMapOf<String, String>(
+            "route" to route,
+            "method" to "navigation",
+            "type" to "screen_entry"
+        )
+        additionalData?.let { entryData.putAll(it) }
+        
+        // Add navigation breadcrumb
+        telemetryManager.addBreadcrumb(
+            message = "Navigated to $finalScreenName",
+            category = "navigation",
+            level = "info",
+            data = entryData
+        )
+        
+        // Track navigation event
+        telemetryManager.trackEvent("navigation.route_change", entryData)
+        
+        // Set up lifecycle observer for screen duration tracking
+        val lifecycleObserver = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    telemetryManager.trackEvent("navigation.screen_resume", mapOf(
+                        "screen" to finalScreenName,
+                        "route" to route
+                    ))
                 }
+                Lifecycle.Event.ON_PAUSE -> {
+                    telemetryManager.trackEvent("navigation.screen_pause", mapOf(
+                        "screen" to finalScreenName,
+                        "route" to route
+                    ))
+                }
+                else -> { /* No action needed */ }
             }
         }
-        lifecycleOwner.lifecycle.addObserver(observer)
+        
+        lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
+        
         onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
+            val duration = System.currentTimeMillis() - startTime
+            
+            // Track screen exit and duration
+            val exitData = mapOf(
+                "screen" to finalScreenName,
+                "route" to route,
+                "exit_method" to "navigation",
+                "duration_ms" to duration.toString()
+            )
+            
+            // Add exit breadcrumb
+            telemetryManager.addBreadcrumb(
+                message = "Exited $finalScreenName",
+                category = "navigation",
+                level = "info",
+                data = exitData
+            )
+            
+            // Track screen duration metric
+            telemetryManager.trackEvent("performance.screen_duration", exitData)
+            
+            lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
         }
     }
 }

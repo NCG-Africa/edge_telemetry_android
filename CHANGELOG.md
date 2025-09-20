@@ -5,6 +5,23 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2025-01-20
+
+### 🔧 Improved
+- **Unified API**: Merged all Flutter-compatible functionality into single TelemetryManager
+- **Single Initialization**: Eliminated dual initialization confusion - only `TelemetryManager.initialize()` needed
+- **Enhanced Backward Compatibility**: All existing code works unchanged with new features available
+- **Simplified Configuration**: Streamlined initialization parameters with sensible defaults
+- **Better Documentation**: Updated README and usage examples for unified API
+
+### 🧹 Removed
+- **EdgeTelemetry Class**: Functionality merged into TelemetryManager to eliminate API duplication
+
+### 📚 Updated
+- **Documentation**: Complete rewrite of README with unified API examples
+- **Usage Examples**: Updated all examples to use single TelemetryManager API
+- **Integration Guide**: Added comprehensive integration summary
+
 ## [1.2.0] - 2025-01-16
 
 ### 💥 Breaking Changes

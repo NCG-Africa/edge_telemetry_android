@@ -86,6 +86,13 @@ dependencies {
     api("com.google.code.gson:gson:2.10.1")
     api("com.squareup.okhttp3:okhttp:4.12.0")
     api("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    
+    // WorkManager for retry scheduling
+    api(libs.androidx.work.runtime)
+    
+    // Room for offline storage
+    api(libs.androidx.room.runtime)
+    api(libs.androidx.room.ktx)
 
     // Desugaring - removed since we no longer use Java 8 time APIs
     // implementation("com.android.tools:desugar_jdk_libs:2.0.4")
@@ -112,7 +119,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.NCG-Africa"
                 artifactId = "edge_telemetry_android"
-                version = "1.2.0"
+                version = "1.2.1"
             }
         }
     }

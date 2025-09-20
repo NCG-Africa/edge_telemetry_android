@@ -13,6 +13,11 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.navigation.NavController
+import com.androidtel.telemetry_library.core.breadcrumbs.BreadcrumbManager
+import com.androidtel.telemetry_library.core.crash.CrashReporter
+import com.androidtel.telemetry_library.core.device.DeviceInfoCollector
+import com.androidtel.telemetry_library.core.events.JsonEventTracker
+import com.androidtel.telemetry_library.core.ids.IdGenerator
 import com.androidtel.telemetry_library.core.models.AppInfo
 import com.androidtel.telemetry_library.core.models.DeviceInfo
 import com.androidtel.telemetry_library.core.models.EventAttributes
@@ -20,6 +25,8 @@ import com.androidtel.telemetry_library.core.models.SessionInfo
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.androidtel.telemetry_library.core.models.TelemetryEvent
 import com.androidtel.telemetry_library.core.models.UserInfo
+import com.androidtel.telemetry_library.core.session.SessionManager
+import com.androidtel.telemetry_library.core.user.UserProfileManager
 import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -48,6 +55,9 @@ class TelemetryManager private constructor(
     private val batchSize: Int,
     private val telemetryEndpoint: String,
 ) : DefaultLifecycleObserver {
+    
+    // Public getter for context
+    val applicationContext: Context get() = context
 
     private val gson = Gson()
     private val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
@@ -68,7 +78,22 @@ class TelemetryManager private constructor(
     private lateinit var networkCapabilityDetector: NetworkCapabilityDetector
     private lateinit var memoryCapabilityTracker: MemoryCapabilityTracker
 
-    // Add additional user profile fields
+    // Flutter-compatible components (initialized based on configuration)
+    private var flutterIdGenerator: IdGenerator? = null
+    private var breadcrumbManager: BreadcrumbManager? = null
+    private var userProfileManager: UserProfileManager? = null
+    private var enhancedSessionManager: SessionManager? = null
+    private var crashReporter: CrashReporter? = null
+    private var deviceInfoCollector: DeviceInfoCollector? = null
+    private var jsonEventTracker: JsonEventTracker? = null
+
+    // Configuration flags
+    private var crashReportingEnabled = false
+    private var userProfilesEnabled = false
+    private var sessionTrackingEnabled = false
+    private var globalAttributes = mutableMapOf<String, String>()
+
+    // Legacy user profile fields (for backward compatibility)
     private var userName: String? = null
     private var userEmail: String? = null
     private var userPhone: String? = null
@@ -95,10 +120,13 @@ class TelemetryManager private constructor(
          */
         fun initialize(
             application: Application,
-            batchSize: Int = 5,
+            batchSize: Int = 30,
             endpoint: String = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
             debugMode: Boolean = false,
-
+            enableCrashReporting: Boolean = true,
+            enableUserProfiles: Boolean = true,
+            enableSessionTracking: Boolean = true,
+            globalAttributes: Map<String, String> = emptyMap()
         ): TelemetryManager {
             return instance ?: synchronized(this) {
                 instance ?: TelemetryManager(
@@ -115,6 +143,12 @@ class TelemetryManager private constructor(
                     instance = manager
                     manager.initializeCapabilities() // Initialize device capabilities first
                     manager.initializeUserId() // Initialize user ID
+                    manager.initializeFlutterComponents(
+                        enableCrashReporting,
+                        enableUserProfiles,
+                        enableSessionTracking,
+                        globalAttributes
+                    ) // Initialize Flutter-compatible components
                     manager.register() // lifecycle + crash handling
                 }
             }
@@ -173,6 +207,76 @@ class TelemetryManager private constructor(
             userId = generateUserId()
             Log.w("TelemetryManager", "Using fallback user ID (not persisted): $userId")
         }
+    }
+
+    /**
+     * Initialize Flutter-compatible components based on configuration
+     */
+    private fun initializeFlutterComponents(
+        enableCrashReporting: Boolean,
+        enableUserProfiles: Boolean,
+        enableSessionTracking: Boolean,
+        globalAttributes: Map<String, String>
+    ) {
+        try {
+            // Set configuration flags
+            this.crashReportingEnabled = enableCrashReporting
+            this.userProfilesEnabled = enableUserProfiles
+            this.sessionTrackingEnabled = enableSessionTracking
+            this.globalAttributes.putAll(globalAttributes)
+
+            // Initialize ID generator (always enabled for Flutter compatibility)
+            flutterIdGenerator = IdGenerator().apply { initialize(context) }
+
+            // Initialize device info collector (always enabled)
+            deviceInfoCollector = DeviceInfoCollector(context, flutterIdGenerator!!)
+
+            // Initialize breadcrumb manager (always enabled for crash reporting)
+            breadcrumbManager = BreadcrumbManager()
+
+            // Initialize user profile manager if enabled
+            if (enableUserProfiles) {
+                userProfileManager = UserProfileManager(context)
+            }
+
+            // Initialize enhanced session manager if enabled
+            if (enableSessionTracking) {
+                enhancedSessionManager = SessionManager(flutterIdGenerator!!)
+            }
+
+            // Initialize crash reporter if enabled
+            if (enableCrashReporting) {
+                crashReporter = CrashReporter(
+                    context = context,
+                    telemetryManager = this,
+                    breadcrumbManager = breadcrumbManager!!,
+                    idGenerator = flutterIdGenerator!!,
+                    enabled = true
+                )
+            }
+
+            // Initialize JSON event tracker (always enabled)
+            jsonEventTracker = JsonEventTracker(
+                telemetryManager = this,
+                sessionManager = enhancedSessionManager ?: createDummySessionManager(),
+                userProfileManager = userProfileManager ?: createDummyUserProfileManager(),
+                breadcrumbManager = breadcrumbManager!!,
+                idGenerator = flutterIdGenerator!!,
+                batchSize = batchSize
+            )
+
+            Log.i("TelemetryManager", "Flutter components initialized - Crash: $enableCrashReporting, Users: $enableUserProfiles, Sessions: $enableSessionTracking")
+        } catch (e: Exception) {
+            Log.e("TelemetryManager", "Failed to initialize Flutter components", e)
+        }
+    }
+
+    private fun createDummySessionManager(): SessionManager {
+        return SessionManager(flutterIdGenerator!!)
+    }
+
+    private fun createDummyUserProfileManager(): UserProfileManager {
+        return UserProfileManager(context)
     }
 
     private fun register() {
@@ -900,8 +1004,158 @@ class TelemetryManager private constructor(
         }
     }
 
+    // ================================
+    // Flutter-Compatible Public API
+    // ================================
 
+    /**
+     * Set user profile information (Flutter-compatible)
+     */
+    fun setUserProfile(
+        name: String? = null,
+        email: String? = null,
+        phone: String? = null,
+        customAttributes: Map<String, String>? = null
+    ) {
+        if (userProfilesEnabled && userProfileManager != null) {
+            userProfileManager!!.setUserProfile(name, email, phone, customAttributes)
+        } else {
+            Log.w("TelemetryManager", "User profiles not enabled. Call initialize() with enableUserProfiles = true")
+        }
+    }
 
+    /**
+     * Clear user profile (Flutter-compatible)
+     */
+    fun clearUserProfile() {
+        if (userProfilesEnabled && userProfileManager != null) {
+            userProfileManager!!.clearUserProfile()
+        } else {
+            Log.w("TelemetryManager", "User profiles not enabled")
+        }
+    }
+
+    /**
+     * Add breadcrumb (Flutter-compatible)
+     */
+    fun addBreadcrumb(
+        message: String,
+        category: String = "custom",
+        level: String = "info",
+        data: Map<String, String>? = null
+    ) {
+        breadcrumbManager?.addBreadcrumb(message, category, level, data)
+            ?: Log.w("TelemetryManager", "Breadcrumb manager not initialized")
+    }
+
+    /**
+     * Track error manually (Flutter-compatible)
+     */
+    fun trackError(error: Throwable, attributes: Map<String, String>? = null) {
+        if (crashReportingEnabled && crashReporter != null) {
+            crashReporter!!.trackError(error, attributes)
+        } else {
+            Log.w("TelemetryManager", "Crash reporting not enabled. Call initialize() with enableCrashReporting = true")
+        }
+    }
+
+    /**
+     * Track error with message (Flutter-compatible)
+     */
+    fun trackError(message: String, stackTrace: String? = null, attributes: Map<String, String>? = null) {
+        if (crashReportingEnabled && crashReporter != null) {
+            crashReporter!!.trackError(message, stackTrace, attributes)
+        } else {
+            Log.w("TelemetryManager", "Crash reporting not enabled")
+        }
+    }
+
+    /**
+     * Start new session (Flutter-compatible)
+     */
+    fun startNewSession() {
+        if (sessionTrackingEnabled && enhancedSessionManager != null) {
+            enhancedSessionManager!!.startNewSession()
+        } else {
+            // Fallback to legacy session management
+            sessionId = generateSessionId()
+            sessionStartTime = System.currentTimeMillis()
+            eventCount = 0
+            metricCount = 0
+            visitedScreens.clear()
+            totalSessions++
+        }
+    }
+
+    /**
+     * End current session (Flutter-compatible)
+     */
+    fun endCurrentSession() {
+        if (sessionTrackingEnabled && enhancedSessionManager != null) {
+            enhancedSessionManager!!.endCurrentSession()
+        }
+    }
+
+    /**
+     * Get device ID (Flutter-compatible format)
+     */
+    fun getDeviceId(): String {
+        return flutterIdGenerator?.getDeviceId() ?: deviceId
+    }
+
+    /**
+     * Get user ID (Flutter-compatible)
+     */
+    fun getUserId(): String? {
+        return if (userProfilesEnabled && userProfileManager != null) {
+            userProfileManager!!.getUserId()
+        } else {
+            userId.takeIf { it.isNotEmpty() }
+        }
+    }
+
+    /**
+     * Get session ID (Flutter-compatible)
+     */
+    fun getSessionId(): String {
+        return if (sessionTrackingEnabled && enhancedSessionManager != null) {
+            enhancedSessionManager!!.getCurrentSessionId()
+        } else {
+            sessionId
+        }
+    }
+
+    /**
+     * Test crash reporting (Flutter-compatible)
+     */
+    fun testCrashReporting(customMessage: String? = null) {
+        if (crashReportingEnabled && crashReporter != null) {
+            crashReporter!!.testCrashReporting(customMessage)
+        } else {
+            Log.w("TelemetryManager", "Crash reporting not enabled. Cannot test.")
+        }
+    }
+
+    /**
+     * Test connectivity (Flutter-compatible)
+     */
+    fun testConnectivity() {
+        jsonEventTracker?.testConnectivity()
+            ?: Log.w("TelemetryManager", "Event tracker not initialized")
+    }
+
+    /**
+     * Get enhanced session manager (for internal use)
+     */
+    internal fun getEnhancedSessionManager(): SessionManager? = enhancedSessionManager
+
+    /**
+     * Get breadcrumb manager (for internal use)
+     */
+    internal fun getBreadcrumbManager(): BreadcrumbManager? = breadcrumbManager
+
+    /**
+     * Get crash reporter (for internal use)
+     */
+    internal fun getCrashReporter(): CrashReporter? = crashReporter
 }
-
-
