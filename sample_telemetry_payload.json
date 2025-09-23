@@ -1,0 +1,182 @@
+{
+  "timestamp": "2025-09-22T13:42:10.123Z",
+  "data": {
+    "type": "batch",
+    "events": [
+      {
+        "type": "event",
+        "eventName": "navigation.route_change",
+        "timestamp": "2025-09-22T13:42:05.100Z",
+        "attributes": {
+          "route": "home_screen",
+          "method": "navigation",
+          "type": "screen_entry",
+          "timestamp": "2025-09-22T13:42:05.100Z",
+          "session.id": "session_1727012525_abc123",
+          "session.start_time": "2025-09-22T13:35:25.000Z",
+          "session.event_count": "15",
+          "session.metric_count": "8",
+          "session.screen_count": "3",
+          "user.id": "user_1727012247_def456",
+          "user.profile_version": "1.2",
+          "user.first_seen": "2025-09-20T10:30:00.000Z",
+          "user.last_seen": "2025-09-22T13:35:25.000Z",
+          "device.id": "device_1727012247_ghi789_android",
+          "device.platform": "android",
+          "device.model": "Pixel 7",
+          "device.manufacturer": "Google",
+          "device.os_version": "14",
+          "device.api_level": "34",
+          "device.brand": "google",
+          "device.hardware": "cloudripper",
+          "device.product": "cheetah",
+          "device.fingerprint": "google/cheetah/cheetah:14/UQ1A.240205.004/11269751:user/release-keys",
+          "app.name": "Edge Telemetry Demo",
+          "app.version": "1.2.0",
+          "app.build_number": "123",
+          "app.package_name": "com.androidtel.demo",
+          "network.type": "wifi"
+        }
+      },
+      {
+        "type": "event",
+        "eventName": "user.interaction",
+        "timestamp": "2025-09-22T13:42:06.250Z",
+        "attributes": {
+          "action": "button_click",
+          "target": "login_button",
+          "screen": "home_screen",
+          "timestamp": "2025-09-22T13:42:06.250Z",
+          "session.id": "session_1727012525_abc123",
+          "session.start_time": "2025-09-22T13:35:25.000Z",
+          "session.event_count": "16",
+          "session.metric_count": "8",
+          "session.screen_count": "3",
+          "user.id": "user_1727012247_def456",
+          "user.profile_version": "1.2",
+          "device.id": "device_1727012247_ghi789_android",
+          "device.platform": "android",
+          "device.model": "Pixel 7",
+          "device.manufacturer": "Google",
+          "device.os_version": "14",
+          "device.api_level": "34",
+          "app.name": "Edge Telemetry Demo",
+          "app.version": "1.2.0",
+          "app.build_number": "123",
+          "app.package_name": "com.androidtel.demo",
+          "network.type": "wifi"
+        }
+      },
+      {
+        "type": "metric",
+        "metricName": "performance.screen_duration",
+        "value": 5420.0,
+        "timestamp": "2025-09-22T13:42:10.520Z",
+        "attributes": {
+          "screen": "home_screen",
+          "route": "home_screen",
+          "exit_method": "navigation",
+          "duration_ms": "5420",
+          "timestamp": "2025-09-22T13:42:10.520Z",
+          "session.id": "session_1727012525_abc123",
+          "session.start_time": "2025-09-22T13:35:25.000Z",
+          "session.event_count": "16",
+          "session.metric_count": "9",
+          "session.screen_count": "3",
+          "user.id": "user_1727012247_def456",
+          "user.profile_version": "1.2",
+          "device.id": "device_1727012247_ghi789_android",
+          "device.platform": "android",
+          "device.model": "Pixel 7",
+          "device.manufacturer": "Google",
+          "device.os_version": "14",
+          "device.api_level": "34",
+          "app.name": "Edge Telemetry Demo",
+          "app.version": "1.2.0",
+          "app.build_number": "123",
+          "app.package_name": "com.androidtel.demo",
+          "network.type": "wifi"
+        }
+      },
+      {
+        "type": "metric",
+        "metricName": "performance.memory_usage",
+        "value": 156.8,
+        "timestamp": "2025-09-22T13:42:07.800Z",
+        "attributes": {
+          "memory.type": "heap",
+          "memory.unit": "mb",
+          "memory.available": "512",
+          "memory.max": "1024",
+          "session.id": "session_1727012525_abc123",
+          "user.id": "user_1727012247_def456",
+          "device.id": "device_1727012247_ghi789_android",
+          "device.platform": "android",
+          "device.model": "Pixel 7",
+          "app.name": "Edge Telemetry Demo",
+          "app.version": "1.2.0",
+          "network.type": "wifi"
+        }
+      },
+      {
+        "type": "metric",
+        "metricName": "performance.frame_rate",
+        "value": 58.5,
+        "timestamp": "2025-09-22T13:42:08.900Z",
+        "attributes": {
+          "frame.unit": "fps",
+          "frame.dropped": "2",
+          "frame.total": "120",
+          "screen": "home_screen",
+          "session.id": "session_1727012525_abc123",
+          "user.id": "user_1727012247_def456",
+          "device.id": "device_1727012247_ghi789_android",
+          "device.platform": "android",
+          "device.model": "Pixel 7",
+          "app.name": "Edge Telemetry Demo",
+          "app.version": "1.2.0",
+          "network.type": "wifi"
+        }
+      },
+      {
+        "type": "event",
+        "eventName": "network.request",
+        "timestamp": "2025-09-22T13:42:09.100Z",
+        "attributes": {
+          "network.url": "https://api.example.com/users",
+          "network.method": "GET",
+          "network.status_code": "200",
+          "network.duration_ms": "245",
+          "network.request_size": "0",
+          "network.response_size": "1024",
+          "session.id": "session_1727012525_abc123",
+          "user.id": "user_1727012247_def456",
+          "device.id": "device_1727012247_ghi789_android",
+          "device.platform": "android",
+          "app.name": "Edge Telemetry Demo",
+          "app.version": "1.2.0",
+          "network.type": "wifi"
+        }
+      },
+      {
+        "type": "event",
+        "eventName": "custom.feature_usage",
+        "timestamp": "2025-09-22T13:42:09.500Z",
+        "attributes": {
+          "feature.name": "dark_mode",
+          "feature.enabled": "true",
+          "feature.source": "settings",
+          "session.id": "session_1727012525_abc123",
+          "user.id": "user_1727012247_def456",
+          "device.id": "device_1727012247_ghi789_android",
+          "device.platform": "android",
+          "app.name": "Edge Telemetry Demo",
+          "app.version": "1.2.0",
+          "network.type": "wifi"
+        }
+      }
+    ],
+    "batch_size": 7,
+    "timestamp": "2025-09-22T13:42:10.123Z"
+  }
+}

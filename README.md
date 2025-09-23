@@ -58,7 +58,7 @@ Add the dependency to your app's `build.gradle`:
 
 ```kotlin
 dependencies {
-    implementation 'com.github.NCG-Africa:edge-telemetry-sdk:1.2.0'
+    implementation 'com.github.NCG-Africa:edge_telemetry_sdk:1.2.1'
 }
 ```
 
@@ -82,7 +82,7 @@ class MyApplication : Application() {
         
         // Initialize telemetry SDK
         TelemetryManager.initialize(
-            context = this,
+            application = this,
             endpoint = "https://your-telemetry-endpoint.com/api/telemetry",
             batchSize = 10
         )
