@@ -2,6 +2,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg?style=flat)](https://android-arsenal.com/api?level=24)
+[![Gradle](https://img.shields.io/badge/Gradle-8.4%2B-02303A.svg?style=flat&logo=gradle)](https://gradle.org)
 [![JitPack](https://jitpack.io/v/NCG-Africa/edge-telemetry-sdk.svg)](https://jitpack.io/#NCG-Africa/edge-telemetry-sdk)
 [![APK Size](https://img.shields.io/badge/APK%20Size-~200KB-orange.svg)]()
 [![Memory](https://img.shields.io/badge/Memory-<5MB-green.svg)]()
@@ -36,6 +37,24 @@ A comprehensive, production-ready Android SDK for collecting and transmitting te
 - **Modern Architecture**: Built with Kotlin coroutines and modern Android APIs
 - **Enhanced Performance Insights**: Consistent, detailed frame metrics for all users
 - **Simplified Codebase**: Streamlined architecture with reduced complexity
+
+## 📋 Requirements
+
+### Build Requirements
+- **Gradle**: `8.4+` (recommended: `8.9+`)
+- **Android Gradle Plugin (AGP)**: `8.0+`
+- **Kotlin**: `1.9.0+`
+
+### Runtime Requirements
+- **Minimum SDK**: `24` (Android 7.0+)
+- **Compile SDK**: `35` (Android 15)
+- **Target SDK**: `34` (Android 14)
+
+### Dependencies
+- **AndroidX Core**: `1.16.0+`
+- **Jetpack Compose**: `2024.04.01+` (if using Compose features)
+- **WorkManager**: `2.9.0+` (for offline storage)
+- **Room**: `2.6.1+` (for local persistence)
 
 ## 📦 Installation
 
