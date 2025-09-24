@@ -12,7 +12,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.io.IOException
-import java.time.Duration
+// Using milliseconds instead of Duration for Java 8 compatibility
 import java.util.concurrent.TimeUnit
 
 /**
@@ -34,7 +34,7 @@ class CrashRetryManager(private val context: Context) {
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
     
-    private val baseRetryDelay = Duration.ofMinutes(1)
+    private val baseRetryDelayMs = 60_000L // 1 minute in milliseconds
     private val offlineStorageFile = File(context.cacheDir, OFFLINE_STORAGE_FILE)
     
     /**
@@ -56,9 +56,9 @@ class CrashRetryManager(private val context: Context) {
                 Log.w(TAG, "❌ Crash send attempt $attempt failed: ${e.message}")
                 
                 if (attempt < MAX_RETRIES) {
-                    val delay = calculateRetryDelay(attempt)
-                    Log.d(TAG, "⏳ Retrying in ${delay.toMillis()}ms...")
-                    delay(delay.toMillis())
+                    val delay = calculateRetryDelayMs(attempt)
+                    Log.d(TAG, "⏳ Retrying in ${delay}ms...")
+                    delay(delay)
                 }
             }
         }
@@ -116,7 +116,8 @@ class CrashRetryManager(private val context: Context) {
         return try {
             if (offlineStorageFile.exists()) {
                 val json = offlineStorageFile.readText()
-                gson.fromJson(json, Array<Map<String, Any>>::class.java).toList()
+                @Suppress("UNCHECKED_CAST")
+                (gson.fromJson(json, Array::class.java) as Array<Map<String, Any>>).toList()
             } else {
                 emptyList()
             }
@@ -136,7 +137,7 @@ class CrashRetryManager(private val context: Context) {
         
         val retryWork = OneTimeWorkRequestBuilder<CrashRetryWorker>()
             .setConstraints(constraints)
-            .setInitialDelay(baseRetryDelay.toMinutes(), TimeUnit.MINUTES)
+            .setInitialDelay(baseRetryDelayMs / 60_000L, TimeUnit.MINUTES)
             .addTag(WORK_TAG)
             .build()
         
@@ -147,15 +148,15 @@ class CrashRetryManager(private val context: Context) {
                 retryWork
             )
         
-        Log.d(TAG, "📅 Retry scheduled for ${baseRetryDelay.toMinutes()} minutes")
+        Log.d(TAG, "📅 Retry scheduled for ${baseRetryDelayMs / 60_000L} minutes")
     }
     
     /**
      * Calculate exponential backoff delay
      */
-    private fun calculateRetryDelay(attempt: Int): Duration {
+    private fun calculateRetryDelayMs(attempt: Int): Long {
         val multiplier = Math.pow(2.0, (attempt - 1).toDouble()).toLong()
-        return Duration.ofMillis(baseRetryDelay.toMillis() * multiplier)
+        return baseRetryDelayMs * multiplier
     }
     
     /**

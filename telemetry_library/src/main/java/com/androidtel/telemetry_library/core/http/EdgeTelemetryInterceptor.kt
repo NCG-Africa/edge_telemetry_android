@@ -6,7 +6,7 @@ import com.androidtel.telemetry_library.core.events.JsonEventTracker
 import okhttp3.Interceptor
 import okhttp3.Response
 import java.io.IOException
-import java.time.Instant
+import com.androidtel.telemetry_library.utils.DateTimeUtils
 
 /**
  * Enhanced HTTP Interceptor for EdgeTelemetry that tracks HTTP requests
@@ -38,7 +38,7 @@ class EdgeTelemetryInterceptor(
             mapOf(
                 "url" to url,
                 "method" to request.method,
-                "timestamp" to Instant.now().toString()
+                "timestamp" to DateTimeUtils.nowAsIso8601()
             )
         )
         
@@ -75,7 +75,7 @@ class EdgeTelemetryInterceptor(
                 mapOf(
                     "url" to url,
                     "method" to request.method,
-                    "error" to e.message ?: "Unknown error",
+                    "error" to (e.message ?: "Unknown error"),
                     "duration_ms" to duration.toString()
                 )
             )

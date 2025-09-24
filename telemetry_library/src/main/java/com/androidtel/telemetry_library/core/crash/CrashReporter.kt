@@ -14,7 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.PrintWriter
 import java.io.StringWriter
-import java.time.Instant
+import com.androidtel.telemetry_library.utils.DateTimeUtils
 
 /**
  * Crash Reporter that handles automatic crash detection and manual error tracking

@@ -1,7 +1,7 @@
 package com.androidtel.telemetry_library.core.payload
 
 import com.google.gson.Gson
-import java.time.Instant
+import com.androidtel.telemetry_library.utils.DateTimeUtils
 
 /**
  * Payload structures that match the Flutter SDK exactly for backend compatibility
@@ -75,7 +75,7 @@ object FlutterPayloadFactory {
         fingerprint: String,
         attributes: Map<String, String>
     ): CrashPayload {
-        val timestamp = Instant.now().toString()
+        val timestamp = DateTimeUtils.nowAsIso8601()
         
         return CrashPayload(
             timestamp = timestamp,
@@ -95,7 +95,7 @@ object FlutterPayloadFactory {
     fun createEventBatchPayload(
         events: List<EventData>
     ): EventBatchPayload {
-        val timestamp = Instant.now().toString()
+        val timestamp = DateTimeUtils.nowAsIso8601()
         
         return EventBatchPayload(
             timestamp = timestamp,
@@ -122,7 +122,7 @@ object FlutterPayloadFactory {
             eventName = eventName,
             metricName = metricName,
             value = value,
-            timestamp = Instant.now().toString(),
+            timestamp = DateTimeUtils.nowAsIso8601(),
             attributes = attributes
         )
     }
@@ -170,7 +170,7 @@ object FlutterPayloadFactory {
         // Add crash-specific fields
         crashAttributes["crash.fingerprint"] = fingerprint
         crashAttributes["crash.breadcrumb_count"] = breadcrumbCount.toString()
-        crashAttributes["error.timestamp"] = Instant.now().toString()
+        crashAttributes["error.timestamp"] = DateTimeUtils.nowAsIso8601()
         crashAttributes["error.has_stack_trace"] = "true"
         crashAttributes["breadcrumbs"] = breadcrumbs
         

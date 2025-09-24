@@ -2,7 +2,7 @@
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose") // ⬅️ required in Kotlin 2.0+
+    // Compose compiler plugin not needed for Kotlin 1.8.x
     id("maven-publish")
 }
 
@@ -28,19 +28,19 @@ android {
     }
 
     compileOptions {
-        // Java 11 is the safest for compatibility
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-//        isCoreLibraryDesugaringEnabled = true
+        // Java 8 compatibility with desugaring
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+        isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "1.8"
     }
 
-    buildFeatures {
-        // ✅ leave compose enabled, but don’t pin compiler version here
-        compose = true
-    }
+    // Compose disabled for Java 8 compatibility
+    // buildFeatures {
+    //     compose = true
+    // }
 
     // ❌ Don’t set composeOptions.kotlinCompilerExtensionVersion
     // (the consuming app should control it)
@@ -61,8 +61,8 @@ android {
 }
 
 dependencies {
-    // Compose BOM — let apps override if needed
-    api(platform(libs.androidx.compose.bom))
+    // Compose BOM removed for Java 8 compatibility
+    // api(platform(libs.androidx.compose.bom))
 
     // AndroidX core + UI
     api(libs.androidx.core.ktx)
@@ -72,15 +72,15 @@ dependencies {
     // Lifecycle + Navigation
     api(libs.androidx.lifecycle.runtime.ktx)
     api(libs.androidx.lifecycle.process)
-    api(libs.androidx.navigation.runtime.android)
-    api(libs.androidx.navigation.compose)
+    api(libs.androidx.navigation.runtime)
+    // api(libs.androidx.navigation.compose) // Removed for Java 8
 
-    // Compose UI
-    api(libs.androidx.activity.compose)
-    api(libs.androidx.ui)
-    api(libs.androidx.ui.graphics)
-    api(libs.androidx.ui.tooling.preview)
-    api(libs.androidx.material3)
+    // Compose UI removed for Java 8 compatibility
+    // api(libs.androidx.activity.compose)
+    // api(libs.androidx.ui)
+    // api(libs.androidx.ui.graphics)
+    // api(libs.androidx.ui.tooling.preview)
+    // api(libs.androidx.material3)
 
     // Networking + JSON
     api("com.google.code.gson:gson:2.10.1")
@@ -88,14 +88,14 @@ dependencies {
     api("com.squareup.okhttp3:logging-interceptor:4.12.0")
     
     // WorkManager for retry scheduling
-    api(libs.androidx.work.runtime)
+    api("androidx.work:work-runtime-ktx:2.8.1")
     
     // Room for offline storage
-    api(libs.androidx.room.runtime)
-    api(libs.androidx.room.ktx)
+    api("androidx.room:room-runtime:2.5.2")
+    api("androidx.room:room-ktx:2.5.2")
 
-    // Desugaring - removed since we no longer use Java 8 time APIs
-    // implementation("com.android.tools:desugar_jdk_libs:2.0.4")
+    // Desugaring - enables Java 8+ APIs on older Android versions
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:1.2.2")
 
     // ❌ REMOVE kotlin-stdlib from compileOnly — let apps provide it
     // compileOnly("org.jetbrains.kotlin:kotlin-stdlib")
@@ -105,9 +105,10 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(libs.androidx.ui.test.junit4)
-    debugImplementation(libs.androidx.ui.tooling)
-    debugImplementation(libs.androidx.ui.test.manifest)
+    // Compose test dependencies removed for Java 8 compatibility
+    // androidTestImplementation(libs.androidx.ui.test.junit4)
+    // debugImplementation(libs.androidx.ui.tooling)
+    // debugImplementation(libs.androidx.ui.test.manifest)
 }
 
 
@@ -119,7 +120,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.NCG-Africa"
                 artifactId = "edge_telemetry_android"
-                version = "1.2.1"
+                version = "1.2.1-java8"
             }
         }
     }

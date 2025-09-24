@@ -2,7 +2,8 @@ package com.androidtel.telemetry_library.core.session
 
 import android.util.Log
 import com.androidtel.telemetry_library.core.ids.IdGenerator
-import java.time.Instant
+import com.androidtel.telemetry_library.utils.DateTimeUtils
+import java.util.Date
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
@@ -109,7 +110,7 @@ class SessionManager(private val idGenerator: IdGenerator) {
             
             mapOf(
                 "session.id" to getCurrentSessionId(),
-                "session.start_time" to Instant.ofEpochMilli(sessionStartTime).toString(),
+                "session.start_time" to DateTimeUtils.formatToIso8601(Date(sessionStartTime)),
                 "session.duration_ms" to duration.toString(),
                 "session.event_count" to eventCount.toString(),
                 "session.metric_count" to metricCount.toString(),
@@ -130,7 +131,7 @@ class SessionManager(private val idGenerator: IdGenerator) {
             
             mapOf(
                 "sessionId" to getCurrentSessionId(),
-                "startTime" to Instant.ofEpochMilli(sessionStartTime).toString(),
+                "startTime" to DateTimeUtils.formatToIso8601(Date(sessionStartTime)),
                 "durationMs" to duration,
                 "eventCount" to eventCount,
                 "metricCount" to metricCount,

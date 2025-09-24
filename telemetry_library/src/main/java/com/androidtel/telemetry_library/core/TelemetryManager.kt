@@ -7,7 +7,7 @@ import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.os.Build
 import android.util.Log
-import androidx.compose.runtime.Composable
+// import androidx.compose.runtime.Composable // Removed for Java 8 compatibility
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -531,10 +531,11 @@ class TelemetryManager private constructor(
         recordEvent(eventName = "app.error", attributes = combinedAttributes)
     }
 
-    @Composable
-    fun trackComposeScreens(navController: NavController) {
-        TrackComposeScreen(navController, this)
-    }
+    // Compose screen tracking removed for Java 8 compatibility
+    // @Composable
+    // fun trackComposeScreens(navController: NavController) {
+    //     TrackComposeScreen(navController, this)
+    // }
 
     fun trackActivities() {
         TelemetryActivityLifecycleObserver(this)
