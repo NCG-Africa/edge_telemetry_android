@@ -3,6 +3,8 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg?style=flat)](https://android-arsenal.com/api?level=24)
 [![Gradle](https://img.shields.io/badge/Gradle-8.4%2B-02303A.svg?style=flat&logo=gradle)](https://gradle.org)
+[![Kotlin](https://img.shields.io/badge/Kotlin-1.9.0%2B-7F52FF.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
+[![Java](https://img.shields.io/badge/Java-11%2B-ED8B00.svg?style=flat&logo=java)](https://www.oracle.com/java/)
 [![JitPack](https://jitpack.io/v/NCG-Africa/edge-telemetry-sdk.svg)](https://jitpack.io/#NCG-Africa/edge-telemetry-sdk)
 [![APK Size](https://img.shields.io/badge/APK%20Size-~200KB-orange.svg)]()
 [![Memory](https://img.shields.io/badge/Memory-<5MB-green.svg)]()
@@ -43,7 +45,8 @@ A comprehensive, production-ready Android SDK for collecting and transmitting te
 ### Build Requirements
 - **Gradle**: `8.4+` (recommended: `8.9+`)
 - **Android Gradle Plugin (AGP)**: `8.0+`
-- **Kotlin**: `1.9.0+`
+- **Kotlin**: `1.9.0+` (for Kotlin projects)
+- **Java**: `11+` (for Java projects)
 
 ### Runtime Requirements
 - **Minimum SDK**: `24` (Android 7.0+)
@@ -94,6 +97,7 @@ dependencies {
 
 Initialize the SDK in your `Application` class:
 
+#### Kotlin
 ```kotlin
 class MyApplication : Application() {
     override fun onCreate() {
@@ -105,6 +109,23 @@ class MyApplication : Application() {
             endpoint = "https://your-telemetry-endpoint.com/api/telemetry",
             batchSize = 10
         )
+    }
+}
+```
+
+#### Java
+```java
+public class MyApplication extends Application {
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        
+        // Initialize telemetry SDK
+        TelemetryManager.initialize(
+            this, // application context
+            "https://your-telemetry-endpoint.com/api/telemetry", // endpoint
+            10 // batchSize
+        );
     }
 }
 ```
@@ -135,6 +156,7 @@ The SDK automatically starts collecting telemetry data once initialized:
 
 Track HTTP requests automatically using the TelemetryInterceptor with OkHttp:
 
+#### Kotlin
 ```kotlin
 // Add to your OkHttpClient - Use the factory method to avoid tracking SDK's own requests
 val client = OkHttpClient.Builder()
@@ -152,16 +174,50 @@ TelemetryManager.getInstance().recordNetworkRequest(
 )
 ```
 
+#### Java
+```java
+// Add to your OkHttpClient - Use the factory method to avoid tracking SDK's own requests
+OkHttpClient client = new OkHttpClient.Builder()
+    .addInterceptor(TelemetryManager.createNetworkInterceptor())
+    .build();
+
+// Or manually track network requests
+TelemetryManager telemetryManager = TelemetryManager.getInstance();
+if (telemetryManager != null) {
+    telemetryManager.recordNetworkRequest(
+        "https://api.example.com/users", // url
+        "GET", // method
+        200, // statusCode
+        245L, // durationMs
+        0L, // requestBodySize
+        1024L // responseBodySize
+    );
+}
+```
+
 ### 5. Navigation Monitoring
 
 #### For XML-based Navigation (Activities/Fragments)
 
 Activities are automatically tracked. For manual screen tracking:
 
+#### Kotlin
 ```kotlin
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Activities are automatically tracked by the SDK
+    }
+}
+```
+
+#### Java
+```java
+public class MainActivity extends AppCompatActivity {
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
         
         // Activities are automatically tracked by the SDK
     }
@@ -189,6 +245,7 @@ fun MyApp() {
 
 ### Custom Event Tracking
 
+#### Kotlin
 ```kotlin
 // Track custom events
 TelemetryManager.getInstance()?.trackEvent(
@@ -200,8 +257,22 @@ TelemetryManager.getInstance()?.trackEvent(
 )
 ```
 
+#### Java
+```java
+// Track custom events
+TelemetryManager telemetryManager = TelemetryManager.getInstance();
+if (telemetryManager != null) {
+    Map<String, Object> customAttributes = new HashMap<>();
+    customAttributes.put("login_method", "google");
+    customAttributes.put("user_type", "premium");
+    
+    telemetryManager.trackEvent("user_login", customAttributes);
+}
+```
+
 ### Custom Metrics
 
+#### Kotlin
 ```kotlin
 // Track custom metrics
 TelemetryManager.getInstance()?.trackMetric(
@@ -212,6 +283,23 @@ TelemetryManager.getInstance()?.trackMetric(
         "method" to "GET"
     )
 )
+```
+
+#### Java
+```java
+// Track custom metrics
+TelemetryManager telemetryManager = TelemetryManager.getInstance();
+if (telemetryManager != null) {
+    Map<String, Object> customAttributes = new HashMap<>();
+    customAttributes.put("endpoint", "/api/users");
+    customAttributes.put("method", "GET");
+    
+    telemetryManager.trackMetric(
+        "api_response_time", // metricName
+        245.0, // value (milliseconds)
+        customAttributes
+    );
+}
 ```
 
 ### Jetpack Compose Screen Tracking
@@ -234,6 +322,7 @@ fun ProfileScreen(navController: NavController) {
 
 ### Manual Screen Tracking
 
+#### Kotlin
 ```kotlin
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -245,10 +334,27 @@ class MainActivity : AppCompatActivity() {
 }
 ```
 
+#### Java
+```java
+public class MainActivity extends AppCompatActivity {
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        
+        // Manual screen tracking
+        TelemetryManager telemetryManager = TelemetryManager.getInstance();
+        if (telemetryManager != null) {
+            telemetryManager.trackScreen("MainActivity");
+        }
+    }
+}
+```
+
 ## 🔧 Configuration
 
 ### Advanced Initialization
 
+#### Kotlin
 ```kotlin
 TelemetryManager.initialize(
     context = this,
@@ -256,6 +362,16 @@ TelemetryManager.initialize(
     batchSize = 20,                    // Events per batch
     enableDebugLogging = BuildConfig.DEBUG
 )
+```
+
+#### Java
+```java
+TelemetryManager.initialize(
+    this, // context
+    "https://api.example.com/telemetry", // endpoint
+    20, // batchSize - Events per batch
+    BuildConfig.DEBUG // enableDebugLogging
+);
 ```
 
 ### Network Configuration
