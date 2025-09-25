@@ -80,7 +80,7 @@ Add the dependency to your app's `build.gradle`:
 
 ```kotlin
 dependencies {
-    implementation 'com.github.NCG-Africa:edge_telemetry_sdk:1.2.1'
+    implementation 'com.github.NCG-Africa:edge_telemetry_android:1.2.1'
 }
 ```
 
