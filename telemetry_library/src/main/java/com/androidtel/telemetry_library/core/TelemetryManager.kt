@@ -67,7 +67,7 @@ class TelemetryManager private constructor(
 
     // Core attributes for every event
     private val deviceId: String = getOrCreateDeviceId()
-    private val appInfo = collectAppInfo()
+    private var appInfo: AppInfo? = null // Will be initialized after deviceCapabilities
     private val deviceInfo = collectDeviceInfo()
     private var sessionId = generateSessionId()
     private var sessionStartTime = System.currentTimeMillis()
@@ -828,6 +828,9 @@ class TelemetryManager private constructor(
         networkCapabilityDetector = NetworkCapabilityDetector(context, deviceCapabilities)
         memoryCapabilityTracker = MemoryCapabilityTracker(context, deviceCapabilities)
         
+        // Now that deviceCapabilities is initialized, we can safely collect app info
+        appInfo = collectAppInfo()
+        
         Log.i("TelemetryManager", "Device capabilities initialized for API ${deviceCapabilities.apiLevel}")
         
         // Log comprehensive capability information
@@ -916,20 +919,40 @@ class TelemetryManager private constructor(
 
     // Gathers and formats app-related information.
     private fun collectAppInfo(): AppInfo? {
-        val packageManager = context.packageManager
-        val packageName = context.packageName
-        val packageInfo = packageManager.getPackageInfo(packageName, 0)
-        return packageInfo.versionName?.let {
-            AppInfo(
-                appName = context.getString(context.applicationInfo.labelRes),
-                appVersion = it,
-                appBuildNumber = if (::deviceCapabilities.isInitialized && deviceCapabilities.supportsLongVersionCode) {
-                    packageInfo.longVersionCode.toString()
-                } else {
-                    packageInfo.versionCode.toString()
-                },
-                appPackageName = packageName
-            )
+        return try {
+            val packageManager = context.packageManager
+            val packageName = context.packageName
+            val packageInfo = packageManager.getPackageInfo(packageName, 0)
+            
+            packageInfo.versionName?.let {
+                // Safely get app name - handle cases where labelRes is 0 or resource loading fails
+                val appName = try {
+                    val labelRes = context.applicationInfo.labelRes
+                    if (labelRes != 0) {
+                        context.getString(labelRes)
+                    } else {
+                        // Fallback to package name if no label resource is defined
+                        packageName
+                    }
+                } catch (e: Exception) {
+                    Log.w("TelemetryManager", "Failed to get app name from resources, using package name as fallback: ${e.localizedMessage}")
+                    packageName
+                }
+                
+                AppInfo(
+                    appName = appName,
+                    appVersion = it,
+                    appBuildNumber = if (::deviceCapabilities.isInitialized && deviceCapabilities.supportsLongVersionCode) {
+                        packageInfo.longVersionCode.toString()
+                    } else {
+                        packageInfo.versionCode.toString()
+                    },
+                    appPackageName = packageName
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("TelemetryManager", "Failed to collect app info: ${e.localizedMessage}", e)
+            null
         }
     }
 

@@ -5,6 +5,92 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2-java8] - 2025-09-26
+
+### 🐛 **Bug Fixes**
+- **Fixed Critical Initialization Crash**: Fixed `Resources.NotFoundException` in `collectAppInfo()` method when apps don't have a proper label resource defined
+- **Improved Error Handling**: Added comprehensive error handling for app info collection with fallback to package name
+- **Initialization Order Fix**: Moved app info collection to after device capabilities initialization to prevent dependency issues
+
+### 🔧 **Technical Improvements**
+- Enhanced robustness of SDK initialization process
+- Better handling of edge cases in app metadata collection
+- Improved logging for debugging initialization issues
+
+## [1.2.1-java8] - 2024-09-24
+
+### 🎯 **Java 8 Compatibility Release**
+
+This is a specialized release that provides full Java 8 compatibility for projects using legacy toolchains like Dagger 2 + KAPT while maintaining all core telemetry functionality.
+
+### ✨ **New Features**
+- **Java 8 Support**: Full compatibility with Java 8 (sourceCompatibility & targetCompatibility)
+- **Legacy Toolchain Support**: Perfect for projects using Dagger 2 + KAPT + Java 8
+- **EdgeTelemetry Facade**: New simplified API class for easier integration
+- **DateTimeUtils**: Custom utility class replacing java.time APIs for Java 8 compatibility
+- **Desugaring Support**: Enabled Android desugaring for modern API usage on older Java versions
+
+### 🔧 **Technical Changes**
+- **Downgraded Build System**: 
+  - Gradle: 7.6.4 (from 8.x)
+  - Android Gradle Plugin: 7.4.2 (from 8.7.1)
+  - Kotlin: 1.8.22 (from 2.1.0)
+- **Java Time API Replacement**: All `java.time.*` usage replaced with `java.util.Date` + custom utilities
+- **AndroidX Compatibility**: Downgraded to Java 8 compatible versions
+- **API Target**: Updated to API 34 for modern Android support while maintaining Java 8 compatibility
+
+### 🚫 **Removed Features (Java 8 Version Only)**
+- **Compose Support**: All Jetpack Compose dependencies and features removed for maximum compatibility
+- **Compose UI Components**: `EdgeTelemetryCompose.kt` disabled
+- **Compose Screen Tracking**: `TrackComposeScreen.kt` disabled  
+- **Advanced Testing**: `EdgeTelemetryTester.kt` simplified
+
+### 📦 **Dependencies**
+- **Minimum SDK**: Android 7.0 (API 24)
+- **Target SDK**: Android 14 (API 34)
+- **Java Version**: 1.8 with desugaring enabled
+- **Core Libraries**: OkHttp, Gson, AndroidX Core (Java 8 compatible versions)
+
+### 🎯 **Use Cases**
+Perfect for:
+- Legacy Android projects using Java 8
+- Projects with Dagger 2 + KAPT setup
+- Enterprise applications with strict Java version requirements
+- Gradual migration scenarios from Java 8 to Java 11+
+
+### 📋 **Migration Guide**
+```gradle
+// For Java 8 + Dagger 2 + KAPT projects
+implementation 'com.github.NCG-Africa:edge_telemetry_android:1.2.1-java8'
+
+// Initialize the SDK
+EdgeTelemetry.initialize(
+    application = this,
+    endpoint = "https://your-endpoint.com/telemetry",
+    batchSize = 10,
+    enableDebugLogging = true
+)
+
+// Track events
+EdgeTelemetry.trackEvent("user.login", mapOf("method" to "email"))
+EdgeTelemetry.trackMetric("response_time", 245.0)
+```
+
+### ⚠️ **Important Notes**
+- This version does NOT support Jetpack Compose
+- For Compose support, use the main version (1.2.1+) with Java 11+
+- All core telemetry features remain fully functional
+- Session management, crash reporting, and metrics collection work identically
+
+### 🔄 **Upgrade Path**
+When ready to move to Java 11+:
+1. Update your project to Java 11+
+2. Switch to main SDK version: `1.2.1` or later
+3. Re-enable Compose features if needed
+4. Update initialization code if using new APIs
+
+---
+
 ## [1.2.1] - 2025-01-20
 
 ### 🔧 Improved
