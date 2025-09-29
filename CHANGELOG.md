@@ -5,6 +5,13 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3-java8] - 2025-09-29
+
+### 🔧 **Build & Deployment**
+- **JitPack Configuration**: Added `jitpack.yml` to configure JDK 17 and Android SDK components for proper JitPack builds
+- **Build Compatibility**: Resolved Java 17 requirement issues on JitPack build environment
+- **SDK Tools**: Ensured proper Android platform tools and build tools installation during JitPack builds
+
 ## [1.2.2-java8] - 2025-09-26
 
 ### 🐛 **Bug Fixes**

@@ -1,0 +1,11 @@
+jdk:
+  - openjdk17
+
+before_install:
+  # Accept Android SDK licenses non-interactively and install required components
+  - yes | sdkmanager --licenses > /dev/null
+  - sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+install:
+  # Build and publish artifacts to local Maven so JitPack can pick them up
+  - ./gradlew -S -i :telemetry_library:publishToMavenLocal
