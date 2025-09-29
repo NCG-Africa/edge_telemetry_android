@@ -1,5 +1,5 @@
 jdk:
-  - openjdk17
+  - openjdk11
 
 before_install:
   # Accept Android SDK licenses non-interactively and install required components
@@ -8,4 +8,4 @@ before_install:
 
 install:
   # Build and publish artifacts to local Maven so JitPack can pick them up
-  - ./gradlew -S -i :telemetry_library:publishToMavenLocal
+  - ./gradlew clean -Pgroup=com.github.NCG-Africa -Pversion=1.2.3-java8 -xtest -xlint :telemetry_library:publishToMavenLocal
