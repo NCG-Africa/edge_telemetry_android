@@ -2,9 +2,8 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg?style=flat)](https://android-arsenal.com/api?level=24)
-[![Gradle](https://img.shields.io/badge/Gradle-8.4%2B-02303A.svg?style=flat&logo=gradle)](https://gradle.org)
-[![Kotlin](https://img.shields.io/badge/Kotlin-1.9.0%2B-7F52FF.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
-[![Java](https://img.shields.io/badge/Java-11%2B-ED8B00.svg?style=flat&logo=java)](https://www.oracle.com/java/)
+[![Java 11+](https://img.shields.io/badge/Java%2011%2B-v1.2.1-ED8B00.svg?style=flat&logo=java)](https://www.oracle.com/java/)
+[![Java 8](https://img.shields.io/badge/Java%208-v1.2.3--java8-orange.svg?style=flat&logo=java)](https://www.oracle.com/java/)
 [![JitPack](https://jitpack.io/v/NCG-Africa/edge-telemetry-sdk.svg)](https://jitpack.io/#NCG-Africa/edge-telemetry-sdk)
 [![APK Size](https://img.shields.io/badge/APK%20Size-~200KB-orange.svg)]()
 [![Memory](https://img.shields.io/badge/Memory-<5MB-green.svg)]()
@@ -14,6 +13,7 @@ A comprehensive, production-ready Android SDK for collecting and transmitting te
 
 ## 🚀 Features
 
+{{ ... }}
 ### Core Telemetry
 - **📊 Performance Monitoring**: Precise FrameMetrics-based frame drop detection, enhanced memory tracking, and app performance metrics
 - **🔄 Session Management**: Automatic session tracking with detailed analytics
@@ -42,26 +42,48 @@ A comprehensive, production-ready Android SDK for collecting and transmitting te
 
 ## 📋 Requirements
 
-### Build Requirements
-- **Gradle**: `8.4+` (recommended: `8.9+`)
-- **Android Gradle Plugin (AGP)**: `8.0+`
-- **Kotlin**: `1.9.0+` (for Kotlin projects)
-- **Java**: `11+` (for Java projects)
+### 🔄 **Version Compatibility Matrix**
 
-### Runtime Requirements
+| Feature | **Java 11+ Version** | **Java 8 Version** |
+|---------|---------------------|--------------------|
+| **Latest Version** | `1.2.1` | `1.2.3-java8` |
+| **Java Requirement** | Java 11+ | Java 8+ |
+| **Gradle** | 8.4+ | 7.5.1+ |
+| **AGP** | 8.0+ | 7.2.2+ |
+| **Kotlin** | 1.9.0+ | 1.8.22+ |
+| **Jetpack Compose** | ✅ Full Support | ❌ Not Supported |
+| **All Core Features** | ✅ | ✅ |
+| **Use Case** | Modern projects | Legacy/Enterprise |
+
+### 🎯 **Choose Your Version**
+
+#### **Java 11+ Version (Recommended)**
+- **Latest Features**: Full Jetpack Compose support
+- **Modern Toolchain**: Latest Gradle, AGP, and Kotlin
+- **Future-Proof**: Receives all new features first
+
+#### **Java 8 Version (Legacy Support)**
+- **Enterprise Ready**: Perfect for legacy codebases
+- **Dagger 2 Compatible**: Works with Dagger 2 + KAPT setups
+- **Core Functionality**: All telemetry features except Compose
+
+### 📱 **Runtime Requirements (Both Versions)**
 - **Minimum SDK**: `24` (Android 7.0+)
-- **Compile SDK**: `35` (Android 15)
+- **Compile SDK**: `34` (Android 14)
 - **Target SDK**: `34` (Android 14)
 
-### Dependencies
-- **AndroidX Core**: `1.16.0+`
-- **Jetpack Compose**: `2024.04.01+` (if using Compose features)
-- **WorkManager**: `2.9.0+` (for offline storage)
-- **Room**: `2.6.1+` (for local persistence)
+### 📦 **Dependencies**
+- **AndroidX Core**: Compatible versions for each Java target
+- **WorkManager**: For offline storage and retry logic
+- **Room**: For local data persistence
+- **OkHttp**: For network communication
+- **Gson**: For JSON serialization
 
 ## 📦 Installation
 
-### Gradle (Recommended)
+### 🔄 **Choose Your Java Version**
+
+#### **Java 11+ Projects (Recommended)**
 
 Add JitPack repository to your root `build.gradle` or `settings.gradle`:
 
@@ -80,16 +102,42 @@ Add the dependency to your app's `build.gradle`:
 
 ```kotlin
 dependencies {
-    implementation 'com.github.NCG-Africa:edge_telemetry_sdk:1.2.1'
+    implementation 'com.github.NCG-Africa:edge_telemetry_android:1.2.1'
 }
 ```
 
-### Requirements
-
-- **Minimum SDK**: Android API 24 (Android 7.0)
-- **Target SDK**: Android API 35
-- **Kotlin**: 1.9.0+
+**Requirements:**
 - **Java**: 11+
+- **Gradle**: 8.4+
+- **AGP**: 8.0+
+- **Kotlin**: 1.9.0+ (for Kotlin projects)
+- **Features**: ✅ Full Compose support
+
+#### **Java 8 Projects (Legacy/Enterprise)**
+
+Add JitPack repository (same as above), then:
+
+```kotlin
+dependencies {
+    implementation 'com.github.NCG-Africa:edge_telemetry_android:1.2.3-java8'
+}
+```
+
+**Requirements:**
+- **Java**: 8+ (with desugaring enabled)
+- **Gradle**: 7.5.1+
+- **AGP**: 7.2.2+
+- **Kotlin**: 1.8.22+ (for Kotlin projects)
+- **Features**: ❌ No Compose support
+
+### 🎯 **When to Use Each Version**
+
+| Use Java 11+ Version | Use Java 8 Version |
+|---------------------|--------------------|
+| ✅ New projects | ✅ Legacy codebases |
+| ✅ Compose apps | ✅ Dagger 2 + KAPT |
+| ✅ Modern toolchain | ✅ Enterprise constraints |
+| ✅ Latest features | ✅ Gradual migration |
 
 ## 🛠 Quick Setup
 
@@ -156,7 +204,7 @@ The SDK automatically starts collecting telemetry data once initialized:
 
 Track HTTP requests automatically using the TelemetryInterceptor with OkHttp:
 
-#### Kotlin
+#### Kotlin (Both Versions)
 ```kotlin
 // Add to your OkHttpClient - Use the factory method to avoid tracking SDK's own requests
 val client = OkHttpClient.Builder()
@@ -174,7 +222,7 @@ TelemetryManager.getInstance().recordNetworkRequest(
 )
 ```
 
-#### Java
+#### Java (Both Versions)
 ```java
 // Add to your OkHttpClient - Use the factory method to avoid tracking SDK's own requests
 OkHttpClient client = new OkHttpClient.Builder()
@@ -224,7 +272,7 @@ public class MainActivity extends AppCompatActivity {
 }
 ```
 
-#### For Jetpack Compose Navigation
+#### For Jetpack Compose Navigation (Java 11+ Version Only)
 
 ```kotlin
 @Composable
@@ -240,6 +288,8 @@ fun MyApp() {
     }
 }
 ```
+
+> **Note**: Compose features are only available in the Java 11+ version (`1.2.1`). For Java 8 projects, use Activity/Fragment-based navigation.
 
 ## 📖 Usage Examples
 
@@ -302,7 +352,7 @@ if (telemetryManager != null) {
 }
 ```
 
-### Jetpack Compose Screen Tracking
+### Jetpack Compose Screen Tracking (Java 11+ Version Only)
 
 ```kotlin
 @Composable
@@ -319,6 +369,8 @@ fun ProfileScreen(navController: NavController) {
     }
 }
 ```
+
+> **Note**: Compose screen tracking is only available in the Java 11+ version. Java 8 version users should use Activity/Fragment lifecycle tracking.
 
 ### Manual Screen Tracking
 
@@ -354,24 +406,76 @@ public class MainActivity extends AppCompatActivity {
 
 ### Advanced Initialization
 
-#### Kotlin
+#### Kotlin (Both Versions)
 ```kotlin
 TelemetryManager.initialize(
-    context = this,
+    application = this,
+    batchSize = 30,
     endpoint = "https://api.example.com/telemetry",
-    batchSize = 20,                    // Events per batch
-    enableDebugLogging = BuildConfig.DEBUG
+    debugMode = BuildConfig.DEBUG,
+    enableCrashReporting = true,
+    enableUserProfiles = true,
+    enableSessionTracking = true,
+    globalAttributes = mapOf(
+        "app_variant" to "production",
+        "feature_flags" to "v2_enabled"
+    )
 )
+```
+
+#### Java (Both Versions)
+```java
+Map<String, String> globalAttributes = new HashMap<>();
+globalAttributes.put("app_variant", "production");
+globalAttributes.put("feature_flags", "v2_enabled");
+
+TelemetryManager.initialize(
+    this,                           // application
+    30,                            // batchSize
+    "https://api.example.com/telemetry", // endpoint
+    BuildConfig.DEBUG,             // debugMode
+    true,                          // enableCrashReporting
+    true,                          // enableUserProfiles
+    true,                          // enableSessionTracking
+    globalAttributes               // globalAttributes
+);
+```
+
+### User Profile Management (Both Versions)
+
+#### Kotlin
+```kotlin
+// Set user profile after login
+TelemetryManager.getInstance().setUserProfile(
+    name = "John Doe",
+    email = "john.doe@example.com",
+    phone = "+1234567890",
+    customAttributes = mapOf(
+        "subscription_tier" to "premium",
+        "signup_date" to "2024-01-15"
+    )
+)
+
+// Clear profile on logout
+TelemetryManager.getInstance().clearUserProfile()
 ```
 
 #### Java
 ```java
-TelemetryManager.initialize(
-    this, // context
-    "https://api.example.com/telemetry", // endpoint
-    20, // batchSize - Events per batch
-    BuildConfig.DEBUG // enableDebugLogging
+// Set user profile after login
+Map<String, String> customAttributes = new HashMap<>();
+customAttributes.put("subscription_tier", "premium");
+customAttributes.put("signup_date", "2024-01-15");
+
+TelemetryManager.getInstance().setUserProfile(
+    "John Doe",              // name
+    "john.doe@example.com",  // email
+    "+1234567890",           // phone
+    customAttributes         // customAttributes
 );
+
+// Clear profile on logout
+TelemetryManager.getInstance().clearUserProfile();
 ```
 
 ### Network Configuration
