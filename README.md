@@ -13,7 +13,6 @@ A comprehensive, production-ready Android SDK for collecting and transmitting te
 
 ## 🚀 Features
 
-{{ ... }}
 ### Core Telemetry
 - **📊 Performance Monitoring**: Precise FrameMetrics-based frame drop detection, enhanced memory tracking, and app performance metrics
 - **🔄 Session Management**: Automatic session tracking with detailed analytics
