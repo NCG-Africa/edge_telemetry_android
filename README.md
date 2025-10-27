@@ -188,7 +188,7 @@ public class MyApplication extends Application {
 }
 ```
 
-> **⚠️ Important**: The `apiKey` parameter is **required** as of version 1.2.2. Get your API key from your backend administrator.
+> **⚠️ Important**: The `apiKey` parameter is **required** as of version 1.2.5. Get your API key from your backend administrator.
 
 ### 2. Register Application in Manifest
 
@@ -460,7 +460,7 @@ TelemetryManager.initialize(
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `application` | `Application` | ✅ Yes | - | Application context |
-| `apiKey` | `String` | ✅ Yes | - | **API key for backend authentication** (v1.2.2+) |
+| `apiKey` | `String` | ✅ Yes | - | **API key for backend authentication** (v1.2.5+) |
 | `batchSize` | `Int` | No | `30` | Number of events to batch before sending |
 | `endpoint` | `String` | No | `https://edgetelemetry.ncgafrica.com/collector/telemetry` | Telemetry backend endpoint |
 | `debugMode` | `Boolean` | No | `false` | Enable verbose logging |
@@ -469,7 +469,7 @@ TelemetryManager.initialize(
 | `enableSessionTracking` | `Boolean` | No | `true` | Enable session analytics |
 | `globalAttributes` | `Map<String, String>` | No | `emptyMap()` | Custom attributes added to all events |
 
-> **⚠️ Breaking Change (v1.2.2)**: The `apiKey` parameter is now **required**. All HTTP requests include the API key in the `X-API-Key` header for backend authentication.
+> **⚠️ Breaking Change (v1.2.5)**: The `apiKey` parameter is now **required**. All HTTP requests include the API key in the `X-API-Key` header for backend authentication.
 
 ### User Profile Management (Both Versions)
 
