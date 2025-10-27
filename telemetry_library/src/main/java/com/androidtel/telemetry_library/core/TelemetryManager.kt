@@ -550,7 +550,7 @@ class TelemetryManager private constructor(
 
     @Composable
     fun trackComposeScreens(navController: NavController) {
-        TrackComposeScreen(navController, this)
+        TrackComposeScreen(navController, telemetryManager = this)
     }
 
     fun trackActivities() {

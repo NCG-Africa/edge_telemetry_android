@@ -51,8 +51,8 @@ class DeviceInfoCollector(
             
             mapOf(
                 "app.name" to appName,
-                "app.version" to packageInfo.versionName ?: "unknown",
-                "app.build_number" to getBuildNumber(packageInfo),
+                "app.version" to (packageInfo.versionName ?: "unknown"),
+                "app.build_number" to getBuildNumber(packageInfo).toString(),
                 "app.package_name" to context.packageName
             )
         } catch (e: Exception) {

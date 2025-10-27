@@ -41,19 +41,19 @@ fun TrackComposeScreen(
         )
         
         // Track navigation event
-        telemetryManager.trackEvent("navigation.route_change", entryData)
+        telemetryManager.recordEvent("navigation.route_change", entryData)
         
         // Set up lifecycle observer for screen duration tracking
         val lifecycleObserver = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
-                    telemetryManager.trackEvent("navigation.screen_resume", mapOf(
+                    telemetryManager.recordEvent("navigation.screen_resume", mapOf(
                         "screen" to finalScreenName,
                         "route" to route
                     ))
                 }
                 Lifecycle.Event.ON_PAUSE -> {
-                    telemetryManager.trackEvent("navigation.screen_pause", mapOf(
+                    telemetryManager.recordEvent("navigation.screen_pause", mapOf(
                         "screen" to finalScreenName,
                         "route" to route
                     ))
@@ -84,7 +84,7 @@ fun TrackComposeScreen(
             )
             
             // Track screen duration metric
-            telemetryManager.trackEvent("performance.screen_duration", exitData)
+            telemetryManager.recordEvent("performance.screen_duration", exitData)
             
             lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
         }

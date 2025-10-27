@@ -145,7 +145,7 @@ class JsonEventTracker(
             "value" to value,
             "timestamp" to Instant.now().toString(),
             "attributes" to getEnrichedAttributes(attributes)
-        ).filterValues { it != null }
+        ).filterValues { it != null } as Map<String, Any>
     }
     
     /**

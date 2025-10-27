@@ -100,13 +100,13 @@ object EdgeTelemetryTester {
             Log.i(TAG, "📊 Current session: ${edgeTelemetry.getSessionId()}")
             
             // Start new session
-            edgeTelemetry.startSession()
+            edgeTelemetry.startNewSession()
             Log.i(TAG, "🚀 New session started: ${edgeTelemetry.getSessionId()}")
             
             // End session after delay
             CoroutineScope(Dispatchers.IO).launch {
                 kotlinx.coroutines.delay(3000)
-                edgeTelemetry.endSession()
+                edgeTelemetry.endCurrentSession()
                 Log.i(TAG, "🏁 Session ended")
             }
         } catch (e: Exception) {
@@ -122,17 +122,17 @@ object EdgeTelemetryTester {
             val edgeTelemetry = EdgeTelemetry.getInstance()
             
             // Track various events
-            edgeTelemetry.trackEvent("test.button_click", mapOf(
+            edgeTelemetry.recordEvent("test.button_click", mapOf(
                 "button_id" to "test_button",
                 "screen" to "test_screen"
             ))
             
-            edgeTelemetry.trackEvent("test.feature_used", mapOf(
+            edgeTelemetry.recordEvent("test.feature_used", mapOf(
                 "feature" to "telemetry_testing",
                 "version" to "1.0"
             ))
             
-            edgeTelemetry.trackEvent("test.performance", mapOf(
+            edgeTelemetry.recordEvent("test.performance", mapOf(
                 "load_time" to "1250ms",
                 "success" to "true"
             ))
@@ -221,7 +221,7 @@ object EdgeTelemetryTester {
             
             // Add test breadcrumb and track test event to validate structure
             edgeTelemetry.addBreadcrumb("Payload validation test", "custom", "info")
-            edgeTelemetry.trackEvent("payload.validation", mapOf("test" to "structure"))
+            edgeTelemetry.recordEvent("payload.validation", mapOf("test" to "structure"))
             
             Log.i(TAG, "✅ Payload structure validation completed")
         } catch (e: Exception) {

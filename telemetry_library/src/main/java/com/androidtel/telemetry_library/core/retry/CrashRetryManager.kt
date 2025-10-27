@@ -116,7 +116,8 @@ class CrashRetryManager(private val context: Context) {
         return try {
             if (offlineStorageFile.exists()) {
                 val json = offlineStorageFile.readText()
-                gson.fromJson(json, Array<Map<String, Any>>::class.java).toList()
+                val type = object : com.google.gson.reflect.TypeToken<Array<Map<String, Any>>>() {}.type
+                gson.fromJson<Array<Map<String, Any>>>(json, type).toList()
             } else {
                 emptyList()
             }

@@ -72,10 +72,10 @@ class EdgeTelemetryInterceptor(
             // Add error breadcrumb
             breadcrumbManager.addNetwork(
                 "HTTP ${request.method} failed",
-                mapOf(
+                mapOf<String, String>(
                     "url" to url,
                     "method" to request.method,
-                    "error" to e.message ?: "Unknown error",
+                    "error" to (e.message ?: "Unknown error"),
                     "duration_ms" to duration.toString()
                 )
             )
