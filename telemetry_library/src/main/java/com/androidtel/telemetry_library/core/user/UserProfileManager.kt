@@ -46,12 +46,8 @@ class UserProfileManager(context: Context) {
         customAttributes: Map<String, String>? = null
     ) {
         lock.write {
-            // Generate user ID if not exists
-            val userId = getUserId() ?: run {
-                val newUserId = idGenerator.generateUserId()
-                idGenerator.setUserId(newUserId)
-                newUserId
-            }
+            // Get or auto-generate user ID (never null)
+            val userId = getUserId()
             
             // Update profile
             name?.let { userProfile["name"] = it }
@@ -99,14 +95,14 @@ class UserProfileManager(context: Context) {
             Log.i(TAG, "🧹 User profile cleared: $userId (version: $profileVersion)")
             
             // Send profile updated event with only user.id and version
-            userId?.let { sendProfileUpdatedEvent(it) }
+            sendProfileUpdatedEvent(userId)
         }
     }
     
     /**
-     * Get user ID
+     * Get user ID - NEVER returns null, auto-generates if needed
      */
-    fun getUserId(): String? {
+    fun getUserId(): String {
         return idGenerator.getUserId()
     }
     

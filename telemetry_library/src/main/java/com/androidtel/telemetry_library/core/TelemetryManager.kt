@@ -1133,12 +1133,19 @@ class TelemetryManager private constructor(
 
     /**
      * Get user ID (Flutter-compatible)
+     * CRITICAL: Always returns a valid user ID, never null
      */
-    fun getUserId(): String? {
+    fun getUserId(): String {
         return if (userProfilesEnabled && userProfileManager != null) {
             userProfileManager!!.getUserId()
         } else {
-            userId.takeIf { it.isNotEmpty() }
+            // Fallback to internal userId, ensure it's not empty
+            if (userId.isBlank()) {
+                Log.w("TelemetryManager", "User ID is blank, generating fallback")
+                "user_fallback_${System.currentTimeMillis()}"
+            } else {
+                userId
+            }
         }
     }
 

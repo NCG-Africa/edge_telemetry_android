@@ -5,6 +5,83 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.7] - 2025-01-27
+
+### 🔒 ID Generation Enhancements
+
+#### Guaranteed Non-Null IDs
+- **User ID Auto-Generation**: `getUserId()` now returns non-nullable `String` with automatic generation if not set
+- **Device ID Validation**: All device ID generation includes validation to ensure non-empty values
+- **Session ID Validation**: Session ID generation validates output is never blank
+- **Type Safety**: Changed all ID getter methods from nullable to non-nullable return types
+
+#### ID Persistence
+- **Device ID**: Persisted permanently in SharedPreferences (`edge_telemetry_ids`)
+- **User ID**: Dual persistence in both `IdGenerator` and `TelemetryManager` SharedPreferences
+- **Session ID**: Ephemeral by design - new ID generated per session
+- **Auto-Recovery**: IDs automatically generated and persisted on first access if missing
+
+### 📊 Payload Structure Improvements
+
+#### Top-Level Device ID
+- **Enhanced Payload**: `device_id` now included at the **root level** of all payloads
+- **Dual Presence**: Device ID present in both root and nested `data.device_id` for backward compatibility
+- **Backend Benefits**: Easier filtering and routing without parsing nested event structures
+- **Crash Payloads**: Crash reports now include top-level `device_id`
+- **Event Batches**: All event batches include top-level `device_id`
+
+#### Payload Structure
+```json
+{
+  "timestamp": "2025-01-27T...",
+  "device_id": "device_123...",  // NEW: Top-level
+  "data": {
+    "type": "batch",
+    "device_id": "device_123...",  // Existing
+    "events": [...]
+  }
+}
+```
+
+### 🛡️ Reliability Improvements
+
+#### Validation at Generation
+- **IllegalStateException**: ID generators throw exceptions if blank IDs are produced
+- **Early Detection**: Problems caught at generation time, not at usage time
+- **Clear Error Messages**: Descriptive error messages for debugging
+
+#### Fallback Mechanisms
+- **TelemetryManager Fallback**: Generates timestamped fallback if userId is blank
+- **HTTP Client Fallback**: Uses `unknown_device` if device_id is null/blank in batch
+- **Attribute Fallback**: Uses `unknown_user` if user_id is blank in attributes
+- **Graceful Degradation**: SDK never crashes due to missing IDs
+
+### 🔧 Technical Changes
+
+#### API Changes
+- `IdGenerator.getUserId()`: `String?` → `String` (non-nullable)
+- `UserProfileManager.getUserId()`: `String?` → `String` (non-nullable)
+- `TelemetryManager.getUserId()`: `String?` → `String` (non-nullable)
+- `FlutterPayloadFactory.createCrashPayload()`: Added `deviceId: String` parameter
+- `FlutterPayloadFactory.createEventBatchPayload()`: Added `deviceId: String` parameter
+
+#### Data Models
+- `TelemetryPayload`: Added `device_id: String` field
+- `CrashPayload`: Added `device_id: String` field
+- `EventBatchPayload`: Added `device_id: String` field
+
+### ⚠️ Migration Notes
+
+#### Breaking Changes
+- **None**: All changes are backward compatible
+- Existing code continues to work without modifications
+- New top-level `device_id` is additive, not replacing existing structure
+
+#### Recommendations
+- Update backend to leverage top-level `device_id` for faster filtering
+- Monitor logs for "CRITICAL ERROR" messages indicating ID generation issues
+- Consider using new non-nullable ID getters for cleaner code
+
 ## [1.2.6] - 2025-01-27
 
 ### 💥 Breaking Changes

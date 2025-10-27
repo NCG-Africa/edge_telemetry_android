@@ -6,6 +6,7 @@ import java.util.UUID
 // ---- Payload + Data ----
 data class TelemetryPayload(
     val timestamp: String,
+    val device_id: String,  // Device ID at top level for easy filtering/routing
     val data: TelemetryDataOut
 ) {
     fun toJson(): String = Gson().toJson(this)

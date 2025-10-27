@@ -145,7 +145,8 @@ class CrashReporter(
             error = errorMessage,
             stackTrace = stackTrace,
             fingerprint = fingerprint,
-            attributes = crashAttributes
+            attributes = crashAttributes,
+            deviceId = idGenerator.getDeviceId()
         )
         
         return gson.fromJson(payload.toJson(), Map::class.java) as Map<String, Any>
@@ -175,7 +176,8 @@ class CrashReporter(
             error = message,
             stackTrace = stackTrace,
             fingerprint = fingerprint,
-            attributes = crashAttributes
+            attributes = crashAttributes,
+            deviceId = idGenerator.getDeviceId()
         )
         
         return gson.fromJson(payload.toJson(), Map::class.java) as Map<String, Any>

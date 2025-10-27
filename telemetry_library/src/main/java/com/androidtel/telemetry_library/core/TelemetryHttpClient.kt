@@ -130,9 +130,11 @@ class TelemetryHttpClient(
             )
         }
         
+        val safeDeviceId = deviceId?.takeIf { it.isNotBlank() } ?: "unknown_device"
+        
         val out = TelemetryDataOut(
             type = "batch",
-            device_id = deviceId?.takeIf { it.isNotBlank() } ?: "unknown_device",
+            device_id = safeDeviceId,
             batch_size = this.batchSize,
             timestamp = this.timestamp,
             events = this.events.map { event ->
@@ -146,7 +148,15 @@ class TelemetryHttpClient(
                 )
             }
         )
-        return Gson().toJson(out)
+        
+        // Wrap in TelemetryPayload with device_id at top level
+        val payload = TelemetryPayload(
+            timestamp = this.timestamp,
+            device_id = safeDeviceId,
+            data = out
+        )
+        
+        return Gson().toJson(payload)
     }
 
     // ---- Helper: Flatten attributes into map ----

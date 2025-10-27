@@ -12,6 +12,7 @@ import java.time.Instant
  */
 data class CrashPayload(
     val timestamp: String,
+    val device_id: String,  // Device ID at top level for easy filtering/routing
     val data: CrashData
 ) {
     fun toJson(): String = Gson().toJson(this)
@@ -34,6 +35,7 @@ data class CrashData(
  */
 data class EventBatchPayload(
     val timestamp: String,
+    val device_id: String,  // Device ID at top level for easy filtering/routing
     val data: EventBatchData
 ) {
     fun toJson(): String = Gson().toJson(this)
@@ -73,12 +75,14 @@ object FlutterPayloadFactory {
         error: String,
         stackTrace: String,
         fingerprint: String,
-        attributes: Map<String, String>
+        attributes: Map<String, String>,
+        deviceId: String
     ): CrashPayload {
         val timestamp = Instant.now().toString()
         
         return CrashPayload(
             timestamp = timestamp,
+            device_id = deviceId,
             data = CrashData(
                 error = error,
                 timestamp = timestamp,
@@ -93,12 +97,14 @@ object FlutterPayloadFactory {
      * Create event batch payload matching Flutter SDK structure
      */
     fun createEventBatchPayload(
-        events: List<EventData>
+        events: List<EventData>,
+        deviceId: String
     ): EventBatchPayload {
         val timestamp = Instant.now().toString()
         
         return EventBatchPayload(
             timestamp = timestamp,
+            device_id = deviceId,
             data = EventBatchData(
                 events = events,
                 batch_size = events.size,

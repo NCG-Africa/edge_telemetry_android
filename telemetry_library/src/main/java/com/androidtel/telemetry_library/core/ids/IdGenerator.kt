@@ -2,6 +2,7 @@ package com.androidtel.telemetry_library.core.ids
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import kotlin.random.Random
 
 /**
@@ -49,20 +50,36 @@ class IdGenerator {
     
     /**
      * Generate User ID with exact format: user_<13-digit-timestamp>_<8-char-random>
+     * CRITICAL: Validates that generated ID is not empty
      */
     fun generateUserId(): String {
         val timestamp = System.currentTimeMillis()
         val random = generateRandomString(8)
-        return "user_${timestamp}_${random}"
+        val userId = "user_${timestamp}_${random}"
+        
+        // Validation: Ensure ID is not empty
+        if (userId.isBlank()) {
+            throw IllegalStateException("Generated user ID is blank - this should never happen")
+        }
+        
+        return userId
     }
     
     /**
      * Generate Session ID with exact format: session_<13-digit-timestamp>_<6-char-random>
+     * CRITICAL: Validates that generated ID is not empty
      */
     fun generateSessionId(): String {
         val timestamp = System.currentTimeMillis()
         val random = generateRandomString(6)
-        return "session_${timestamp}_${random}"
+        val sessionId = "session_${timestamp}_${random}"
+        
+        // Validation: Ensure ID is not empty
+        if (sessionId.isBlank()) {
+            throw IllegalStateException("Generated session ID is blank - this should never happen")
+        }
+        
+        return sessionId
     }
     
     /**
@@ -74,11 +91,18 @@ class IdGenerator {
     }
     
     /**
-     * Get stored user ID
+     * Get stored user ID, auto-generating if not exists
+     * CRITICAL: This method NEVER returns null - always returns a valid user ID
      */
-    fun getUserId(): String? {
+    fun getUserId(): String {
         val prefs = this.prefs ?: throw IllegalStateException("IdGenerator not initialized")
-        return prefs.getString(KEY_USER_ID, null)
+        return prefs.getString(KEY_USER_ID, null) ?: run {
+            // Auto-generate user ID if not exists
+            val newUserId = generateUserId()
+            prefs.edit().putString(KEY_USER_ID, newUserId).apply()
+            Log.i("IdGenerator", "Auto-generated user ID: $newUserId")
+            newUserId
+        }
     }
     
     /**
@@ -91,11 +115,19 @@ class IdGenerator {
     
     /**
      * Generate device ID with exact format
+     * CRITICAL: Validates that generated ID is not empty
      */
     private fun generateDeviceId(): String {
         val timestamp = System.currentTimeMillis()
         val random = generateRandomString(8)
-        return "device_${timestamp}_${random}_android"
+        val deviceId = "device_${timestamp}_${random}_android"
+        
+        // Validation: Ensure ID is not empty
+        if (deviceId.isBlank()) {
+            throw IllegalStateException("Generated device ID is blank - this should never happen")
+        }
+        
+        return deviceId
     }
     
     /**
