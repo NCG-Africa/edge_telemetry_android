@@ -71,7 +71,7 @@ class TelemetryManager private constructor(
     private val deviceInfo = collectDeviceInfo()
     private var sessionId = generateSessionId()
     private var sessionStartTime = System.currentTimeMillis()
-    private var userId: String = "" // Will be set during initialization
+    private lateinit var userId: String // Will be set during initialization - must never be null/empty
     
     // Device capabilities for runtime feature detection
     private lateinit var deviceCapabilities: DeviceCapabilities
@@ -120,6 +120,7 @@ class TelemetryManager private constructor(
          */
         fun initialize(
             application: Application,
+            apiKey: String,
             batchSize: Int = 30,
             endpoint: String = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
             debugMode: Boolean = false,
@@ -133,6 +134,7 @@ class TelemetryManager private constructor(
                     application,
                     httpClient = TelemetryHttpClient(
                         telemetryUrl = endpoint,
+                        apiKey = apiKey,
                         debugMode = debugMode
                     ),
                     offlineStorage = OfflineBatchStorage(application.applicationContext),
@@ -184,19 +186,24 @@ class TelemetryManager private constructor(
      * Initializes the user ID automatically during SDK setup.
      * Creates a new user ID if none exists, or loads existing one from SharedPreferences.
      * This ensures permanent user identity across app lifecycle with zero developer intervention.
+     * CRITICAL: userId must NEVER be null or empty - uses fallback if generation fails.
      */
     private fun initializeUserId() {
         try {
             val prefs = context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE)
             val existingUserId = prefs.getString("sdk_managed_user_id", null)
             
-            if (existingUserId != null) {
-                // Load existing user ID
+            if (!existingUserId.isNullOrBlank()) {
+                // Load existing user ID (validated to be non-empty)
                 userId = existingUserId
                 Log.i("TelemetryManager", "Loaded existing user ID: $userId")
             } else {
                 // Generate new user ID and store it permanently
                 userId = generateUserId()
+                if (userId.isBlank()) {
+                    Log.e("TelemetryManager", "CRITICAL ERROR: Generated userId is blank. Using fallback.")
+                    userId = "user_fallback_${System.currentTimeMillis()}"
+                }
                 prefs.edit().putString("sdk_managed_user_id", userId).apply()
                 Log.i("TelemetryManager", "Generated new user ID: $userId")
             }
@@ -205,7 +212,17 @@ class TelemetryManager private constructor(
             Log.e("TelemetryManager", "Failed to initialize user ID from SharedPreferences: ${e.localizedMessage}", e)
             // Fallback: generate user ID but don't persist (will be regenerated on next launch)
             userId = generateUserId()
+            if (userId.isBlank()) {
+                Log.e("TelemetryManager", "CRITICAL ERROR: Fallback userId is blank. Using emergency fallback.")
+                userId = "user_emergency_${System.currentTimeMillis()}"
+            }
             Log.w("TelemetryManager", "Using fallback user ID (not persisted): $userId")
+        }
+        
+        // Final safety check - ensure userId is initialized
+        if (!::userId.isInitialized || userId.isBlank()) {
+            Log.e("TelemetryManager", "CRITICAL ERROR: userId not properly initialized. Using emergency fallback.")
+            userId = "user_emergency_${System.currentTimeMillis()}"
         }
     }
 
@@ -809,12 +826,23 @@ class TelemetryManager private constructor(
 
 
     // Generates a structured device ID and stores it persistently in SharedPreferences.
+    // CRITICAL: deviceId must NEVER be null or empty - uses fallback if generation fails.
     private fun getOrCreateDeviceId(): String {
         val prefs = context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE)
         var deviceId = prefs.getString("device.id", null)
-        if (deviceId == null) {
+        if (deviceId.isNullOrBlank()) {
             deviceId = generateDeviceId()
+            if (deviceId.isBlank()) {
+                Log.e("TelemetryManager", "CRITICAL ERROR: Generated deviceId is blank. Using fallback.")
+                deviceId = "device_fallback_${System.currentTimeMillis()}_android"
+            }
             prefs.edit().putString("device.id", deviceId).apply()
+        }
+        
+        // Final safety check - ensure deviceId is not blank
+        if (deviceId.isBlank()) {
+            Log.e("TelemetryManager", "CRITICAL ERROR: deviceId is blank. Using emergency fallback.")
+            deviceId = "device_emergency_${System.currentTimeMillis()}_android"
         }
         return deviceId
     }

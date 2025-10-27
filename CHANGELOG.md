@@ -5,6 +5,115 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2025-01-27
+
+### 💥 Breaking Changes
+
+#### API Key Authentication Required
+- **API Key Parameter**: `apiKey` is now a **required parameter** in `TelemetryManager.initialize()`
+- **Security Enhancement**: All telemetry requests now include `X-API-Key` header for backend authentication
+- **Migration Required**: Existing integrations must add `apiKey` parameter to initialization
+
+### 🔒 Security Enhancements
+
+#### API Key Authentication
+- **Required Parameter**: `apiKey` must be provided during SDK initialization
+- **Header-Based Auth**: API key sent via `X-API-Key` HTTP header on all requests
+- **Secure Transmission**: API key never exposed in URLs or request bodies
+- **Consistent Auth**: API key included in all retry attempts and offline batch sends
+
+### 🛡️ Reliability Improvements
+
+#### Critical ID Validation with Safe Error Handling
+- **Device ID Protection**: Multiple validation layers ensure `device_id` is never null or empty
+- **User ID Protection**: Comprehensive validation ensures `user_id` is always present
+- **Graceful Degradation**: SDK uses fallback IDs instead of crashing the instrumented app
+- **Clear Error Logging**: All validation failures logged with "CRITICAL ERROR" prefix for easy debugging
+
+#### Fallback ID System
+- **Emergency Fallbacks**: Automatic fallback IDs generated if primary generation fails
+- **Identifiable Patterns**: Fallback IDs clearly marked (e.g., `device_fallback_`, `user_emergency_`)
+- **Telemetry Continuity**: Data collection continues even with fallback IDs
+- **Zero App Crashes**: SDK errors never crash the host application
+
+### 📊 Payload Structure Updates
+
+#### Enhanced JSON Response
+- **Top-Level Device ID**: `device_id` now included at the root level of the `data` object
+- **Consistent Structure**: Device ID present in both payload root and event attributes
+- **Backend Optimization**: Easier device identification without parsing individual events
+
+### 🔧 Technical Improvements
+
+#### Safe Error Handling
+- **No Exception Throwing**: Replaced `require()` and `check()` calls with safe logging
+- **Fallback Values**: Uses `unknown_device`, `unknown_user`, or timestamped fallbacks
+- **Production Ready**: SDK never crashes the instrumented application
+- **Debug Friendly**: Clear error logs help identify and fix integration issues
+
+#### Validation Layers
+1. **Initialization Layer**: IDs validated when created/loaded from SharedPreferences
+2. **Data Model Layer**: `userId` is non-nullable in `UserInfo` data class
+3. **Payload Builder Layer**: Validation before creating `TelemetryDataOut`
+4. **Attribute Flattening Layer**: Final validation when converting to JSON
+
+### 📝 Migration Guide
+
+#### Update Initialization Code
+
+**Before (v1.2.1 and earlier):**
+```kotlin
+TelemetryManager.initialize(
+    application = this,
+    batchSize = 30,
+    endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry"
+)
+```
+
+**After (v1.2.2+):**
+```kotlin
+TelemetryManager.initialize(
+    application = this,
+    apiKey = "your-api-key-here",  // ⚠️ REQUIRED
+    batchSize = 30,
+    endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry"
+)
+```
+
+### 🔍 What Changed
+
+#### New Required Parameter
+- `apiKey: String` - Required parameter for backend authentication
+
+#### HTTP Request Headers
+All telemetry requests now include:
+```http
+X-API-Key: your-api-key-here
+Content-Type: application/json
+User-Agent: EdgeTelemetryAndroid/1.0.0
+```
+
+#### JSON Payload Structure
+```json
+{
+  "timestamp": "2025-01-27T13:42:10.123Z",
+  "data": {
+    "type": "batch",
+    "device_id": "device_1727012247_ghi789_android",
+    "events": [...],
+    "batch_size": 7,
+    "timestamp": "2025-01-27T13:42:10.123Z"
+  }
+}
+```
+
+### ⚠️ Important Notes
+
+- **Backend Integration**: Your backend must validate the `X-API-Key` header
+- **API Key Storage**: Store API keys securely (e.g., in BuildConfig or secure storage)
+- **No Default Value**: `apiKey` has no default - must be explicitly provided
+- **Backward Incompatible**: Apps using v1.2.1 or earlier must update initialization code
+
 ## [1.2.1] - 2025-01-20
 
 ### 🔧 Improved

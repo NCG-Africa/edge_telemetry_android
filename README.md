@@ -154,8 +154,13 @@ class MyApplication : Application() {
         // Initialize telemetry SDK
         TelemetryManager.initialize(
             application = this,
-            endpoint = "https://your-telemetry-endpoint.com/api/telemetry",
-            batchSize = 10
+            apiKey = "your-api-key-here",  // ⚠️ REQUIRED - Get from your backend
+            batchSize = 30,
+            endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
+            debugMode = BuildConfig.DEBUG,
+            enableCrashReporting = true,
+            enableUserProfiles = true,
+            enableSessionTracking = true
         )
     }
 }
@@ -170,13 +175,20 @@ public class MyApplication extends Application {
         
         // Initialize telemetry SDK
         TelemetryManager.initialize(
-            this, // application context
-            "https://your-telemetry-endpoint.com/api/telemetry", // endpoint
-            10 // batchSize
+            this,                                                      // application
+            "your-api-key-here",                                      // apiKey (REQUIRED)
+            30,                                                        // batchSize
+            "https://edgetelemetry.ncgafrica.com/collector/telemetry", // endpoint
+            BuildConfig.DEBUG,                                         // debugMode
+            true,                                                      // enableCrashReporting
+            true,                                                      // enableUserProfiles
+            true                                                       // enableSessionTracking
         );
     }
 }
 ```
+
+> **⚠️ Important**: The `apiKey` parameter is **required** as of version 1.2.2. Get your API key from your backend administrator.
 
 ### 2. Register Application in Manifest
 
@@ -410,8 +422,9 @@ public class MainActivity extends AppCompatActivity {
 ```kotlin
 TelemetryManager.initialize(
     application = this,
+    apiKey = "your-api-key-here",  // ⚠️ REQUIRED
     batchSize = 30,
-    endpoint = "https://api.example.com/telemetry",
+    endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
     debugMode = BuildConfig.DEBUG,
     enableCrashReporting = true,
     enableUserProfiles = true,
@@ -430,16 +443,33 @@ globalAttributes.put("app_variant", "production");
 globalAttributes.put("feature_flags", "v2_enabled");
 
 TelemetryManager.initialize(
-    this,                           // application
-    30,                            // batchSize
-    "https://api.example.com/telemetry", // endpoint
-    BuildConfig.DEBUG,             // debugMode
-    true,                          // enableCrashReporting
+    this,                                                      // application
+    "your-api-key-here",                                      // apiKey (REQUIRED)
+    30,                                                        // batchSize
+    "https://edgetelemetry.ncgafrica.com/collector/telemetry", // endpoint
+    BuildConfig.DEBUG,                                         // debugMode
+    true,                                                      // enableCrashReporting
     true,                          // enableUserProfiles
     true,                          // enableSessionTracking
     globalAttributes               // globalAttributes
 );
 ```
+
+### Configuration Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `application` | `Application` | ✅ Yes | - | Application context |
+| `apiKey` | `String` | ✅ Yes | - | **API key for backend authentication** (v1.2.2+) |
+| `batchSize` | `Int` | No | `30` | Number of events to batch before sending |
+| `endpoint` | `String` | No | `https://edgetelemetry.ncgafrica.com/collector/telemetry` | Telemetry backend endpoint |
+| `debugMode` | `Boolean` | No | `false` | Enable verbose logging |
+| `enableCrashReporting` | `Boolean` | No | `true` | Enable automatic crash reporting |
+| `enableUserProfiles` | `Boolean` | No | `true` | Enable user profile tracking |
+| `enableSessionTracking` | `Boolean` | No | `true` | Enable session analytics |
+| `globalAttributes` | `Map<String, String>` | No | `emptyMap()` | Custom attributes added to all events |
+
+> **⚠️ Breaking Change (v1.2.2)**: The `apiKey` parameter is now **required**. All HTTP requests include the API key in the `X-API-Key` header for backend authentication.
 
 ### User Profile Management (Both Versions)
 

@@ -2,6 +2,7 @@
   "timestamp": "2025-09-22T13:42:10.123Z",
   "data": {
     "type": "batch",
+    "device_id": "device_1727012247_ghi789_android",
     "events": [
       {
         "type": "event",

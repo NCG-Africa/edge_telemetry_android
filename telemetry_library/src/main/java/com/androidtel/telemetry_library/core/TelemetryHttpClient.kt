@@ -24,7 +24,11 @@ class ClientException(code: Int, message: String) : IOException("Client error $c
 class ServerException(code: Int, message: String) : IOException("Server error $code: $message")
 class UnknownException(code: Int) : IOException("Unknown HTTP error code: $code")
 
-class TelemetryHttpClient(private val telemetryUrl: String, private val debugMode: Boolean) {
+class TelemetryHttpClient(
+    private val telemetryUrl: String,
+    private val apiKey: String,
+    private val debugMode: Boolean
+) {
 
 
     private val okHttpClient = OkHttpClient.Builder()
@@ -106,6 +110,7 @@ class TelemetryHttpClient(private val telemetryUrl: String, private val debugMod
             .post(jsonPayload.toRequestBody("application/json".toMediaType()))
             .addHeader("Content-Type", "application/json")
             .addHeader("User-Agent", "EdgeTelemetryAndroid/1.0.0")
+            .addHeader("X-API-Key", apiKey)
             .build()
         return okHttpClient.newCall(request).execute()
     }
@@ -113,8 +118,21 @@ class TelemetryHttpClient(private val telemetryUrl: String, private val debugMod
 
     // --- Extension: Convert Batch -> Outgoing JSON ---
     fun TelemetryBatch.toJson(): String {
+        // Extract device_id from the first event's attributes
+        val deviceId = this.events.firstOrNull()?.attributes?.device?.deviceId
+        
+        // CRITICAL: device_id must NEVER be null or empty
+        // Log error but use fallback to prevent crashing the instrumented app
+        if (deviceId.isNullOrBlank()) {
+            Log.e(
+                "TelemetryHttpClient",
+                "CRITICAL ERROR: device_id is null or empty in telemetry batch. Using fallback 'unknown_device'."
+            )
+        }
+        
         val out = TelemetryDataOut(
             type = "batch",
+            device_id = deviceId?.takeIf { it.isNotBlank() } ?: "unknown_device",
             batch_size = this.batchSize,
             timestamp = this.timestamp,
             events = this.events.map { event ->
@@ -141,8 +159,15 @@ class TelemetryHttpClient(private val telemetryUrl: String, private val debugMod
         flat["app.build_number"] = attrs.app.appBuildNumber
         flat["app.package_name"] = attrs.app.appPackageName
 
-        // Device
-        flat["device.id"] = attrs.device.deviceId
+        // Device - CRITICAL: device.id must never be null or empty
+        // Log error but use fallback to prevent crashing the instrumented app
+        if (attrs.device.deviceId.isBlank()) {
+            Log.e(
+                "TelemetryHttpClient",
+                "CRITICAL ERROR: device.id is blank in event attributes. Using fallback 'unknown_device'."
+            )
+        }
+        flat["device.id"] = attrs.device.deviceId.takeIf { it.isNotBlank() } ?: "unknown_device"
         flat["device.platform"] = attrs.device.platform
         flat["device.platform_version"] = attrs.device.platformVersion
         flat["device.model"] = attrs.device.model
@@ -154,8 +179,15 @@ class TelemetryHttpClient(private val telemetryUrl: String, private val debugMod
         flat["device.hardware"] = attrs.device.hardware
         flat["device.product"] = attrs.device.product
 
-        // User
-        flat["user.id"] = attrs.user.userId
+        // User - CRITICAL: user.id must never be null or empty
+        // Log error but use fallback to prevent crashing the instrumented app
+        if (attrs.user.userId.isBlank()) {
+            Log.e(
+                "TelemetryHttpClient",
+                "CRITICAL ERROR: user.id is blank in event attributes. Using fallback 'unknown_user'."
+            )
+        }
+        flat["user.id"] = attrs.user.userId.takeIf { it.isNotBlank() } ?: "unknown_user"
         flat["user.name"] = attrs.user.name
         flat["user.email"] = attrs.user.email
         flat["user.phone"] = attrs.user.phone

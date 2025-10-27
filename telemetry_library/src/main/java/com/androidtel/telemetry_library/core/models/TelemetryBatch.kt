@@ -13,6 +13,7 @@ data class TelemetryPayload(
 
 data class TelemetryDataOut(
     val type: String = "batch",
+    val device_id: String,
     val events: List<TelemetryEventOut>,
     val batch_size: Int,
     val timestamp: String
@@ -78,7 +79,7 @@ data class DeviceInfo(
 )
 
 data class UserInfo(
-    val userId: String? = null,
+    val userId: String,  // Non-nullable - always required
     val name: String? = null,
     val email: String? = null,
     val phone: String? = null,
