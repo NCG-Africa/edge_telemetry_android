@@ -1,6 +1,7 @@
 package com.androidtel.telemetry_library.core
 
 import android.util.Log
+import com.androidtel.telemetry_library.core.interceptors.ApiKeyRedactionInterceptor
 import com.androidtel.telemetry_library.core.models.EventAttributes
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.androidtel.telemetry_library.core.models.TelemetryDataOut
@@ -35,6 +36,7 @@ class TelemetryHttpClient(
         .connectTimeout(10, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor(ApiKeyRedactionInterceptor(debugMode))
         .addInterceptor(HttpLoggingInterceptor().apply {
             level =
                 if (debugMode) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE

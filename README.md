@@ -583,6 +583,124 @@ The SDK collects various event types:
 - **Configurable**: All data collection can be customized
 - **Secure**: HTTPS-only transmission with proper error handling
 
+### 🔐 API Key Security Best Practices
+
+**⚠️ CRITICAL: Never hardcode API keys in your source code or commit them to version control.**
+
+#### Recommended Approach 1: BuildConfig (Recommended)
+
+Store your API key in `local.properties` (which is gitignored by default):
+
+```properties
+# local.properties
+TELEMETRY_API_KEY=your-api-key-here
+```
+
+Access it in your `build.gradle.kts`:
+
+```kotlin
+// app/build.gradle.kts
+android {
+    defaultConfig {
+        // Read API key from local.properties
+        val properties = Properties()
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            properties.load(FileInputStream(localPropertiesFile))
+        }
+        
+        buildConfigField(
+            "String",
+            "TELEMETRY_API_KEY",
+            "\"${properties.getProperty("TELEMETRY_API_KEY", "")}\""
+        )
+    }
+}
+```
+
+Use it in your code:
+
+```kotlin
+TelemetryManager.initialize(
+    application = this,
+    apiKey = BuildConfig.TELEMETRY_API_KEY,  // ✅ Secure
+    // ... other parameters
+)
+```
+
+#### Recommended Approach 2: Environment Variables
+
+For CI/CD pipelines, use environment variables:
+
+```kotlin
+// build.gradle.kts
+android {
+    defaultConfig {
+        buildConfigField(
+            "String",
+            "TELEMETRY_API_KEY",
+            "\"${System.getenv("TELEMETRY_API_KEY") ?: ""}\""
+        )
+    }
+}
+```
+
+#### Recommended Approach 3: Android Keystore (Advanced)
+
+For maximum security in production apps:
+
+```kotlin
+// Use Android Keystore System to encrypt/decrypt API key
+// See: https://developer.android.com/training/articles/keystore
+```
+
+#### What NOT to Do ❌
+
+```kotlin
+// ❌ NEVER hardcode API keys
+TelemetryManager.initialize(
+    application = this,
+    apiKey = "edge_1234567890abcdef",  // ❌ INSECURE!
+    // ...
+)
+
+// ❌ NEVER commit API keys to git
+// ❌ NEVER include API keys in strings.xml
+// ❌ NEVER log API keys in plain text
+```
+
+#### .gitignore Configuration
+
+Ensure your `.gitignore` includes:
+
+```gitignore
+# API Keys and Secrets
+local.properties
+*.keystore
+*.jks
+secrets.properties
+```
+
+#### API Key Redaction in Logs
+
+The SDK automatically redacts API keys in debug logs:
+- **Full key**: `edge_1234567890abcdef_xyz123`
+- **Logged as**: `edge_**************_xyz1`
+
+This applies to:
+- HTTP request logs (when `debugMode = true`)
+- Crash report logs
+- WorkManager retry logs
+
+#### ProGuard/R8 Protection
+
+The SDK includes ProGuard/R8 rules in `consumer-rules.pro` to:
+- Obfuscate string constants in release builds
+- Protect API keys from reverse engineering
+- Maintain SDK public API
+
+**Note**: ProGuard provides basic obfuscation but is not a substitute for proper API key management.
+
 ## 🏗 Architecture
 
 ### Core Components

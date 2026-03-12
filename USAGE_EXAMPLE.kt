@@ -25,9 +25,15 @@ class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         
+        // ⚠️ SECURITY: Never hardcode API keys in source code!
+        // Use BuildConfig, local.properties, or environment variables instead.
+        // See README.md "API Key Security Best Practices" section for details.
+        
         // Initialize TelemetryManager with Flutter-compatible features
         TelemetryManager.initialize(
             application = this,
+            apiKey = BuildConfig.TELEMETRY_API_KEY,  // ✅ Secure: API key from BuildConfig
+            // apiKey = "your-api-key",  // ❌ NEVER hardcode API keys!
             endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
             debugMode = true, // Set to false in production
             batchSize = 30,

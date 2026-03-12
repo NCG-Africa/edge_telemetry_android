@@ -5,11 +5,13 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.util.Log
 import androidx.work.*
+import com.androidtel.telemetry_library.core.interceptors.ApiKeyRedactionInterceptor
 import com.google.gson.Gson
 import kotlinx.coroutines.delay
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.logging.HttpLoggingInterceptor
 import java.io.File
 import java.io.IOException
 import java.time.Duration
@@ -21,7 +23,8 @@ import java.util.concurrent.TimeUnit
 class CrashRetryManager(
     private val context: Context,
     private val apiKey: String,
-    private val telemetryEndpoint: String
+    private val telemetryEndpoint: String,
+    private val debugMode: Boolean = false
 ) {
     
     companion object {
@@ -36,6 +39,11 @@ class CrashRetryManager(
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor(ApiKeyRedactionInterceptor(debugMode))
+        .addInterceptor(HttpLoggingInterceptor().apply {
+            level = if (debugMode) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
+            redactHeader("X-API-Key")
+        })
         .build()
     
     private val baseRetryDelay = Duration.ofMinutes(1)
@@ -142,7 +150,8 @@ class CrashRetryManager(
         
         val inputData = workDataOf(
             "apiKey" to apiKey,
-            "endpoint" to telemetryEndpoint
+            "endpoint" to telemetryEndpoint,
+            "debugMode" to debugMode
         )
         
         val retryWork = OneTimeWorkRequestBuilder<CrashRetryWorker>()
@@ -253,16 +262,17 @@ class CrashRetryWorker(
         return try {
             Log.d(TAG, "🔄 Starting crash retry work")
             
-            // Retrieve API key and endpoint from input data
+            // Retrieve API key, endpoint, and debugMode from input data
             val apiKey = inputData.getString("apiKey")
             val endpoint = inputData.getString("endpoint")
+            val debugMode = inputData.getBoolean("debugMode", false)
             
             if (apiKey.isNullOrBlank() || endpoint.isNullOrBlank()) {
                 Log.e(TAG, "❌ Missing API key or endpoint in WorkManager input data")
                 return Result.failure()
             }
             
-            val retryManager = CrashRetryManager(applicationContext, apiKey, endpoint)
+            val retryManager = CrashRetryManager(applicationContext, apiKey, endpoint, debugMode)
             retryManager.retryOfflineCrashes()
             
             Log.d(TAG, "✅ Crash retry work completed")

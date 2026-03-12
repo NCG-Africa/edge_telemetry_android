@@ -276,7 +276,8 @@ class TelemetryManager private constructor(
                     idGenerator = flutterIdGenerator!!,
                     apiKey = apiKey,
                     telemetryEndpoint = telemetryEndpoint,
-                    enabled = true
+                    enabled = true,
+                    debugMode = debugMode
                 )
             }
 
