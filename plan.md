@@ -1,517 +1,860 @@
-# API Key Implementation Plan
+# Location Tracking Implementation Plan
 
 ## Overview
-This plan addresses the integration and enhancement of API key authentication across the Edge Telemetry Android SDK to ensure all network requests include proper authentication headers as required by the backend.
-
-## Current Status
-- ✅ API key parameter added to `TelemetryManager.initialize()` (v1.2.6)
-- ✅ `TelemetryHttpClient` includes `X-API-Key` header in regular batch requests
-- ❌ **CRITICAL:** `CrashRetryManager` bypasses `TelemetryHttpClient` and doesn't include API key
-- ⚠️ No API key validation at initialization
-- ⚠️ API key might be exposed in debug logs
-- ⚠️ Hardcoded endpoint in `CrashRetryManager`
-
----
-
-## Phase 1: Critical Bug Fixes 🔴
-
-### Task 1.1: Fix CrashRetryManager API Key Issue
-**Priority:** CRITICAL  
-**Estimated Time:** 2-3 hours
-
-#### Subtasks:
-1. **Modify CrashRetryManager constructor**
-   - Add `apiKey: String` parameter
-   - Add `telemetryEndpoint: String` parameter
-   - Remove hardcoded endpoint URL
-   - **File:** `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/retry/CrashRetryManager.kt`
-
-2. **Update sendCrashData() method**
-   - Add `X-API-Key` header to HTTP request builder (line 79-84)
-   - Add `User-Agent` header for consistency
-   - Use configurable endpoint instead of hardcoded URL
-   - **File:** `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/retry/CrashRetryManager.kt`
-
-3. **Update CrashReporter initialization**
-   - Pass `apiKey` from TelemetryManager to CrashReporter
-   - Pass `telemetryEndpoint` from TelemetryManager to CrashReporter
-   - Store these values in CrashReporter
-   - **File:** `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/crash/CrashReporter.kt`
-
-4. **Update CrashReporter to pass values to CrashRetryManager**
-   - Modify CrashRetryManager instantiation (line 37)
-   - Pass apiKey and endpoint parameters
-   - **File:** `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/crash/CrashReporter.kt`
-
-5. **Update TelemetryManager Flutter components initialization**
-   - Pass apiKey to CrashReporter during initialization
-   - Pass telemetryEndpoint to CrashReporter
-   - **File:** `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/TelemetryManager.kt` (line 264-273)
-
-6. **Update CrashRetryWorker**
-   - Ensure WorkManager worker can access API key
-   - Consider storing API key in SharedPreferences for worker access
-   - Or pass via WorkManager input data
-   - **File:** `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/retry/CrashRetryManager.kt` (line 232-255)
-
-#### Acceptance Criteria:
-- [x] All crash reports include `X-API-Key` header
-- [x] Offline crash retries include `X-API-Key` header
-- [x] WorkManager retry jobs include `X-API-Key` header
-- [x] No hardcoded endpoints remain in CrashRetryManager
-- [ ] Backend successfully receives authenticated crash reports (pending manual verification)
-
----
-
-### Task 1.2: Add API Key Validation
-**Priority:** HIGH  
-**Estimated Time:** 1 hour
-
-#### Subtasks:
-1. **Add validation in TelemetryManager.initialize()**
-   - Check if apiKey is not blank
-   - Throw IllegalArgumentException with helpful message
-   - Add logging for validation failure
-   - **File:** `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/TelemetryManager.kt` (line 121-157)
-
-2. **Add API key format validation (optional)**
-   - Check if API key matches expected format (e.g., starts with "edge_")
-   - Add warning log if format seems incorrect
-   - Don't block initialization, just warn
-   - **File:** `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/TelemetryManager.kt`
-
-3. **Update error messages**
-   - Provide clear guidance on where to get API key
-   - Include link to documentation
-   - **File:** `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/TelemetryManager.kt`
-
-#### Acceptance Criteria:
-- [x] Blank API key throws IllegalArgumentException
-- [x] Error message guides developers to get API key from backend
-- [x] Validation happens before any network requests
-- [x] Existing valid initializations continue to work
-
----
-
-## Phase 2: Security Enhancements 🟡
-
-### Task 2.1: Prevent API Key Exposure in Logs
-**Priority:** MEDIUM  
-**Estimated Time:** 2 hours
-
-#### Subtasks:
-1. **Create API key redaction interceptor**
-   - Create new class `ApiKeyRedactionInterceptor`
-   - Redact `X-API-Key` header value in logs
-   - Show only first/last 4 characters (e.g., "edge_****_5R...")
-   - **File:** `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/interceptors/ApiKeyRedactionInterceptor.kt` (new file)
-
-2. **Update TelemetryHttpClient logging**
-   - Add redaction interceptor before logging interceptor
-   - Ensure API key never appears in full in logs
-   - Test with debugMode = true
-   - **File:** `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/TelemetryHttpClient.kt` (line 34-42)
-
-3. **Update CrashRetryManager logging**
-   - Add similar redaction for crash retry requests
-   - Ensure consistency across all HTTP clients
-   - **File:** `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/retry/CrashRetryManager.kt`
-
-4. **Add security documentation**
-   - Document API key security best practices
-   - Warn against hardcoding API keys
-   - Recommend using BuildConfig or secure storage
-   - **File:** `README.md` and `README_EDGE_TELEMETRY.md`
-
-#### Acceptance Criteria:
-- [ ] API key never appears in full in logs
-- [ ] Debug mode logs show redacted API key
-- [ ] Security documentation added to README
-- [ ] No API key leakage in crash reports or error logs
-
----
-
-### Task 2.2: Add API Key Storage Recommendations
-**Priority:** LOW  
-**Estimated Time:** 1 hour
-
-#### Subtasks:
-1. **Create security guide section in README**
-   - Add "Security Best Practices" section
-   - Document BuildConfig approach
-   - Document Android Keystore approach
-   - Add .gitignore recommendations
-   - **File:** `README.md`
-
-2. **Add example code for secure storage**
-   - Show BuildConfig example
-   - Show local.properties example
-   - Show environment variable example
-   - **File:** `USAGE_EXAMPLE.kt` or new `SECURITY_GUIDE.md`
-
-3. **Add ProGuard/R8 rules for API key obfuscation**
-   - Ensure API key strings are obfuscated in release builds
-   - Add to consumer-rules.pro
-   - **File:** `telemetry_library/consumer-rules.pro`
-
-#### Acceptance Criteria:
-- [ ] Security guide added to documentation
-- [ ] Example code shows secure API key storage
-- [ ] ProGuard rules protect API key in release builds
-- [ ] Developers warned against committing API keys
-
----
-
-## Phase 3: Configuration Improvements 🟢
-
-### Task 3.1: Centralize Configuration
-**Priority:** MEDIUM  
-**Estimated Time:** 2 hours
-
-#### Subtasks:
-1. **Create TelemetryConfig data class**
-   - Centralize all configuration parameters
-   - Include apiKey, endpoint, debugMode, etc.
-   - Make it immutable
-   - **File:** `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/TelemetryConfig.kt` (new file)
-
-2. **Refactor TelemetryManager.initialize()**
-   - Accept TelemetryConfig object (optional, maintain backward compatibility)
-   - Keep existing parameter-based initialization
-   - Add overload for config-based initialization
-   - **File:** `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/TelemetryManager.kt`
-
-3. **Pass config to all components**
-   - Update TelemetryHttpClient to accept config
-   - Update CrashRetryManager to accept config
-   - Update CrashReporter to accept config
-   - Ensure single source of truth for configuration
-
-#### Acceptance Criteria:
-- [x] TelemetryConfig class created
-- [x] Both initialization methods work (params and config)
-- [x] All components use centralized configuration
-- [x] Backward compatibility maintained
-
----
-
-### Task 3.2: Add API Key Rotation Support (Future)
-**Priority:** LOW  
-**Estimated Time:** 3 hours
-
-#### Subtasks:
-1. **Design API key rotation mechanism**
-   - Allow updating API key without reinitializing SDK
-   - Ensure thread-safety during rotation
-   - Handle in-flight requests gracefully
-
-2. **Add updateApiKey() method**
-   - Create public method in TelemetryManager
-   - Update all HTTP clients with new key
-   - Invalidate old key safely
-
-3. **Add rotation event tracking**
-   - Track when API key is rotated
-   - Send event to backend for audit trail
-
-#### Acceptance Criteria:
-- [ ] API key can be updated at runtime
-- [ ] No requests fail during rotation
-- [ ] Rotation is tracked for security audit
-
----
-
-## Phase 4: Testing & Validation 🔵
-
-### Task 4.1: Add Unit Tests
-**Priority:** HIGH  
-**Estimated Time:** 3 hours
-
-#### Subtasks:
-1. **Test API key validation**
-   - Test blank API key throws exception
-   - Test valid API key passes
-   - Test error messages are helpful
-   - **File:** `telemetry_library/src/test/java/com/androidtel/telemetry_library/TelemetryManagerTest.kt`
-
-2. **Test API key in HTTP requests**
-   - Mock HTTP client
-   - Verify X-API-Key header is present
-   - Verify header value is correct
-   - **File:** `telemetry_library/src/test/java/com/androidtel/telemetry_library/TelemetryHttpClientTest.kt`
-
-3. **Test crash retry includes API key**
-   - Mock crash retry requests
-   - Verify X-API-Key header in retry requests
-   - Test offline retry includes API key
-   - **File:** `telemetry_library/src/test/java/com/androidtel/telemetry_library/CrashRetryManagerTest.kt`
-
-4. **Test API key redaction in logs**
-   - Enable debug mode
-   - Verify API key is redacted in logs
-   - Verify only partial key is shown
-   - **File:** `telemetry_library/src/test/java/com/androidtel/telemetry_library/ApiKeyRedactionTest.kt`
-
-#### Acceptance Criteria:
-- [x] All tests pass
-- [x] Code coverage > 80% for API key logic
-- [x] Edge cases covered (null, empty, invalid format)
-- [x] Mock tests verify header presence
-
----
-
-### Task 4.2: Integration Testing
-**Priority:** MEDIUM  
-**Estimated Time:** 2 hours
-
-#### Subtasks:
-1. **Test against real backend**
-   - Send test events with valid API key
-   - Verify backend accepts requests
-   - Test with invalid API key (should fail)
-   - Test crash reports are authenticated
-
-2. **Test offline retry mechanism**
-   - Disable network
-   - Generate crash reports
-   - Enable network
-   - Verify retries include API key
-   - Verify backend receives retried crashes
-
-3. **Test WorkManager retry**
-   - Force WorkManager retry scenario
-   - Verify API key is included
-   - Verify backend receives delayed crashes
-
-#### Acceptance Criteria:
-- [ ] Backend successfully receives all authenticated requests
-- [ ] Invalid API key requests are rejected by backend
-- [ ] Offline retries work with authentication
-- [ ] WorkManager retries include API key
-
----
-
-### Task 4.3: Update EdgeTelemetryTester
-**Priority:** LOW  
-**Estimated Time:** 1 hour
-
-#### Subtasks:
-1. **Add API key validation test**
-   - Add test method to EdgeTelemetryTester
-   - Verify API key is configured
-   - Test connectivity with authentication
-   - **File:** `telemetry_library/src/main/java/com/androidtel/telemetry_library/testing/EdgeTelemetryTester.kt`
-
-2. **Update comprehensive test suite**
-   - Include API key in test payloads
-   - Verify authenticated requests
-   - Add to runComprehensiveTest()
-
-#### Acceptance Criteria:
-- [x] EdgeTelemetryTester validates API key
-- [x] Test suite covers authentication scenarios
-- [x] Developers can easily test API key setup
-
----
-
-## Phase 5: Documentation Updates 📚
-
-### Task 5.1: Update README Files
-**Priority:** HIGH  
-**Estimated Time:** 2 hours
-
-#### Subtasks:
-1. **Update README.md**
-   - Emphasize API key requirement
-   - Update initialization examples
-   - Add troubleshooting section for API key issues
-   - **File:** `README.md`
-
-2. **Update README_EDGE_TELEMETRY.md**
-   - Update Flutter compatibility section
-   - Ensure API key examples are consistent
-   - **File:** `README_EDGE_TELEMETRY.md`
-
-3. **Update USAGE_EXAMPLE.kt**
-   - Add API key to all examples
-   - Show secure storage example
-   - Add comments about API key security
-   - **File:** `USAGE_EXAMPLE.kt`
-
-4. **Update INTEGRATION_SUMMARY.md**
-   - Document API key requirement
-   - Add migration notes
-   - **File:** `INTEGRATION_SUMMARY.md`
-
-#### Acceptance Criteria:
-- [x] All documentation mentions API key requirement
-- [x] Examples show proper API key usage
-- [x] Security warnings are prominent
-- [x] Migration guide is clear
-
----
-
-### Task 5.2: Update CHANGELOG
-**Priority:** MEDIUM  
-**Estimated Time:** 30 minutes
-
-#### Subtasks:
-1. **Add new version entry**
-   - Create v1.2.8 or v1.3.0 section
-   - Document API key fixes
-   - Document security enhancements
-   - List breaking changes if any
-   - **File:** `CHANGELOG.md`
-
-2. **Document migration path**
-   - Explain changes from v1.2.7
-   - Provide upgrade instructions
-   - Highlight critical fixes
-
-#### Acceptance Criteria:
-- [x] CHANGELOG updated with new version
-- [x] All changes documented
-- [x] Migration instructions clear
-- [x] Breaking changes highlighted
-
----
-
-### Task 5.3: Create API Key Management Guide
-**Priority:** LOW  
-**Estimated Time:** 1 hour
-
-#### Subtasks:
-1. **Create API_KEY_GUIDE.md**
-   - How to obtain API key from backend
-   - How to securely store API key
-   - How to rotate API key
-   - Troubleshooting common issues
-   - **File:** `API_KEY_GUIDE.md` (new file)
-
-2. **Add to documentation index**
-   - Link from README
-   - Add to GitHub wiki if applicable
-
-#### Acceptance Criteria:
-- [x] Comprehensive API key guide created
-- [x] Covers all common scenarios
-- [x] Linked from main documentation
-- [x] Includes troubleshooting section
-
----
-
-## Phase 6: Release Preparation 🚀
-
-### Task 6.1: Version Bump
-**Priority:** HIGH  
-**Estimated Time:** 30 minutes
-
-#### Subtasks:
-1. **Update version in build.gradle.kts**
-   - Bump to v1.2.8 or v1.3.0
-   - Update version in publishing block
-   - **File:** `telemetry_library/build.gradle.kts` (line 122)
-
-2. **Update version references**
-   - Update README badges
-   - Update installation instructions
-   - Update CHANGELOG
-
-#### Acceptance Criteria:
-- [ ] Version bumped consistently across all files
-- [ ] Semantic versioning followed
-- [ ] Installation instructions updated
-
----
-
-### Task 6.2: Pre-release Testing
-**Priority:** CRITICAL  
-**Estimated Time:** 2 hours
-
-#### Subtasks:
-1. **Run all unit tests**
-   - Execute `./gradlew test`
-   - Ensure 100% pass rate
-   - Fix any failures
-
-2. **Run integration tests**
-   - Execute `./gradlew connectedAndroidTest`
-   - Test on real devices
-   - Test on different Android versions
-
-3. **Manual testing checklist**
-   - [ ] Initialize SDK with valid API key
-   - [ ] Initialize SDK with invalid API key (should fail gracefully)
-   - [ ] Send regular telemetry events
-   - [ ] Trigger crash report
-   - [ ] Test offline crash retry
-   - [ ] Verify all requests include X-API-Key header
-   - [ ] Check logs for API key redaction
-
-#### Acceptance Criteria:
-- [ ] All automated tests pass
-- [ ] Manual testing checklist completed
-- [ ] No regressions found
-- [ ] API key authentication works end-to-end
-
----
-
-### Task 6.3: Publish to JitPack
-**Priority:** HIGH  
-**Estimated Time:** 1 hour
-
-#### Subtasks:
-1. **Create Git tag**
-   - Tag commit with version number
-   - Push tag to GitHub
-   - `git tag v1.2.8 && git push origin v1.2.8`
-
-2. **Trigger JitPack build**
-   - Visit JitPack.io
-   - Verify build succeeds
-   - Test installation from JitPack
-
-3. **Update installation instructions**
-   - Update version in README
-   - Test installation in sample app
-
-#### Acceptance Criteria:
-- [ ] Git tag created and pushed
-- [ ] JitPack build successful
-- [ ] Library installable via Gradle
-- [ ] Sample app works with new version
-
----
-
-## Summary
-
-### Critical Path (Must Complete First):
-1. Task 1.1: Fix CrashRetryManager API Key Issue ⚠️
-2. Task 1.2: Add API Key Validation
-3. Task 4.1: Add Unit Tests
-4. Task 5.1: Update README Files
-5. Task 6.1: Version Bump
-6. Task 6.2: Pre-release Testing
-7. Task 6.3: Publish to JitPack
-
-### Total Estimated Time: 24-28 hours
-
-### Priority Order:
-1. **Phase 1** (Critical Bug Fixes) - 3-4 hours
-2. **Phase 4** (Testing) - 5-6 hours
-3. **Phase 5** (Documentation) - 3-4 hours
-4. **Phase 2** (Security) - 3 hours
-5. **Phase 3** (Configuration) - 2-5 hours
-6. **Phase 6** (Release) - 3-4 hours
-
-### Risk Areas:
-- CrashRetryWorker API key access (may need SharedPreferences)
-- Backward compatibility with existing integrations
-- JitPack build configuration changes
-
-### Success Metrics:
-- [ ] All crash reports include API key
-- [ ] Backend accepts 100% of authenticated requests
-- [ ] No API key exposure in logs
-- [ ] Zero breaking changes for existing users
-- [ ] Documentation comprehensive and clear
+Add lightweight city/country location tracking to telemetry payloads without requiring location permissions or GPS access. The solution uses network-based geolocation APIs that derive location from IP address.
+
+## Target Payload Structure
+```json
+{
+  "timestamp": "2026-01-26T21:00:00Z",
+  "device_id": "device_1234567890_abc123_android",
+  "data": {
+    "type": "batch",
+    "device_id": "device_1234567890_abc123_android",
+    "events": [...],
+    "batch_size": 50,
+    "timestamp": "2026-01-26T21:00:00Z",
+    "location": "Nairobi/Kenya"
+  }
+}
+```
+
+## Solution: IP-Based Geolocation with Fallback (No Permissions Required)
+
+### Approach
+Use **ipinfo.io** API (50,000 requests/month free) to get city/country information. If the API limit is exceeded or fails, send the device's IP address instead. Backend service will handle IP-to-location conversion asynchronously.
+
+**Key Features:**
+- ✅ **Lightweight** - Single HTTP request per session
+- ✅ **No permissions** - Uses network connection only (already required)
+- ✅ **Privacy-friendly** - Only city/country level, not precise location
+- ✅ **Minimal performance impact** - Cached for session duration
+- ✅ **Graceful degradation** - Falls back to IP address if API fails
+- ✅ **Backend processing** - Backend service converts IP to location asynchronously
+
+### Selected API: ipinfo.io
+- **Free Tier**: 50,000 requests/month
+- **Endpoint**: `https://ipinfo.io/json`
+- **Response**: `{"city": "Nairobi", "country": "KE", "ip": "105.163.0.47"}`
+- **Fallback**: If limit exceeded (HTTP 429) or error, send raw IP address
+
+### Location Format
+- **Success**: `"Nairobi/Kenya"` (City/Country)
+- **Fallback**: `"105.163.0.47"` (IP address for backend processing)
+
+## Implementation Plan
+
+### Phase 1: Core Location Service
+**File**: `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/location/LocationProvider.kt`
+
+**Features**:
+- Fetch location from IP geolocation API
+- Cache location for session duration (avoid repeated API calls)
+- Fallback to "Unknown/Unknown" if API fails
+- Configurable timeout (2-3 seconds max)
+- Background thread execution to avoid blocking
+
+**Key Methods**:
+```kotlin
+interface LocationProvider {
+    suspend fun getLocation(): String  // Returns "City/Country" or IP address
+    fun getCachedLocation(): String?
+    fun clearCache()
+}
+
+class IpLocationProvider(
+    private val httpClient: OkHttpClient,
+    private val apiEndpoint: String = "https://ipinfo.io/json"
+) : LocationProvider
+```
+
+### Phase 2: Update Data Models
+**Files to modify**:
+1. `TelemetryBatch.kt` - Add `location` field to `TelemetryDataOut`
+2. `FlutterCompatiblePayload.kt` - Add `location` field to `EventBatchData`
+
+**Changes**:
+```kotlin
+// TelemetryBatch.kt
+data class TelemetryDataOut(
+    val type: String = "batch",
+    val device_id: String,
+    val events: List<TelemetryEventOut>,
+    val batch_size: Int,
+    val timestamp: String,
+    val location: String? = null  // NEW: "City/Country" format
+)
+
+// FlutterCompatiblePayload.kt
+data class EventBatchData(
+    val type: String = "batch",
+    val events: List<EventData>,
+    val batch_size: Int,
+    val timestamp: String,
+    val location: String? = null  // NEW: "City/Country" format
+)
+```
+
+### Phase 3: Update Configuration
+**File**: `TelemetryConfig.kt`
+
+**Add configuration options**:
+```kotlin
+data class TelemetryConfig(
+    // ... existing fields ...
+    val enableLocationTracking: Boolean = true,
+    val locationApiEndpoint: String = "https://ipinfo.io/json",
+    val locationCacheDuration: Long = 3600000,  // 1 hour in ms
+    val locationFallbackToIp: Boolean = true    // Send IP if API fails
+)
+```
+
+### Phase 4: Integrate Location Provider
+**File**: `TelemetryManager.kt` or main telemetry orchestrator
+
+**Integration points**:
+1. Initialize `LocationProvider` on SDK init
+2. Fetch location once per session (or per cache duration)
+3. Include location in batch payloads
+4. Handle failures gracefully (don't block telemetry if location fails)
+
+**Flow**:
+```
+SDK Init → Fetch Location (async) → Cache → Include in Batches
+           ↓ (if fails)
+           Use "Unknown/Unknown"
+```
+
+### Phase 5: Update Payload Builders
+**File**: `FlutterCompatiblePayload.kt` - Update `FlutterPayloadFactory`
+
+**Modify**:
+```kotlin
+fun createEventBatchPayload(
+    events: List<EventData>,
+    deviceId: String,
+    location: String? = null  // NEW parameter
+): EventBatchPayload {
+    val timestamp = Instant.now().toString()
+    
+    return EventBatchPayload(
+        timestamp = timestamp,
+        device_id = deviceId,
+        data = EventBatchData(
+            events = events,
+            batch_size = events.size,
+            timestamp = timestamp,
+            location = location  // Include location
+        )
+    )
+}
+```
+
+## Implementation Details
+
+### LocationProvider Implementation
+```kotlin
+class IpLocationProvider(
+    private val httpClient: OkHttpClient,
+    private val apiEndpoint: String,
+    private val cacheDuration: Long,
+    private val fallbackToIp: Boolean = true
+) : LocationProvider {
+    
+    private var cachedLocation: String? = null
+    private var cacheTimestamp: Long = 0
+    
+    override suspend fun getLocation(): String = withContext(Dispatchers.IO) {
+        // Check cache first
+        if (isCacheValid()) {
+            return@withContext cachedLocation ?: "Unknown/Unknown"
+        }
+        
+        try {
+            val request = Request.Builder()
+                .url(apiEndpoint)
+                .get()
+                .build()
+            
+            val response = withTimeout(3000) {
+                httpClient.newCall(request).execute()
+            }
+            
+            if (response.isSuccessful) {
+                val json = JSONObject(response.body?.string() ?: "{}")
+                val city = json.optString("city", "")
+                val country = json.optString("country", "")  // ipinfo.io uses "country" not "country_name"
+                val ip = json.optString("ip", "")
+                
+                val location = if (city.isNotEmpty() && country.isNotEmpty()) {
+                    "$city/$country"
+                } else if (fallbackToIp && ip.isNotEmpty()) {
+                    ip  // Fallback to IP for backend processing
+                } else {
+                    "Unknown/Unknown"
+                }
+                
+                cachedLocation = location
+                cacheTimestamp = System.currentTimeMillis()
+                
+                location
+            } else if (response.code == 429 && fallbackToIp) {
+                // Rate limit exceeded - try to get IP from error response or use fallback
+                Log.w(TAG, "ipinfo.io rate limit exceeded, attempting IP fallback")
+                getIpAddressFallback()
+            } else {
+                "Unknown/Unknown"
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to fetch location: ${e.message}")
+            if (fallbackToIp) {
+                getIpAddressFallback()
+            } else {
+                "Unknown/Unknown"
+            }
+        }
+    }
+    
+    /**
+     * Fallback method to get device's public IP address
+     * Uses a simple IP echo service
+     */
+    private suspend fun getIpAddressFallback(): String {
+        return try {
+            val request = Request.Builder()
+                .url("https://api.ipify.org?format=text")  // Simple IP echo service
+                .get()
+                .build()
+            
+            val response = withTimeout(2000) {
+                httpClient.newCall(request).execute()
+            }
+            
+            if (response.isSuccessful) {
+                response.body?.string()?.trim() ?: "Unknown/Unknown"
+            } else {
+                "Unknown/Unknown"
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to get IP fallback: ${e.message}")
+            "Unknown/Unknown"
+        }
+    }
+    
+    private fun isCacheValid(): Boolean {
+        return cachedLocation != null && 
+               (System.currentTimeMillis() - cacheTimestamp) < cacheDuration
+    }
+}
+```
+
+## Performance Considerations
+
+### 1. **Caching Strategy**
+- Cache location for entire session (or 1 hour)
+- Only 1 API call per session
+- Minimal memory footprint (~50 bytes)
+
+### 2. **Network Impact**
+- Single HTTP request: ~500 bytes
+- Timeout: 3 seconds max
+- Non-blocking: Runs on background thread
+- Fails gracefully: Doesn't block telemetry
+
+### 3. **Battery Impact**
+- Negligible: Uses existing network connection
+- No GPS/location services required
+- No continuous polling
+
+### 4. **Privacy**
+- City/country level only (not precise)
+- Derived from IP (already exposed in HTTP requests)
+- No device location permissions
+- Can be disabled via config
+
+## Testing Strategy
+
+### 1. **Unit Tests**
+- Test location parsing from ipinfo.io responses
+- Test cache validity logic
+- Test fallback to IP address on rate limit (HTTP 429)
+- Test fallback to IP address on API failure
+- Test IP echo service fallback
+- Test timeout handling
+
+### 2. **Integration Tests**
+- Test location inclusion in payloads
+- Test with mock API responses
+- Test with API failures
+- Test cache expiration
+
+### 3. **Manual Testing**
+```kotlin
+// Test location provider
+val location = locationProvider.getLocation()
+Log.d("Location", "Detected: $location")
+
+// Test in payload
+EdgeTelemetryTester.validatePayloadStructure()
+```
+
+## Migration & Backward Compatibility
+
+### 1. **Optional Field**
+- `location` is nullable in data models
+- Existing payloads without location remain valid
+- Backend should handle both with/without location
+
+### 2. **Feature Flag**
+- `enableLocationTracking` config option
+- Default: `true` (opt-out)
+- Easy to disable if needed
+
+### 3. **Gradual Rollout**
+- Can be enabled/disabled per app
+- No breaking changes to existing SDK users
+
+## Alternative Approaches (Considered & Rejected)
+
+### ❌ GPS/FusedLocationProvider
+- **Requires**: `ACCESS_FINE_LOCATION` or `ACCESS_COARSE_LOCATION` permissions
+- **Impact**: User permission prompt, privacy concerns
+- **Rejected**: Too invasive for telemetry use case
+
+### ❌ Carrier/Network Cell Tower
+- **Requires**: `ACCESS_FINE_LOCATION` permission
+- **Accuracy**: City-level but still needs permissions
+- **Rejected**: Requires permissions
+
+### ❌ Timezone-based Estimation
+- **Accuracy**: Very low (timezone != location)
+- **Example**: US has 4 timezones, can't determine city
+- **Rejected**: Too inaccurate
+
+### ✅ IP-based Geolocation (Selected)
+- **Requires**: No permissions (uses existing INTERNET permission)
+- **Accuracy**: City/country level (sufficient for analytics)
+- **Privacy**: Non-invasive, aggregated data
+- **Performance**: Minimal impact with caching
+
+## File Changes Summary
+
+### New Files
+1. `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/location/LocationProvider.kt`
+2. `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/location/IpLocationProvider.kt`
+
+### Modified Files
+1. `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/models/TelemetryBatch.kt`
+2. `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/payload/FlutterCompatiblePayload.kt`
+3. `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/TelemetryConfig.kt`
+4. `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/TelemetryManager.kt`
+5. `sample_telemetry_payload.json` (update example)
+6. `README_EDGE_TELEMETRY.md` (add documentation)
+
+## Estimated Effort
+- **Development**: 4-6 hours
+- **Testing**: 2-3 hours
+- **Documentation**: 1 hour
+- **Total**: ~1 day
+
+## Step-by-Step Implementation Guide
+
+### Step 1: Create Location Provider Interface
+**File**: `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/location/LocationProvider.kt`
+
+```kotlin
+package com.androidtel.telemetry_library.core.location
+
+/**
+ * Interface for location providers that fetch city/country information
+ * or IP address for telemetry payloads
+ */
+interface LocationProvider {
+    /**
+     * Get location as "City/Country" or IP address if API fails
+     * @return Location string (e.g., "Nairobi/Kenya" or "105.163.0.47")
+     */
+    suspend fun getLocation(): String
+    
+    /**
+     * Get cached location without making network call
+     * @return Cached location or null if not cached
+     */
+    fun getCachedLocation(): String?
+    
+    /**
+     * Clear cached location (useful for testing or session changes)
+     */
+    fun clearCache()
+}
+```
+
+### Step 2: Implement IP Location Provider
+**File**: `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/location/IpLocationProvider.kt`
+
+```kotlin
+package com.androidtel.telemetry_library.core.location
+
+import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
+
+/**
+ * Location provider that uses ipinfo.io API to get city/country
+ * Falls back to IP address if API fails or rate limit is exceeded
+ */
+class IpLocationProvider(
+    private val httpClient: OkHttpClient,
+    private val apiEndpoint: String = "https://ipinfo.io/json",
+    private val cacheDuration: Long = 3600000, // 1 hour
+    private val fallbackToIp: Boolean = true
+) : LocationProvider {
+    
+    companion object {
+        private const val TAG = "IpLocationProvider"
+        private const val IP_ECHO_SERVICE = "https://api.ipify.org?format=text"
+    }
+    
+    @Volatile
+    private var cachedLocation: String? = null
+    
+    @Volatile
+    private var cacheTimestamp: Long = 0
+    
+    override suspend fun getLocation(): String = withContext(Dispatchers.IO) {
+        // Check cache first
+        if (isCacheValid()) {
+            Log.d(TAG, "Returning cached location: $cachedLocation")
+            return@withContext cachedLocation ?: "Unknown/Unknown"
+        }
+        
+        try {
+            val request = Request.Builder()
+                .url(apiEndpoint)
+                .get()
+                .build()
+            
+            val response = withTimeout(3000) {
+                httpClient.newCall(request).execute()
+            }
+            
+            if (response.isSuccessful) {
+                val json = JSONObject(response.body?.string() ?: "{}")
+                val city = json.optString("city", "")
+                val country = json.optString("country", "")
+                val ip = json.optString("ip", "")
+                
+                val location = when {
+                    city.isNotEmpty() && country.isNotEmpty() -> {
+                        Log.d(TAG, "Successfully fetched location: $city/$country")
+                        "$city/$country"
+                    }
+                    fallbackToIp && ip.isNotEmpty() -> {
+                        Log.d(TAG, "Using IP from response: $ip")
+                        ip
+                    }
+                    else -> {
+                        Log.w(TAG, "No location data in response")
+                        "Unknown/Unknown"
+                    }
+                }
+                
+                cachedLocation = location
+                cacheTimestamp = System.currentTimeMillis()
+                
+                location
+            } else if (response.code == 429 && fallbackToIp) {
+                Log.w(TAG, "ipinfo.io rate limit exceeded (429), attempting IP fallback")
+                getIpAddressFallback()
+            } else {
+                Log.w(TAG, "API request failed with code: ${response.code}")
+                "Unknown/Unknown"
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to fetch location: ${e.message}")
+            if (fallbackToIp) {
+                getIpAddressFallback()
+            } else {
+                "Unknown/Unknown"
+            }
+        }
+    }
+    
+    override fun getCachedLocation(): String? = cachedLocation
+    
+    override fun clearCache() {
+        Log.d(TAG, "Clearing location cache")
+        cachedLocation = null
+        cacheTimestamp = 0
+    }
+    
+    /**
+     * Fallback method to get device's public IP address
+     * Uses api.ipify.org as a simple IP echo service
+     */
+    private suspend fun getIpAddressFallback(): String {
+        return try {
+            val request = Request.Builder()
+                .url(IP_ECHO_SERVICE)
+                .get()
+                .build()
+            
+            val response = withTimeout(2000) {
+                httpClient.newCall(request).execute()
+            }
+            
+            if (response.isSuccessful) {
+                val ip = response.body?.string()?.trim() ?: ""
+                if (ip.isNotEmpty()) {
+                    Log.d(TAG, "IP fallback successful: $ip")
+                    cachedLocation = ip
+                    cacheTimestamp = System.currentTimeMillis()
+                    ip
+                } else {
+                    Log.w(TAG, "IP fallback returned empty response")
+                    "Unknown/Unknown"
+                }
+            } else {
+                Log.w(TAG, "IP fallback failed with code: ${response.code}")
+                "Unknown/Unknown"
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "IP fallback exception: ${e.message}")
+            "Unknown/Unknown"
+        }
+    }
+    
+    private fun isCacheValid(): Boolean {
+        return cachedLocation != null && 
+               (System.currentTimeMillis() - cacheTimestamp) < cacheDuration
+    }
+}
+```
+
+### Step 3: Update TelemetryBatch Data Models
+**File**: `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/models/TelemetryBatch.kt`
+
+Add `location` field to `TelemetryDataOut`:
+
+```kotlin
+data class TelemetryDataOut(
+    val type: String = "batch",
+    val device_id: String,
+    val events: List<TelemetryEventOut>,
+    val batch_size: Int,
+    val timestamp: String,
+    val location: String? = null  // NEW: "City/Country" or IP address
+)
+```
+
+### Step 4: Update Flutter Compatible Payload Models
+**File**: `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/payload/FlutterCompatiblePayload.kt`
+
+Add `location` field to `EventBatchData`:
+
+```kotlin
+data class EventBatchData(
+    val type: String = "batch",
+    val events: List<EventData>,
+    val batch_size: Int,
+    val timestamp: String,
+    val location: String? = null  // NEW: "City/Country" or IP address
+)
+```
+
+Update `FlutterPayloadFactory.createEventBatchPayload`:
+
+```kotlin
+fun createEventBatchPayload(
+    events: List<EventData>,
+    deviceId: String,
+    location: String? = null  // NEW parameter
+): EventBatchPayload {
+    val timestamp = Instant.now().toString()
+    
+    return EventBatchPayload(
+        timestamp = timestamp,
+        device_id = deviceId,
+        data = EventBatchData(
+            events = events,
+            batch_size = events.size,
+            timestamp = timestamp,
+            location = location  // Include location
+        )
+    )
+}
+```
+
+### Step 5: Update TelemetryConfig
+**File**: `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/TelemetryConfig.kt`
+
+Add location tracking configuration options:
+
+```kotlin
+data class TelemetryConfig(
+    val application: Application,
+    val apiKey: String,
+    val batchSize: Int = 30,
+    val endpoint: String = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
+    val debugMode: Boolean = false,
+    val enableCrashReporting: Boolean = true,
+    val enableUserProfiles: Boolean = true,
+    val enableSessionTracking: Boolean = true,
+    val globalAttributes: Map<String, String> = emptyMap(),
+    // NEW: Location tracking options
+    val enableLocationTracking: Boolean = true,
+    val locationApiEndpoint: String = "https://ipinfo.io/json",
+    val locationCacheDuration: Long = 3600000,  // 1 hour in ms
+    val locationFallbackToIp: Boolean = true
+) {
+    // ... existing init block ...
+}
+```
+
+Update the Builder class:
+
+```kotlin
+class Builder(
+    private val application: Application,
+    private val apiKey: String
+) {
+    // ... existing fields ...
+    private var enableLocationTracking: Boolean = true
+    private var locationApiEndpoint: String = "https://ipinfo.io/json"
+    private var locationCacheDuration: Long = 3600000
+    private var locationFallbackToIp: Boolean = true
+    
+    // ... existing methods ...
+    
+    fun enableLocationTracking(enabled: Boolean) = apply { this.enableLocationTracking = enabled }
+    fun locationApiEndpoint(endpoint: String) = apply { this.locationApiEndpoint = endpoint }
+    fun locationCacheDuration(duration: Long) = apply { this.locationCacheDuration = duration }
+    fun locationFallbackToIp(enabled: Boolean) = apply { this.locationFallbackToIp = enabled }
+    
+    fun build() = TelemetryConfig(
+        // ... existing parameters ...
+        enableLocationTracking = enableLocationTracking,
+        locationApiEndpoint = locationApiEndpoint,
+        locationCacheDuration = locationCacheDuration,
+        locationFallbackToIp = locationFallbackToIp
+    )
+}
+```
+
+### Step 6: Integrate LocationProvider into TelemetryManager
+**File**: `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/TelemetryManager.kt`
+
+1. Add LocationProvider as a class member
+2. Initialize it during SDK initialization
+3. Fetch location asynchronously on init
+4. Pass location to payload builders
+
+**Key changes:**
+
+```kotlin
+class TelemetryManager private constructor() {
+    
+    private var locationProvider: LocationProvider? = null
+    private var currentLocation: String? = null
+    
+    fun initialize(config: TelemetryConfig) {
+        // ... existing initialization ...
+        
+        // Initialize location provider if enabled
+        if (config.enableLocationTracking) {
+            locationProvider = IpLocationProvider(
+                httpClient = httpClient,  // Use existing OkHttpClient
+                apiEndpoint = config.locationApiEndpoint,
+                cacheDuration = config.locationCacheDuration,
+                fallbackToIp = config.locationFallbackToIp
+            )
+            
+            // Fetch location asynchronously (don't block initialization)
+            coroutineScope.launch {
+                try {
+                    currentLocation = locationProvider?.getLocation()
+                    Log.d(TAG, "Location initialized: $currentLocation")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to initialize location: ${e.message}")
+                }
+            }
+        }
+    }
+    
+    // Update batch sending to include location
+    private fun sendBatch(events: List<TelemetryEvent>) {
+        coroutineScope.launch {
+            try {
+                // Get current location (from cache if available)
+                val location = locationProvider?.getCachedLocation() ?: currentLocation
+                
+                // Create payload with location
+                val payload = createPayloadWithLocation(events, location)
+                
+                // Send payload
+                // ... existing send logic ...
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send batch", e)
+            }
+        }
+    }
+    
+    private fun createPayloadWithLocation(
+        events: List<TelemetryEvent>,
+        location: String?
+    ): TelemetryPayload {
+        // Convert events to output format
+        val eventDataList = events.map { /* conversion logic */ }
+        
+        // Create payload with location
+        return TelemetryPayload(
+            timestamp = Instant.now().toString(),
+            device_id = idGenerator.getDeviceId(),
+            data = TelemetryDataOut(
+                type = "batch",
+                device_id = idGenerator.getDeviceId(),
+                events = eventDataList,
+                batch_size = events.size,
+                timestamp = Instant.now().toString(),
+                location = location  // Include location
+            )
+        )
+    }
+}
+```
+
+### Step 7: Update Sample Payload JSON
+**File**: `sample_telemetry_payload.json`
+
+Add location field to the example:
+
+```json
+{
+  "timestamp": "2025-09-22T13:42:10.123Z",
+  "device_id": "device_1727012247_ghi789_android",
+  "data": {
+    "type": "batch",
+    "device_id": "device_1727012247_ghi789_android",
+    "events": [...],
+    "batch_size": 7,
+    "timestamp": "2025-09-22T13:42:10.123Z",
+    "location": "Nairobi/Kenya"
+  }
+}
+```
+
+### Step 8: Add Unit Tests
+**File**: `telemetry_library/src/test/java/com/androidtel/telemetry_library/location/IpLocationProviderTest.kt`
+
+```kotlin
+class IpLocationProviderTest {
+    
+    @Test
+    fun `test successful location fetch from ipinfo`() {
+        // Mock successful response
+        // Assert location is "City/Country" format
+    }
+    
+    @Test
+    fun `test rate limit fallback to IP`() {
+        // Mock HTTP 429 response
+        // Assert fallback to IP echo service
+    }
+    
+    @Test
+    fun `test cache validity`() {
+        // Test that cache is used within duration
+        // Test that cache expires after duration
+    }
+    
+    @Test
+    fun `test IP fallback on API failure`() {
+        // Mock API failure
+        // Assert IP fallback is used
+    }
+    
+    @Test
+    fun `test location included in payload`() {
+        // Test that location field is present in TelemetryPayload
+    }
+}
+```
+
+### Step 9: Update Documentation
+**File**: `README_EDGE_TELEMETRY.md`
+
+Add section on location tracking:
+
+```markdown
+## Location Tracking
+
+The SDK automatically includes city/country location in telemetry payloads using IP-based geolocation (no permissions required).
+
+### Configuration
+
+```kotlin
+val config = TelemetryConfig.builder(this, BuildConfig.TELEMETRY_API_KEY)
+    .enableLocationTracking(true)  // Default: true
+    .locationApiEndpoint("https://ipinfo.io/json")  // Default
+    .locationCacheDuration(3600000)  // 1 hour cache
+    .locationFallbackToIp(true)  // Send IP if API fails
+    .build()
+```
+
+### How It Works
+
+- Uses ipinfo.io API (50,000 free requests/month)
+- Location cached for 1 hour per session
+- Falls back to IP address if rate limit exceeded
+- No location permissions required
+- Minimal performance impact
+
+### Location Format
+
+- **Success**: `"Nairobi/Kenya"` (City/Country)
+- **Fallback**: `"105.163.0.47"` (IP address for backend processing)
+- **Disabled**: `null` (location field omitted)
+
+### Disable Location Tracking
+
+```kotlin
+val config = TelemetryConfig.builder(this, apiKey)
+    .enableLocationTracking(false)
+    .build()
+```
+```
+
+### Step 10: Update Changelog
+**File**: `README_EDGE_TELEMETRY.md` - Changelog section
+
+```markdown
+### Version 1.2.9 (Upcoming)
+- ✨ **NEW**: IP-based location tracking (city/country)
+- ✨ **NEW**: Automatic fallback to IP address on rate limit
+- ✨ **NEW**: Location caching to minimize API calls
+- 🔧 **IMPROVED**: Payload structure includes location field
+- 📚 **UPDATED**: Documentation with location tracking guide
+- 🔒 **PRIVACY**: No location permissions required
+```
+
+## Implementation Checklist
+
+- [ ] Create `LocationProvider.kt` interface
+- [ ] Implement `IpLocationProvider.kt` with ipinfo.io integration
+- [ ] Update `TelemetryBatch.kt` - add location field to `TelemetryDataOut`
+- [ ] Update `FlutterCompatiblePayload.kt` - add location field to `EventBatchData`
+- [ ] Update `TelemetryConfig.kt` - add location tracking options
+- [ ] Update `TelemetryManager.kt` - integrate LocationProvider
+- [ ] Update `sample_telemetry_payload.json` - add location example
+- [ ] Write unit tests for `IpLocationProvider`
+- [ ] Write integration tests for location in payloads
+- [ ] Update `README_EDGE_TELEMETRY.md` - add location tracking documentation
+- [ ] Update changelog with version 1.2.9 features
+- [ ] Test with real ipinfo.io API
+- [ ] Test rate limit fallback scenario
+- [ ] Test cache expiration
+- [ ] Build and release SDK version 1.2.9
