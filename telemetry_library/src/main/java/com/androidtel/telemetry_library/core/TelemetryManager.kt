@@ -219,6 +219,15 @@ class TelemetryManager private constructor(
                 telemetryEndpoint = manager.telemetryEndpoint
             )
         }
+        
+        /**
+         * Reset singleton instance for testing purposes only.
+         * This method should NEVER be called in production code.
+         */
+        @JvmStatic
+        internal fun resetForTesting() {
+            instance = null
+        }
     }
 
     /**

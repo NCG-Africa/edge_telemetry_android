@@ -171,16 +171,55 @@ object EdgeTelemetryTester {
     }
     
     /**
+     * Test API key validation and authenticated connectivity
+     */
+    fun testApiKeyValidation() {
+        try {
+            Log.i(TAG, "🔑 Testing API key validation...")
+            
+            // Verify SDK is initialized (which validates API key)
+            val edgeTelemetry = EdgeTelemetry.getInstance()
+            Log.i(TAG, "✅ SDK initialized with valid API key")
+            
+            // Test authenticated connectivity by sending a test event
+            edgeTelemetry.recordEvent("api_key.validation_test", mapOf(
+                "test" to "api_key_validation",
+                "timestamp" to System.currentTimeMillis().toString()
+            ))
+            
+            Log.i(TAG, "📡 Test event sent with API key authentication")
+            
+            // Add breadcrumb to verify authenticated request
+            edgeTelemetry.addBreadcrumb(
+                "API key validation test",
+                "system",
+                "info",
+                mapOf("validation" to "success")
+            )
+            
+            Log.i(TAG, "✅ API key validation test completed successfully")
+        } catch (e: IllegalStateException) {
+            Log.e(TAG, "❌ SDK not initialized - API key validation failed", e)
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ API key validation test failed", e)
+        }
+    }
+    
+    /**
      * Run comprehensive test suite
      */
     fun runComprehensiveTest() {
         Log.i(TAG, "🧪 Starting comprehensive EdgeTelemetry test suite...")
         
         try {
-            // Test in sequence with delays
-            testBreadcrumbs()
+            // Test API key validation first
+            testApiKeyValidation()
             
+            // Test in sequence with delays
             CoroutineScope(Dispatchers.IO).launch {
+                kotlinx.coroutines.delay(500)
+                testBreadcrumbs()
+                
                 kotlinx.coroutines.delay(500)
                 testEventTracking()
                 

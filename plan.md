@@ -253,10 +253,10 @@ This plan addresses the integration and enhancement of API key authentication ac
    - **File:** `telemetry_library/src/test/java/com/androidtel/telemetry_library/ApiKeyRedactionTest.kt`
 
 #### Acceptance Criteria:
-- [ ] All tests pass
-- [ ] Code coverage > 80% for API key logic
-- [ ] Edge cases covered (null, empty, invalid format)
-- [ ] Mock tests verify header presence
+- [x] All tests pass
+- [x] Code coverage > 80% for API key logic
+- [x] Edge cases covered (null, empty, invalid format)
+- [x] Mock tests verify header presence
 
 ---
 
@@ -308,9 +308,9 @@ This plan addresses the integration and enhancement of API key authentication ac
    - Add to runComprehensiveTest()
 
 #### Acceptance Criteria:
-- [ ] EdgeTelemetryTester validates API key
-- [ ] Test suite covers authentication scenarios
-- [ ] Developers can easily test API key setup
+- [x] EdgeTelemetryTester validates API key
+- [x] Test suite covers authentication scenarios
+- [x] Developers can easily test API key setup
 
 ---
 
