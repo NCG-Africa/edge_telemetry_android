@@ -29,6 +29,7 @@ class MyApplication : Application() {
         // ⚠️ SECURITY: Never hardcode API keys in source code!
         // Use BuildConfig, local.properties, or environment variables instead.
         // See README.md "API Key Security Best Practices" section for details.
+        // For comprehensive guide, see: API_KEY_GUIDE.md
         
         // Option 1: Initialize with TelemetryConfig (Recommended)
         // Cleaner, more maintainable approach for complex configurations

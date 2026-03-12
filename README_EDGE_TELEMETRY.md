@@ -49,14 +49,35 @@ Add to your `AndroidManifest.xml`:
 
 ### 1. Initialize in Application
 
+> **🔐 SECURITY**: Never hardcode API keys! Use BuildConfig, local.properties, or environment variables.
+
 ```kotlin
 class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         
+        // Option 1: Using TelemetryConfig (Recommended)
+        val config = TelemetryConfig.builder(this, BuildConfig.TELEMETRY_API_KEY)
+            .endpoint("https://edgetelemetry.ncgafrica.com/collector/telemetry")
+            .debugMode(BuildConfig.DEBUG)
+            .batchSize(30)
+            .enableCrashReporting(true)
+            .enableUserProfiles(true)
+            .enableSessionTracking(true)
+            .globalAttributes(mapOf(
+                "app.environment" to if (BuildConfig.DEBUG) "development" else "production",
+                "app.flavor" to BuildConfig.FLAVOR
+            ))
+            .build()
+        
+        TelemetryManager.initialize(config)
+        
+        // Option 2: Direct parameters (Legacy)
+        /*
         TelemetryManager.initialize(
             application = this,
-            endpoint = "https://your-telemetry-endpoint.com/collector/telemetry",
+            apiKey = BuildConfig.TELEMETRY_API_KEY,  // ⚠️ REQUIRED (v1.2.6+)
+            endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
             debugMode = BuildConfig.DEBUG,
             batchSize = 30,
             enableCrashReporting = true, // enabled by default
@@ -67,9 +88,12 @@ class MyApplication : Application() {
                 "app.flavor" to BuildConfig.FLAVOR
             )
         )
+        */
     }
 }
 ```
+
+> **⚠️ Breaking Change (v1.2.6+)**: The `apiKey` parameter is now **required**. Get your API key from your backend administrator.
 
 ### 2. Basic Usage
 
@@ -379,10 +403,29 @@ The SDK generates IDs that match the Flutter SDK format exactly:
 
 ## Configuration Options
 
+### Using TelemetryConfig (Recommended)
+
+```kotlin
+val config = TelemetryConfig.builder(application, BuildConfig.TELEMETRY_API_KEY)
+    .endpoint("https://edgetelemetry.ncgafrica.com/collector/telemetry")
+    .debugMode(false)                    // Enable debug logging
+    .batchSize(30)                       // Events per batch
+    .enableCrashReporting(true)          // Automatic crash detection (default: true)
+    .enableUserProfiles(true)            // User profile management (default: true)
+    .enableSessionTracking(true)         // Enhanced session tracking (default: true)
+    .globalAttributes(emptyMap())        // Global attributes for all events
+    .build()
+
+TelemetryManager.initialize(config)
+```
+
+### Using Direct Parameters (Legacy)
+
 ```kotlin
 TelemetryManager.initialize(
     application = applicationContext,
-    endpoint = "https://your-endpoint.com/collector/telemetry",
+    apiKey = BuildConfig.TELEMETRY_API_KEY,  // ⚠️ REQUIRED (v1.2.6+)
+    endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
     debugMode = false,                    // Enable debug logging
     batchSize = 30,                       // Events per batch
     enableCrashReporting = true,          // Automatic crash detection (default: true)
@@ -390,6 +433,33 @@ TelemetryManager.initialize(
     enableSessionTracking = true,         // Enhanced session tracking (default: true)
     globalAttributes = emptyMap()         // Global attributes for all events
 )
+```
+
+### API Key Security
+
+**Store API key in `local.properties`:**
+```properties
+# local.properties (gitignored)
+TELEMETRY_API_KEY=edge_your_api_key_here
+```
+
+**Access in `build.gradle.kts`:**
+```kotlin
+android {
+    defaultConfig {
+        val properties = Properties()
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            properties.load(FileInputStream(localPropertiesFile))
+        }
+        
+        buildConfigField(
+            "String",
+            "TELEMETRY_API_KEY",
+            "\"${properties.getProperty("TELEMETRY_API_KEY", "")}\""
+        )
+    }
+}
 ```
 
 ## Requirements
@@ -426,6 +496,27 @@ For issues, feature requests, or questions:
 3. Include SDK version, Android version, and reproduction steps
 
 ## Changelog
+
+### Version 1.2.8 (Upcoming)
+- 🔒 **SECURITY**: API key authentication now required for all requests
+- ✨ **NEW**: TelemetryConfig builder pattern for cleaner initialization
+- ✨ **NEW**: API key validation with "edge_" prefix requirement
+- ✨ **NEW**: Automatic API key redaction in debug logs
+- 🔧 **IMPROVED**: Enhanced crash retry mechanism with API key support
+- 🔧 **IMPROVED**: Comprehensive unit test coverage for API key logic
+- 📚 **UPDATED**: Documentation with security best practices
+- ⚠️ **BREAKING**: `apiKey` parameter now required in initialization
+
+### Version 1.2.7
+- 🔒 **IMPROVED**: Guaranteed non-null ID generation
+- 📊 **NEW**: Top-level device_id in all payloads
+- 🛡️ **IMPROVED**: Enhanced ID validation and fallback mechanisms
+- 🔧 **IMPROVED**: Payload structure improvements for backend filtering
+
+### Version 1.2.6
+- 🔒 **SECURITY**: API key authentication introduced
+- 🛡️ **IMPROVED**: Critical ID validation with safe error handling
+- 📊 **IMPROVED**: Enhanced JSON response structure
 
 ### Version 1.2.1
 - 🔧 **IMPROVED**: Unified API - single TelemetryManager initialization

@@ -5,6 +5,148 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.8] - 2025-01-XX
+
+### 🔒 Critical Security & Reliability Fixes
+
+#### API Key Authentication Enhancements
+- **CrashRetryManager Fix**: Fixed critical bug where crash retry requests bypassed API key authentication
+- **Comprehensive Coverage**: API key now included in all network requests (regular batches, crash reports, offline retries, WorkManager jobs)
+- **Validation Enhancement**: API key validation now enforces "edge_" prefix requirement
+- **Error Messages**: Improved error messages guide developers to obtain API key from backend
+
+#### Crash Reporting Reliability
+- **Offline Retry Fixed**: Crash reports now properly authenticated during offline retry attempts
+- **WorkManager Integration**: Background retry jobs now include API key in all requests
+- **Endpoint Configuration**: Removed hardcoded endpoints from CrashRetryManager
+- **Consistent Headers**: All crash-related requests include both `X-API-Key` and `User-Agent` headers
+
+### ✨ New Features
+
+#### TelemetryConfig Builder Pattern
+- **Cleaner Initialization**: New builder pattern for type-safe, immutable configuration
+- **Validation at Build Time**: Configuration validated when built, not at runtime
+- **Fluent API**: Chainable methods for intuitive configuration
+- **Backward Compatible**: Existing parameter-based initialization still fully supported
+
+```kotlin
+// New TelemetryConfig builder (recommended)
+val config = TelemetryConfig.builder(application, apiKey)
+    .batchSize(30)
+    .endpoint("https://edgetelemetry.ncgafrica.com/collector/telemetry")
+    .debugMode(true)
+    .enableCrashReporting(true)
+    .enableUserProfiles(true)
+    .enableSessionTracking(true)
+    .globalAttributes(mapOf("key" to "value"))
+    .build()
+
+TelemetryManager.initialize(config)
+```
+
+### 🔧 Improvements
+
+#### Security Enhancements
+- **API Key Redaction**: API keys automatically redacted in debug logs (e.g., `edge_****_xyz1`)
+- **ProGuard/R8 Rules**: Consumer rules added to protect API keys in release builds
+- **Security Documentation**: Comprehensive security best practices added to README
+- **BuildConfig Guidance**: Clear examples for secure API key storage
+
+#### Testing & Quality
+- **Unit Test Coverage**: Comprehensive tests for API key validation and authentication
+- **Integration Tests**: Tests verify API key inclusion in all request types
+- **EdgeTelemetryTester**: Updated testing utilities validate API key configuration
+- **Mock Tests**: HTTP client tests verify header presence and correctness
+
+#### Documentation Updates
+- **README.md**: Updated with TelemetryConfig examples and enhanced troubleshooting
+- **README_EDGE_TELEMETRY.md**: Added API key integration and security guidance
+- **USAGE_EXAMPLE.kt**: Enhanced security comments and API_KEY_GUIDE.md reference
+- **INTEGRATION_SUMMARY.md**: Added comprehensive migration guide for v1.2.6+ and v1.2.8+
+- **API_KEY_GUIDE.md**: New comprehensive guide for API key management (see Task 5.3)
+
+### 🐛 Bug Fixes
+
+#### Critical Fixes
+- **CrashRetryManager API Key**: Fixed missing API key in crash retry requests
+- **Hardcoded Endpoints**: Removed hardcoded telemetry endpoint from CrashRetryManager
+- **WorkManager Retry**: Fixed API key not being passed to WorkManager retry jobs
+- **Offline Batch Sync**: Fixed API key missing from offline batch synchronization
+
+#### Component Updates
+- **CrashRetryManager**: Now accepts `apiKey` and `telemetryEndpoint` parameters
+- **CrashReporter**: Updated to pass API key and endpoint to CrashRetryManager
+- **TelemetryManager**: Enhanced Flutter components initialization with API key
+- **TelemetryHttpClient**: Consistent API key header across all request types
+
+### 📝 Migration Guide
+
+#### From v1.2.7 to v1.2.8
+
+**No Breaking Changes** - This is a patch release with bug fixes and enhancements.
+
+**Recommended Actions:**
+1. **Adopt TelemetryConfig** for cleaner initialization code (optional)
+2. **Review Security Practices** using updated documentation
+3. **Test Crash Reporting** to verify offline retry functionality
+4. **Update Documentation** references if using custom integration guides
+
+**Example Migration to TelemetryConfig:**
+```kotlin
+// Before (still works)
+TelemetryManager.initialize(
+    application = this,
+    apiKey = BuildConfig.TELEMETRY_API_KEY,
+    batchSize = 30,
+    endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
+    debugMode = BuildConfig.DEBUG
+)
+
+// After (recommended)
+val config = TelemetryConfig.builder(this, BuildConfig.TELEMETRY_API_KEY)
+    .batchSize(30)
+    .endpoint("https://edgetelemetry.ncgafrica.com/collector/telemetry")
+    .debugMode(BuildConfig.DEBUG)
+    .build()
+
+TelemetryManager.initialize(config)
+```
+
+### ⚠️ Important Notes
+
+- **Backend Compatibility**: Ensure your backend validates `X-API-Key` header
+- **Crash Retry**: Offline crash reports now properly authenticated
+- **API Key Format**: Must start with "edge_" prefix
+- **Security**: Never hardcode API keys - use BuildConfig or environment variables
+
+### 📊 Technical Details
+
+#### Files Modified
+- `CrashRetryManager.kt` - Added API key and endpoint parameters
+- `CrashReporter.kt` - Updated to pass configuration to CrashRetryManager
+- `TelemetryManager.kt` - Enhanced initialization with API key validation
+- `TelemetryConfig.kt` - New configuration builder class
+- `TelemetryManagerTest.kt` - Added comprehensive API key tests
+
+#### Test Coverage
+- API key validation tests (blank, invalid format, valid)
+- HTTP request header verification tests
+- Crash retry API key inclusion tests
+- WorkManager retry authentication tests
+- TelemetryConfig builder validation tests
+
+### 🎯 Success Metrics
+
+- ✅ All crash reports include API key in `X-API-Key` header
+- ✅ Offline crash retries properly authenticated
+- ✅ WorkManager retry jobs include API key
+- ✅ No hardcoded endpoints in codebase
+- ✅ API key validation prevents blank/invalid keys
+- ✅ Unit test coverage >80% for API key logic
+- ✅ Documentation comprehensive and clear
+
+---
+
 ## [1.2.7] - 2025-01-27
 
 ### 🔒 ID Generation Enhancements

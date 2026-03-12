@@ -143,18 +143,75 @@ dependencies {
 
 ### 1. Initialize the SDK
 
+> **🔐 SECURITY FIRST**: Never hardcode API keys! Use BuildConfig, local.properties, or environment variables. See [API Key Security](#-api-key-security-best-practices) section below.
+
 Initialize the SDK in your `Application` class:
 
-#### Kotlin
+#### Option A: TelemetryConfig (Recommended)
+
+**Kotlin**
 ```kotlin
 class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         
-        // Initialize telemetry SDK
+        // Create configuration
+        val config = TelemetryConfig.builder(this, BuildConfig.TELEMETRY_API_KEY)
+            .batchSize(30)
+            .endpoint("https://edgetelemetry.ncgafrica.com/collector/telemetry")
+            .debugMode(BuildConfig.DEBUG)
+            .enableCrashReporting(true)
+            .enableUserProfiles(true)
+            .enableSessionTracking(true)
+            .globalAttributes(mapOf(
+                "app_environment" to if (BuildConfig.DEBUG) "dev" else "prod"
+            ))
+            .build()
+        
+        // Initialize SDK
+        TelemetryManager.initialize(config)
+    }
+}
+```
+
+**Java**
+```java
+public class MyApplication extends Application {
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        
+        // Create configuration
+        Map<String, String> globalAttrs = new HashMap<>();
+        globalAttrs.put("app_environment", BuildConfig.DEBUG ? "dev" : "prod");
+        
+        TelemetryConfig config = TelemetryConfig.builder(this, BuildConfig.TELEMETRY_API_KEY)
+            .batchSize(30)
+            .endpoint("https://edgetelemetry.ncgafrica.com/collector/telemetry")
+            .debugMode(BuildConfig.DEBUG)
+            .enableCrashReporting(true)
+            .enableUserProfiles(true)
+            .enableSessionTracking(true)
+            .globalAttributes(globalAttrs)
+            .build();
+        
+        // Initialize SDK
+        TelemetryManager.initialize(config);
+    }
+}
+```
+
+#### Option B: Direct Parameters (Legacy)
+
+**Kotlin**
+```kotlin
+class MyApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        
         TelemetryManager.initialize(
             application = this,
-            apiKey = "your-api-key-here",  // ⚠️ REQUIRED - Get from your backend
+            apiKey = BuildConfig.TELEMETRY_API_KEY,  // ✅ From BuildConfig
             batchSize = 30,
             endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
             debugMode = BuildConfig.DEBUG,
@@ -166,17 +223,16 @@ class MyApplication : Application() {
 }
 ```
 
-#### Java
+**Java**
 ```java
 public class MyApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
         
-        // Initialize telemetry SDK
         TelemetryManager.initialize(
             this,                                                      // application
-            "your-api-key-here",                                      // apiKey (REQUIRED)
+            BuildConfig.TELEMETRY_API_KEY,                            // apiKey ✅ From BuildConfig
             30,                                                        // batchSize
             "https://edgetelemetry.ncgafrica.com/collector/telemetry", // endpoint
             BuildConfig.DEBUG,                                         // debugMode
@@ -188,7 +244,7 @@ public class MyApplication extends Application {
 }
 ```
 
-> **⚠️ Important**: The `apiKey` parameter is **required** as of version 1.2.6. Get your API key from your backend administrator.
+> **⚠️ Breaking Change (v1.2.6+)**: The `apiKey` parameter is **required**. Get your API key from your backend administrator and store it securely using BuildConfig.
 
 ### 2. Register Application in Manifest
 
@@ -460,16 +516,40 @@ TelemetryManager.initialize(
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `application` | `Application` | ✅ Yes | - | Application context |
-| `apiKey` | `String` | ✅ Yes | - | **API key for backend authentication** (v1.2.6+) |
+| `apiKey` | `String` | ✅ Yes | - | **API key for backend authentication** (v1.2.6+) - Must start with `edge_` |
 | `batchSize` | `Int` | No | `30` | Number of events to batch before sending |
 | `endpoint` | `String` | No | `https://edgetelemetry.ncgafrica.com/collector/telemetry` | Telemetry backend endpoint |
-| `debugMode` | `Boolean` | No | `false` | Enable verbose logging |
+| `debugMode` | `Boolean` | No | `false` | Enable verbose logging (API keys auto-redacted) |
 | `enableCrashReporting` | `Boolean` | No | `true` | Enable automatic crash reporting |
 | `enableUserProfiles` | `Boolean` | No | `true` | Enable user profile tracking |
 | `enableSessionTracking` | `Boolean` | No | `true` | Enable session analytics |
 | `globalAttributes` | `Map<String, String>` | No | `emptyMap()` | Custom attributes added to all events |
 
-> **⚠️ Breaking Change (v1.2.6)**: The `apiKey` parameter is now **required**. All HTTP requests include the API key in the `X-API-Key` header for backend authentication.
+> **⚠️ Breaking Change (v1.2.6+)**: The `apiKey` parameter is now **required**. All HTTP requests include the API key in the `X-API-Key` header for backend authentication.
+
+### TelemetryConfig Builder
+
+For cleaner, more maintainable code, use the `TelemetryConfig` builder:
+
+```kotlin
+val config = TelemetryConfig.builder(application, apiKey)
+    .batchSize(30)
+    .endpoint("your-endpoint")
+    .debugMode(true)
+    .enableCrashReporting(true)
+    .enableUserProfiles(true)
+    .enableSessionTracking(true)
+    .globalAttributes(mapOf("key" to "value"))
+    .build()
+
+TelemetryManager.initialize(config)
+```
+
+**Benefits:**
+- Type-safe configuration
+- Immutable config object
+- Validation at build time
+- Cleaner initialization code
 
 ### User Profile Management (Both Versions)
 
@@ -753,10 +833,47 @@ TelemetryManager (Main SDK Interface)
 
 ### Common Issues
 
+#### API Key Issues
+
+**Error: "API key cannot be blank"**
+```kotlin
+// ❌ Wrong - API key is blank or missing
+TelemetryManager.initialize(
+    application = this,
+    apiKey = "",  // Blank!
+    // ...
+)
+
+// ✅ Correct - Use BuildConfig
+TelemetryManager.initialize(
+    application = this,
+    apiKey = BuildConfig.TELEMETRY_API_KEY,
+    // ...
+)
+```
+
+**Error: "API key is invalid"**
+```kotlin
+// API key must start with "edge_"
+// Get the correct format from your backend administrator
+```
+
+**401 Unauthorized from backend:**
+- Verify API key is correct
+- Check API key is active in backend
+- Ensure API key hasn't expired
+- Review backend logs for authentication errors
+
+#### SDK Initialization Issues
+
 **SDK not collecting data:**
 ```kotlin
-// Ensure proper initialization
-TelemetryManager.initialize(context, endpoint, batchSize)
+// Ensure proper initialization with API key
+TelemetryManager.initialize(
+    application = this,
+    apiKey = BuildConfig.TELEMETRY_API_KEY,  // Required!
+    endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry"
+)
 
 // Check if instance is available
 val telemetry = TelemetryManager.getInstance()
@@ -765,14 +882,34 @@ if (telemetry == null) {
 }
 ```
 
-**Network issues:**
-- Verify endpoint URL is correct and accessible
-- Check network permissions in manifest
-- Review logs for HTTP error codes
+**IllegalArgumentException during initialization:**
+- Check API key is not blank
+- Verify API key starts with "edge_"
+- Ensure batch size > 0
+- Verify endpoint is not blank
 
-**Memory issues:**
+#### Network Issues
+
+**Data not reaching backend:**
+- Verify endpoint URL is correct and accessible
+- Check network permissions in `AndroidManifest.xml`
+- Review logs for HTTP error codes (401, 403, 500, etc.)
+- Enable debug mode to see detailed HTTP logs
+- Verify API key is included in `X-API-Key` header
+
+**Offline data not syncing:**
+- SDK automatically retries failed requests
+- Check device has network connectivity
+- Review WorkManager logs for retry attempts
+- Verify crash retry mechanism is working
+
+#### Memory Issues
+
+**Out of memory errors:**
 - SDK automatically manages memory and prevents leaks
 - Ensure proper app lifecycle management
+- Reduce batch size if processing large volumes
+- Check for memory leaks in your app code
 
 ### Debug Logging
 
@@ -780,12 +917,30 @@ Enable debug logging to troubleshoot issues:
 
 ```kotlin
 TelemetryManager.initialize(
-    context = this,
+    application = this,
+    apiKey = BuildConfig.TELEMETRY_API_KEY,
     endpoint = "your-endpoint",
-    batchSize = 10,
-    enableDebugLogging = true  // Enable for debugging
+    debugMode = true  // ✅ Enable for debugging
 )
 ```
+
+**What debug mode shows:**
+- API key validation (redacted: `edge_****_xyz1`)
+- HTTP request/response details
+- Batch processing logs
+- Crash report generation
+- Retry mechanism activity
+- WorkManager job status
+
+### Getting Help
+
+If issues persist:
+
+1. **Check logs** with `debugMode = true`
+2. **Review documentation** at [API Key Guide](API_KEY_GUIDE.md)
+3. **Verify backend** accepts your API key
+4. **Test connectivity** using `TelemetryManager.getInstance().testConnectivity()`
+5. **Report issues** at [GitHub Issues](https://github.com/NCG-Africa/edge-telemetry-android/issues)
 
 ## 🤝 Contributing
 
