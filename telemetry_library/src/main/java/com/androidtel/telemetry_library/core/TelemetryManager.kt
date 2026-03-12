@@ -55,6 +55,7 @@ class TelemetryManager private constructor(
     private val batchSize: Int,
     private val apiKey: String,
     private val telemetryEndpoint: String,
+    private val debugMode: Boolean,
 ) : DefaultLifecycleObserver {
     
     // Public getter for context
@@ -117,6 +118,37 @@ class TelemetryManager private constructor(
         private var instance: TelemetryManager? = null
 
         /**
+         * Initialize SDK with TelemetryConfig object
+         * 
+         * Recommended approach for cleaner configuration management.
+         * 
+         * Example:
+         * ```
+         * val config = TelemetryConfig.builder(application, "edge_your_api_key")
+         *     .debugMode(true)
+         *     .batchSize(50)
+         *     .build()
+         * 
+         * TelemetryManager.initialize(config)
+         * ```
+         */
+        fun initialize(config: TelemetryConfig): TelemetryManager {
+            return initialize(
+                application = config.application,
+                apiKey = config.apiKey,
+                batchSize = config.batchSize,
+                endpoint = config.endpoint,
+                debugMode = config.debugMode,
+                enableCrashReporting = config.enableCrashReporting,
+                enableUserProfiles = config.enableUserProfiles,
+                enableSessionTracking = config.enableSessionTracking,
+                globalAttributes = config.globalAttributes
+            )
+        }
+
+        /**
+         * Initialize SDK with individual parameters (legacy approach)
+         * 
          * Call this once in Application.onCreate()
          */
         fun initialize(
@@ -147,6 +179,7 @@ class TelemetryManager private constructor(
                     batchSize = batchSize,
                     apiKey = apiKey,
                     telemetryEndpoint = endpoint,
+                    debugMode = debugMode,
                 ).also { manager ->
                     instance = manager
                     manager.initializeCapabilities() // Initialize device capabilities first

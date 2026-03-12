@@ -15,6 +15,7 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.androidtel.telemetry_library.core.TelemetryConfig
 import com.androidtel.telemetry_library.core.TelemetryManager
 import com.androidtel.telemetry_library.core.TrackComposeScreen
 import com.androidtel.telemetry_library.testing.EdgeTelemetryTester
@@ -29,7 +30,26 @@ class MyApplication : Application() {
         // Use BuildConfig, local.properties, or environment variables instead.
         // See README.md "API Key Security Best Practices" section for details.
         
-        // Initialize TelemetryManager with Flutter-compatible features
+        // Option 1: Initialize with TelemetryConfig (Recommended)
+        // Cleaner, more maintainable approach for complex configurations
+        val config = TelemetryConfig.builder(this, BuildConfig.TELEMETRY_API_KEY)
+            .debugMode(true) // Set to false in production
+            .batchSize(30)
+            .endpoint("https://edgetelemetry.ncgafrica.com/collector/telemetry")
+            .enableCrashReporting(true)
+            .enableUserProfiles(true)
+            .enableSessionTracking(true)
+            .globalAttributes(mapOf(
+                "app.environment" to "development",
+                "app.version" to "1.0.0"
+            ))
+            .build()
+        
+        TelemetryManager.initialize(config)
+        
+        // Option 2: Initialize with individual parameters (Legacy)
+        // Still fully supported for backward compatibility
+        /*
         TelemetryManager.initialize(
             application = this,
             apiKey = BuildConfig.TELEMETRY_API_KEY,  // ✅ Secure: API key from BuildConfig
@@ -45,6 +65,7 @@ class MyApplication : Application() {
                 "app.version" to "1.0.0"
             )
         )
+        */
         
         // Set initial user profile (if user is logged in)
         TelemetryManager.getInstance().setUserProfile(
