@@ -25,6 +25,8 @@ class CrashReporter(
     private val telemetryManager: TelemetryManager,
     private val breadcrumbManager: BreadcrumbManager,
     private val idGenerator: IdGenerator,
+    private val apiKey: String,
+    private val telemetryEndpoint: String,
     private val enabled: Boolean = true
 ) {
     
@@ -34,7 +36,7 @@ class CrashReporter(
     
     private val gson = Gson()
     private val scope = CoroutineScope(Dispatchers.IO)
-    private val retryManager = CrashRetryManager(context)
+    private val retryManager = CrashRetryManager(context, apiKey, telemetryEndpoint)
     private val deviceInfoCollector = DeviceInfoCollector(context, idGenerator)
     private var originalHandler: Thread.UncaughtExceptionHandler? = null
     

@@ -18,7 +18,11 @@ import java.util.concurrent.TimeUnit
 /**
  * Network-aware retry system for crash data with exponential backoff
  */
-class CrashRetryManager(private val context: Context) {
+class CrashRetryManager(
+    private val context: Context,
+    private val apiKey: String,
+    private val telemetryEndpoint: String
+) {
     
     companion object {
         private const val TAG = "CrashRetryManager"
@@ -77,10 +81,11 @@ class CrashRetryManager(private val context: Context) {
         val requestBody = json.toRequestBody("application/json".toMediaType())
         
         val request = Request.Builder()
-            .url("https://edgetelemetry.ncgafrica.com/collector/telemetry") // This should be configurable
+            .url(telemetryEndpoint)
             .post(requestBody)
             .addHeader("Content-Type", "application/json")
             .addHeader("User-Agent", "EdgeTelemetry-Android/1.2.0")
+            .addHeader("X-API-Key", apiKey)
             .build()
         
         val response = httpClient.newCall(request).execute()
@@ -135,9 +140,15 @@ class CrashRetryManager(private val context: Context) {
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
         
+        val inputData = workDataOf(
+            "apiKey" to apiKey,
+            "endpoint" to telemetryEndpoint
+        )
+        
         val retryWork = OneTimeWorkRequestBuilder<CrashRetryWorker>()
             .setConstraints(constraints)
             .setInitialDelay(baseRetryDelay.toMinutes(), TimeUnit.MINUTES)
+            .setInputData(inputData)
             .addTag(WORK_TAG)
             .build()
         
@@ -242,7 +253,16 @@ class CrashRetryWorker(
         return try {
             Log.d(TAG, "🔄 Starting crash retry work")
             
-            val retryManager = CrashRetryManager(applicationContext)
+            // Retrieve API key and endpoint from input data
+            val apiKey = inputData.getString("apiKey")
+            val endpoint = inputData.getString("endpoint")
+            
+            if (apiKey.isNullOrBlank() || endpoint.isNullOrBlank()) {
+                Log.e(TAG, "❌ Missing API key or endpoint in WorkManager input data")
+                return Result.failure()
+            }
+            
+            val retryManager = CrashRetryManager(applicationContext, apiKey, endpoint)
             retryManager.retryOfflineCrashes()
             
             Log.d(TAG, "✅ Crash retry work completed")

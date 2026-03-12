@@ -38,6 +38,7 @@ class TelemetryHttpClient(
         .addInterceptor(HttpLoggingInterceptor().apply {
             level =
                 if (debugMode) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
+            redactHeader("X-API-Key")
         })
         .build()
 

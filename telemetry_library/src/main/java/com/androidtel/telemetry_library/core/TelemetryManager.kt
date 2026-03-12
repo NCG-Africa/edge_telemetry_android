@@ -53,6 +53,7 @@ class TelemetryManager private constructor(
     private val offlineStorage: OfflineBatchStorage,
     private val screenTimingTracker: ScreenTimingTracker,
     private val batchSize: Int,
+    private val apiKey: String,
     private val telemetryEndpoint: String,
 ) : DefaultLifecycleObserver {
     
@@ -129,6 +130,10 @@ class TelemetryManager private constructor(
             enableSessionTracking: Boolean = true,
             globalAttributes: Map<String, String> = emptyMap()
         ): TelemetryManager {
+            // Validate API key before any initialization
+            require(apiKey.isNotBlank()) { "API key cannot be blank" }
+            require(apiKey.startsWith("edge_")) { "API key is invalid" }
+            
             return instance ?: synchronized(this) {
                 instance ?: TelemetryManager(
                     application,
@@ -140,6 +145,7 @@ class TelemetryManager private constructor(
                     offlineStorage = OfflineBatchStorage(application.applicationContext),
                     screenTimingTracker = ScreenTimingTracker(),
                     batchSize = batchSize,
+                    apiKey = apiKey,
                     telemetryEndpoint = endpoint,
                 ).also { manager ->
                     instance = manager
@@ -268,6 +274,8 @@ class TelemetryManager private constructor(
                     telemetryManager = this,
                     breadcrumbManager = breadcrumbManager!!,
                     idGenerator = flutterIdGenerator!!,
+                    apiKey = apiKey,
+                    telemetryEndpoint = telemetryEndpoint,
                     enabled = true
                 )
             }
