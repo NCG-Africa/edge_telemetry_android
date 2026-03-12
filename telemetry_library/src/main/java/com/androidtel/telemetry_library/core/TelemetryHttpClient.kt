@@ -43,6 +43,11 @@ class TelemetryHttpClient(
             redactHeader("X-API-Key")
         })
         .build()
+    
+    /**
+     * Expose OkHttpClient for location provider and other internal uses
+     */
+    fun getOkHttpClient(): OkHttpClient = okHttpClient
 
     // Public method to send a batch with built-in retry logic.
     suspend fun sendBatch(batch: TelemetryBatch): Result<Unit> {
@@ -149,7 +154,8 @@ class TelemetryHttpClient(
                     timestamp = event.timestamp,
                     attributes = flattenAttributes(event.attributes)
                 )
-            }
+            },
+            location = this.location
         )
         
         // Wrap in TelemetryPayload with device_id at top level

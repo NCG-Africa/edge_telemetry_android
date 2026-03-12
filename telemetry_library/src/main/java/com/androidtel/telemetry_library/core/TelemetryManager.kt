@@ -18,6 +18,8 @@ import com.androidtel.telemetry_library.core.crash.CrashReporter
 import com.androidtel.telemetry_library.core.device.DeviceInfoCollector
 import com.androidtel.telemetry_library.core.events.JsonEventTracker
 import com.androidtel.telemetry_library.core.ids.IdGenerator
+import com.androidtel.telemetry_library.core.location.IpLocationProvider
+import com.androidtel.telemetry_library.core.location.LocationProvider
 import com.androidtel.telemetry_library.core.models.AppInfo
 import com.androidtel.telemetry_library.core.models.DeviceInfo
 import com.androidtel.telemetry_library.core.models.EventAttributes
@@ -89,10 +91,15 @@ class TelemetryManager private constructor(
     private var deviceInfoCollector: DeviceInfoCollector? = null
     private var jsonEventTracker: JsonEventTracker? = null
 
+    // Location tracking components
+    private var locationProvider: LocationProvider? = null
+    private var currentLocation: String? = null
+
     // Configuration flags
     private var crashReportingEnabled = false
     private var userProfilesEnabled = false
     private var sessionTrackingEnabled = false
+    private var locationTrackingEnabled = false
     private var globalAttributes = mutableMapOf<String, String>()
 
     // Legacy user profile fields (for backward compatibility)
@@ -142,7 +149,11 @@ class TelemetryManager private constructor(
                 enableCrashReporting = config.enableCrashReporting,
                 enableUserProfiles = config.enableUserProfiles,
                 enableSessionTracking = config.enableSessionTracking,
-                globalAttributes = config.globalAttributes
+                globalAttributes = config.globalAttributes,
+                enableLocationTracking = config.enableLocationTracking,
+                locationApiEndpoint = config.locationApiEndpoint,
+                locationCacheDuration = config.locationCacheDuration,
+                locationFallbackToIp = config.locationFallbackToIp
             )
         }
 
@@ -160,7 +171,11 @@ class TelemetryManager private constructor(
             enableCrashReporting: Boolean = true,
             enableUserProfiles: Boolean = true,
             enableSessionTracking: Boolean = true,
-            globalAttributes: Map<String, String> = emptyMap()
+            globalAttributes: Map<String, String> = emptyMap(),
+            enableLocationTracking: Boolean = true,
+            locationApiEndpoint: String = "https://ipinfo.io/json",
+            locationCacheDuration: Long = 3600000,
+            locationFallbackToIp: Boolean = true
         ): TelemetryManager {
             // Validate API key before any initialization
             require(apiKey.isNotBlank()) { "API key cannot be blank" }
@@ -188,7 +203,11 @@ class TelemetryManager private constructor(
                         enableCrashReporting,
                         enableUserProfiles,
                         enableSessionTracking,
-                        globalAttributes
+                        globalAttributes,
+                        enableLocationTracking,
+                        locationApiEndpoint,
+                        locationCacheDuration,
+                        locationFallbackToIp
                     ) // Initialize Flutter-compatible components
                     manager.register() // lifecycle + crash handling
                 }
@@ -281,13 +300,18 @@ class TelemetryManager private constructor(
         enableCrashReporting: Boolean,
         enableUserProfiles: Boolean,
         enableSessionTracking: Boolean,
-        globalAttributes: Map<String, String>
+        globalAttributes: Map<String, String>,
+        enableLocationTracking: Boolean,
+        locationApiEndpoint: String,
+        locationCacheDuration: Long,
+        locationFallbackToIp: Boolean
     ) {
         try {
             // Set configuration flags
             this.crashReportingEnabled = enableCrashReporting
             this.userProfilesEnabled = enableUserProfiles
             this.sessionTrackingEnabled = enableSessionTracking
+            this.locationTrackingEnabled = enableLocationTracking
             this.globalAttributes.putAll(globalAttributes)
 
             // Initialize ID generator (always enabled for Flutter compatibility)
@@ -333,7 +357,27 @@ class TelemetryManager private constructor(
                 batchSize = batchSize
             )
 
-            Log.i("TelemetryManager", "Flutter components initialized - Crash: $enableCrashReporting, Users: $enableUserProfiles, Sessions: $enableSessionTracking")
+            // Initialize location provider if enabled
+            if (enableLocationTracking) {
+                locationProvider = IpLocationProvider(
+                    httpClient = httpClient.getOkHttpClient(),
+                    apiEndpoint = locationApiEndpoint,
+                    cacheDuration = locationCacheDuration,
+                    fallbackToIp = locationFallbackToIp
+                )
+                
+                // Fetch location asynchronously (don't block initialization)
+                scope.launch {
+                    try {
+                        currentLocation = locationProvider?.getLocation()
+                        Log.d("TelemetryManager", "Location initialized: $currentLocation")
+                    } catch (e: Exception) {
+                        Log.w("TelemetryManager", "Failed to initialize location: ${e.message}")
+                    }
+                }
+            }
+
+            Log.i("TelemetryManager", "Flutter components initialized - Crash: $enableCrashReporting, Users: $enableUserProfiles, Sessions: $enableSessionTracking, Location: $enableLocationTracking")
         } catch (e: Exception) {
             Log.e("TelemetryManager", "Failed to initialize Flutter components", e)
         }
@@ -746,13 +790,21 @@ class TelemetryManager private constructor(
 
         if (eventsToSend.isEmpty()) return
 
+        // Get current location (from cache if available)
+        val location = if (locationTrackingEnabled) {
+            locationProvider?.getCachedLocation() ?: currentLocation
+        } else {
+            null
+        }
+
         val batch = TelemetryBatch(
             batchSize = eventsToSend.size,
             timestamp = dateFormat.format(Date()),
-            events = eventsToSend
+            events = eventsToSend,
+            location = location
         )
 
-        Log.i("TelemetryManager", "Attempting to send a batch of ${batch.batchSize} events.")
+        Log.i("TelemetryManager", "Attempting to send a batch of ${batch.batchSize} events with location: $location")
         val result = httpClient.sendBatch(batch)
 
         if (result.isSuccess) {

@@ -37,7 +37,8 @@ data class TelemetryBatch(
     val type: String = "telemetry_batch",
     val batchSize: Int,
     val timestamp: String,
-    val events: List<TelemetryEvent>
+    val events: List<TelemetryEvent>,
+    val location: String? = null
 )
 
 // ---- Original Event ----

@@ -843,12 +843,12 @@ val config = TelemetryConfig.builder(this, apiKey)
 
 ## Implementation Checklist
 
-- [ ] Create `LocationProvider.kt` interface
-- [ ] Implement `IpLocationProvider.kt` with ipinfo.io integration
-- [ ] Update `TelemetryBatch.kt` - add location field to `TelemetryDataOut`
-- [ ] Update `FlutterCompatiblePayload.kt` - add location field to `EventBatchData`
-- [ ] Update `TelemetryConfig.kt` - add location tracking options
-- [ ] Update `TelemetryManager.kt` - integrate LocationProvider
+- [x] Create `LocationProvider.kt` interface
+- [x] Implement `IpLocationProvider.kt` with ipinfo.io integration
+- [x] Update `TelemetryBatch.kt` - add location field to `TelemetryDataOut`
+- [x] Update `FlutterCompatiblePayload.kt` - add location field to `EventBatchData`
+- [x] Update `TelemetryConfig.kt` - add location tracking options
+- [x] Update `TelemetryManager.kt` - integrate LocationProvider
 - [ ] Update `sample_telemetry_payload.json` - add location example
 - [ ] Write unit tests for `IpLocationProvider`
 - [ ] Write integration tests for location in payloads
