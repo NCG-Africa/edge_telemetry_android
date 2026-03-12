@@ -48,7 +48,8 @@ data class EventBatchData(
     val type: String = "batch",
     val events: List<EventData>,
     val batch_size: Int,
-    val timestamp: String
+    val timestamp: String,
+    val location: String? = null
 )
 
 /**
@@ -98,7 +99,8 @@ object FlutterPayloadFactory {
      */
     fun createEventBatchPayload(
         events: List<EventData>,
-        deviceId: String
+        deviceId: String,
+        location: String? = null
     ): EventBatchPayload {
         val timestamp = Instant.now().toString()
         
@@ -108,7 +110,8 @@ object FlutterPayloadFactory {
             data = EventBatchData(
                 events = events,
                 batch_size = events.size,
-                timestamp = timestamp
+                timestamp = timestamp,
+                location = location
             )
         )
     }

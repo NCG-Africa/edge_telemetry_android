@@ -17,7 +17,8 @@ data class TelemetryDataOut(
     val device_id: String,
     val events: List<TelemetryEventOut>,
     val batch_size: Int,
-    val timestamp: String
+    val timestamp: String,
+    val location: String? = null
 )
 
 // ---- Flattened Event ----
