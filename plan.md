@@ -849,9 +849,9 @@ val config = TelemetryConfig.builder(this, apiKey)
 - [x] Update `FlutterCompatiblePayload.kt` - add location field to `EventBatchData`
 - [x] Update `TelemetryConfig.kt` - add location tracking options
 - [x] Update `TelemetryManager.kt` - integrate LocationProvider
-- [ ] Update `sample_telemetry_payload.json` - add location example
-- [ ] Write unit tests for `IpLocationProvider`
-- [ ] Write integration tests for location in payloads
+- [x] Update `sample_telemetry_payload.json` - add location example
+- [x] Write unit tests for `IpLocationProvider`
+- [x] Write integration tests for location in payloads
 - [ ] Update `README_EDGE_TELEMETRY.md` - add location tracking documentation
 - [ ] Update changelog with version 1.2.9 features
 - [ ] Test with real ipinfo.io API
