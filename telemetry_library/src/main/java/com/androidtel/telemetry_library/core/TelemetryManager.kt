@@ -116,6 +116,10 @@ class TelemetryManager private constructor(
     private var metricCount: Int = 0
     private var totalSessions: Int = 0
     private val visitedScreens: MutableSet<String> = mutableSetOf()
+    
+    // ID validation state
+    @Volatile
+    private var idsInitialized: Boolean = false
 
 
     // file name for persisted fatal crash batch
@@ -278,16 +282,29 @@ class TelemetryManager private constructor(
         try {
             userId = idGenerator.getUserId()
             Log.i("TelemetryManager", "Loaded/generated user ID: $userId")
+            
+            // Mark IDs as initialized only if both device ID and user ID are valid
+            if (::deviceId.isInitialized && deviceId.isNotBlank() && 
+                ::userId.isInitialized && userId.isNotBlank() &&
+                !deviceId.startsWith("user_emergency_") && 
+                !userId.startsWith("user_emergency_")) {
+                idsInitialized = true
+                Log.i("TelemetryManager", "IDs successfully initialized and validated")
+            } else {
+                Log.w("TelemetryManager", "IDs initialized but validation failed")
+            }
         } catch (e: Exception) {
             Log.e("TelemetryManager", "Failed to initialize user ID: ${e.localizedMessage}", e)
             userId = "user_emergency_${System.currentTimeMillis()}"
             Log.w("TelemetryManager", "Using emergency fallback user ID: $userId")
+            idsInitialized = false
         }
         
         // Final safety check - ensure userId is initialized
         if (!::userId.isInitialized || userId.isBlank()) {
             Log.e("TelemetryManager", "CRITICAL ERROR: userId not properly initialized. Using emergency fallback.")
             userId = "user_emergency_${System.currentTimeMillis()}"
+            idsInitialized = false
         }
     }
 
@@ -741,6 +758,15 @@ class TelemetryManager private constructor(
     // This method sends the buffered events as a single JSON batch.
     // It now uses the TelemetryHttpClient and OfflineBatchStorage.
     private suspend fun sendBatch(forceSend: Boolean = false, flushOffline: Boolean = true) {
+        // CRITICAL: Validate that device ID and user ID are properly initialized before sending
+        if (!idsInitialized) {
+            Log.w(
+                "TelemetryManager",
+                "Skipping batch send - IDs not properly initialized. Events remain queued (${eventQueue.size} events)."
+            )
+            return
+        }
+        
         if (!forceSend && eventQueue.size < batchSize) {
             return
         }
