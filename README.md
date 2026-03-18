@@ -12,6 +12,27 @@
 
 A comprehensive, production-ready Android SDK for collecting and transmitting telemetry data including app performance metrics, user interactions, crash reports, and system analytics. Built with modern Android development practices and optimized for performance and reliability.
 
+---
+
+## 🔴 v2.0.0 Breaking Changes
+
+**Version 2.0.0** introduces breaking changes to crash reporting payload structure to align with backend Kafka processor requirements.
+
+### What Changed
+- Crash events now sent as `type: "event"` with `eventName: "app.crash"` (batch envelope structure)
+- New required crash attributes: `message`, `stacktrace`, `exception_type`, `error_context`, `is_fatal`, `cause`
+- New optional context APIs: `setProductContext()`, `setLastUserAction()`, error code support
+- Removed SDK-generated fields: `crash.fingerprint`, `crash.breadcrumb_count` (backend auto-generates)
+
+### Migration Required
+- **Public API**: No changes required - existing `trackError()` calls work unchanged
+- **Backend**: Kafka processor must support new crash event structure
+- **Recommended**: Use new context APIs for enhanced crash analytics
+
+📖 **[Read Full Migration Guide](docs/MIGRATION_GUIDE_V2.md)** | 📋 **[View Changelog](CHANGELOG.md#200---2025-03-18)**
+
+---
+
 ## 🚀 Features
 
 ### Core Telemetry
@@ -19,7 +40,7 @@ A comprehensive, production-ready Android SDK for collecting and transmitting te
 - **🔄 Session Management**: Automatic session tracking with detailed analytics
 - **📱 Screen Analytics**: Activity and Fragment lifecycle monitoring with timing data
 - **🎯 Custom Events**: Track custom business events and user interactions
-- **💥 Crash Reporting**: Comprehensive crash detection and reporting with stack traces
+- **💥 Crash Reporting**: Comprehensive crash detection with automatic classification, context tracking, and backend-compatible event structure (v2.0.0)
 - **🧠 Memory Intelligence**: Enhanced memory tracking with detailed insights (API 24+)
 
 ### Advanced Capabilities
@@ -46,7 +67,7 @@ A comprehensive, production-ready Android SDK for collecting and transmitting te
 
 | Feature | **Java 11+ Version** | **Java 8 Version** |
 |---------|---------------------|--------------------|
-| **Latest Version** | `1.2.1` | `1.2.3-java8` |
+| **Latest Version** | `2.0.0` | `1.2.3-java8` |
 | **Java Requirement** | Java 11+ | Java 8+ |
 | **Gradle** | 8.4+ | 7.5.1+ |
 | **AGP** | 8.0+ | 7.2.2+ |
@@ -102,7 +123,7 @@ Add the dependency to your app's `build.gradle`:
 
 ```kotlin
 dependencies {
-    implementation 'com.github.NCG-Africa:edge_telemetry_android:1.2.1'
+    implementation 'com.github.NCG-Africa:edge_telemetry_android:2.0.0'
 }
 ```
 

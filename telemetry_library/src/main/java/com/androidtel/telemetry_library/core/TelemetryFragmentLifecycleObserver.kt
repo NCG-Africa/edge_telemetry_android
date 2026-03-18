@@ -7,11 +7,13 @@ import android.util.Log
 import android.view.View
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
+import com.androidtel.telemetry_library.core.navigation.NavigationStackTracker
 
 class TelemetryFragmentLifecycleObserver(private val telemetryManager: TelemetryManager = TelemetryManager.getInstance()) :
     FragmentManager.FragmentLifecycleCallbacks() {
 
     private val screenTimingTracker = ScreenTimingTracker()
+    private val navigationTracker = NavigationStackTracker()
 
     override fun onFragmentResumed(fm: FragmentManager, f: Fragment) {
         super.onFragmentResumed(fm, f)
@@ -21,15 +23,17 @@ class TelemetryFragmentLifecycleObserver(private val telemetryManager: Telemetry
         // Start tracking screen duration for this fragment
         screenTimingTracker.startScreen(fragmentName)
 
-        // Record a navigation event for the fragment change
+        // Track navigation with proper structure
+        val navEvent = navigationTracker.push(fragmentName)
         telemetryManager.recordEvent(
-            eventName = "navigation.route_change",
+            eventName = "navigation",
             attributes = mapOf(
-                "navigation.to" to fragmentName,
-                "navigation.method" to "resumed",
-                "navigation.type" to "fragment_change",
-                "navigation.timestamp" to System.currentTimeMillis().toString(),
-                "screen.type" to "fragment"
+                "navigation.from_screen" to (navEvent.fromScreen ?: ""),
+                "navigation.to_screen" to navEvent.toScreen,
+                "navigation.method" to navEvent.method.toLowerCaseString(),
+                "navigation.route_type" to "fragment_flow",
+                "navigation.has_arguments" to (f.arguments?.isEmpty == false),
+                "navigation.timestamp" to navEvent.timestamp
             )
         )
     }

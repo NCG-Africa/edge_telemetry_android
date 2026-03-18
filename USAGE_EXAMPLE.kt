@@ -1,5 +1,13 @@
-// Example usage of the EdgeTelemetry Android SDK
+// Example usage of the EdgeTelemetry Android SDK v2.0.0
 // This file demonstrates how to integrate and use the SDK in your Android application
+// 
+// v2.0.0 Features:
+// - Enhanced crash reporting with automatic classification
+// - Product context tracking (setProductContext)
+// - User action tracking (setLastUserAction)
+// - Error code support for better crash analytics
+// - Automatic character limit enforcement
+// - Backend-compatible crash event structure
 
 import android.app.Application
 import android.os.Bundle
@@ -335,6 +343,7 @@ fun SettingsScreen(navController: NavController) {
                     throw RuntimeException("Simulated error for testing")
                 } catch (e: Exception) {
                     // v2.0.0: Enhanced error tracking with context
+                    // New parameters: errorCode, productId, userAction
                     TelemetryManager.getInstance().trackError(
                         error = e,
                         errorCode = "SETTINGS_001",

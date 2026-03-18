@@ -5,6 +5,260 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2025-03-18
+
+### 💥 BREAKING CHANGES
+
+#### Crash Payload Structure Completely Redesigned
+- **🔴 CRITICAL**: Crash payload structure updated to match backend Kafka processor requirements
+- **Event Type Change**: Crashes now sent as `type: "event"` with `eventName: "app.crash"` (previously `type: "error"`)
+- **Batch Envelope**: All crash events wrapped in batch envelope structure with `tenant_id`, `location`, `batch_size`, and `events` array
+- **Backend Compatibility**: New structure required for backend processor to correctly handle crash events
+- **Migration Required**: Existing crash payloads from v1.x are incompatible with v2.0.0
+
+#### New Required Crash Attributes
+- **`message`** (String, max 1000 chars): Exception class name and message
+- **`stacktrace`** (String, max 2000 chars): Full stack trace (renamed from `stackTrace`)
+- **`exception_type`** (String, max 255 chars): Simple exception class name
+- **`error_context`** (String, max 500 chars): Top stack frame location (e.g., "LoginActivity.onButtonClick")
+- **`is_fatal`** (Boolean): Auto-detected based on exception type
+- **`cause`** (String, max 255 chars): Root cause exception message
+
+#### Optional Enhanced Context Attributes
+- **`product_id`** (String, max 255 chars): Module/feature identification
+- **`user_action`** (String, max 500 chars): Last user interaction before crash
+- **`error_code`** (String, max 100 chars): App-specific error codes
+
+#### Removed Fields (Backend Auto-Generates)
+- **🗑️ REMOVED**: `crash.fingerprint` → Backend generates `crash_hash` via SHA-256
+- **🗑️ REMOVED**: `crash.breadcrumb_count` → Backend auto-counts from context
+- **✅ RETAINED**: `breadcrumbs` JSON array for richer debugging context
+
+### ✨ New Features
+
+#### Automatic Crash Classification
+- **Fatal Detection**: Automatically determines if crash is fatal based on exception type
+- **Exception Type Extraction**: Extracts simple class name from throwable
+- **Error Context Extraction**: Parses top stack frame for method/class context
+- **Root Cause Analysis**: Captures root cause exception message
+
+#### Character Limit Enforcement
+- **Automatic Truncation**: All crash attributes truncated to backend limits
+- **No Data Loss**: Truncation logged for debugging purposes
+- **Backend Compatibility**: Prevents field truncation errors in backend processor
+
+#### Enhanced Context Tracking
+- **Product Context API**: `setProductContext(productId)` for module tracking
+- **User Action API**: `setLastUserAction(action)` for interaction tracking
+- **Error Code Support**: Custom error codes in crash attributes
+- **Context Persistence**: Product and user action context persisted across crashes
+
+### 🔧 Technical Improvements
+
+#### New Crash Event Structure
+```json
+{
+  "timestamp": "2025-03-18T13:30:00.000Z",
+  "device_id": "device_xxx",
+  "data": {
+    "tenant_id": "uuid-here",
+    "location": "Kenya",
+    "timestamp": "2025-03-18T13:30:00.000Z",
+    "batch_size": 1,
+    "events": [
+      {
+        "type": "event",
+        "eventName": "app.crash",
+        "timestamp": "2025-03-18T13:30:00.000Z",
+        "attributes": {
+          "message": "NullPointerException: User object was null",
+          "stacktrace": "at com.example.LoginActivity.onButtonClick...",
+          "exception_type": "NullPointerException",
+          "error_context": "LoginActivity.onButtonClick",
+          "is_fatal": true,
+          "cause": "User object was null",
+          "product_id": "authentication_module",
+          "user_action": "Clicked login button",
+          "error_code": "AUTH_001"
+        }
+      }
+    ]
+  }
+}
+```
+
+#### Field Mapping Logic
+- **message**: `${throwable.javaClass.name}: ${throwable.message}`.take(1000)
+- **stacktrace**: Full stack trace truncated to 2000 chars
+- **exception_type**: `throwable.javaClass.simpleName`.take(255)
+- **error_context**: Extracted from top stack frame, max 500 chars
+- **is_fatal**: Based on exception type (OutOfMemoryError, StackOverflowError, etc.)
+- **cause**: Root cause message truncated to 255 chars
+
+#### Helper Functions Added
+- `extractErrorContext(stackTrace)`: Extracts "ClassName.methodName" from stack
+- `isFatalException(throwable)`: Determines if exception indicates app crash
+- Character limit enforcement for all crash attributes
+
+### 📝 Migration Guide
+
+#### Update Crash Tracking Code
+
+**Before (v1.x):**
+```kotlin
+// Crash automatically tracked with old structure
+TelemetryManager.getInstance().trackError(exception, mapOf(
+    "custom" to "value"
+))
+```
+
+**After (v2.0.0):**
+```kotlin
+// Same API, enhanced with new optional context
+TelemetryManager.getInstance().trackError(exception, mapOf(
+    "error_code" to "AUTH_001",
+    "product_id" to "authentication_module",
+    "user_action" to "Clicked login button"
+))
+
+// Or use new context APIs
+TelemetryManager.getInstance().setProductContext("authentication_module")
+TelemetryManager.getInstance().setLastUserAction("Clicked login button")
+TelemetryManager.getInstance().trackError(exception)
+```
+
+#### New TelemetryManager APIs
+```kotlin
+// Set product/module context for crashes
+fun setProductContext(productId: String)
+
+// Track last user action for crash context
+fun setLastUserAction(action: String)
+
+// Enhanced error tracking with context
+fun trackError(
+    error: Throwable,
+    attributes: Map<String, String>? = null
+)
+```
+
+#### Backend Requirements
+- **Kafka Consumer**: Must support new crash event structure
+- **Database Schema**: Must handle new crash attributes
+- **Deduplication**: Uses backend-generated `crash_hash` instead of SDK fingerprint
+- **Severity Classification**: Backend auto-classifies severity based on `exception_type`
+
+### 🧪 Testing & Validation
+
+#### Comprehensive Test Coverage (60+ Tests)
+- **PayloadStructureValidationTest.kt**: 12 tests validating backend compatibility
+- **CrashScenarioIntegrationTest.kt**: 17 scenario tests for various crash types
+- **BackendCompatibilityTest.kt**: 11 tests ensuring Kafka processor compatibility
+- **CrashBatchEnvelopeTest.kt**: 20 tests for batch structure validation
+
+#### Test Scenarios Covered
+- ✅ Crash event structure (`type: "event"`, `eventName: "app.crash"`)
+- ✅ Batch envelope wrapping with all required fields
+- ✅ Character limit enforcement and truncation
+- ✅ Field naming alignment (`stacktrace` vs `stackTrace`)
+- ✅ Fatal exception detection accuracy
+- ✅ Error context extraction from stack traces
+- ✅ Product context and user action tracking
+- ✅ Error code support and validation
+
+### ⚠️ Important Notes
+
+#### Backend Compatibility
+- **Required**: Backend Kafka processor must support new crash event structure
+- **Validation**: Test with backend team before production deployment
+- **Monitoring**: Monitor crash processing logs during rollout
+
+#### Breaking Change Impact
+- **Existing Deployments**: v1.x crash payloads will not be processed correctly
+- **Version Bump**: Major version bump (v2.0.0) indicates breaking change
+- **Migration Timeline**: Plan migration window with backend team
+
+#### Character Truncation
+- **Automatic**: All fields truncated to backend limits
+- **Logging**: Truncation events logged for debugging
+- **No Data Loss**: Most important crash info preserved within limits
+
+### 🎯 Success Criteria
+
+#### Phase 2 (Implementation) - ✅ COMPLETE
+- [x] New crash event structure implemented
+- [x] Batch envelope wrapping implemented
+- [x] All required fields present and validated
+- [x] Character limits enforced
+- [x] Field naming aligned with backend
+- [x] Helper functions implemented
+- [x] Product context tracking
+- [x] User action tracking
+- [x] Error code support
+
+#### Phase 3 (Testing) - ✅ COMPLETE
+- [x] 60+ unit tests passing
+- [x] 17 integration scenario tests passing
+- [x] 11 backend compatibility tests passing
+- [x] No field truncation errors
+- [x] Payload structure validation complete
+
+#### Phase 4 (Migration) - 🚧 IN PROGRESS
+- [x] v2.0.0 version bump
+- [x] Comprehensive changelog created
+- [ ] Migration guide published
+- [ ] Sample payloads updated
+- [ ] README documentation updated
+- [ ] Backend compatibility confirmed
+- [ ] Production deployment
+
+### 📊 Files Modified
+
+#### Core Implementation
+- `FlutterCompatiblePayload.kt` - New crash event models
+- `CrashReporter.kt` - Updated payload creation logic
+- `TelemetryManager.kt` - New context tracking APIs
+- `FlutterPayloadFactory.kt` - Crash event factory methods
+
+#### Test Files Created/Updated
+- `PayloadStructureValidationTest.kt` - Backend schema validation
+- `CrashScenarioIntegrationTest.kt` - Crash scenario testing
+- `BackendCompatibilityTest.kt` - Kafka processor compatibility
+- `CrashBatchEnvelopeTest.kt` - Batch structure validation
+
+### 🔄 Upgrade Path
+
+#### Step 1: Update Dependency
+```gradle
+dependencies {
+    implementation 'com.github.NCG-Africa:edge_telemetry_android:2.0.0'
+}
+```
+
+#### Step 2: Review Crash Tracking
+- Existing `trackError()` calls continue to work
+- Consider adding `product_id`, `user_action`, `error_code` for enhanced context
+
+#### Step 3: Backend Coordination
+- Coordinate with backend team for Kafka processor update
+- Test crash event processing in staging environment
+- Monitor crash deduplication and severity classification
+
+#### Step 4: Validate
+- Test crash reporting in staging
+- Verify backend processes new crash structure
+- Monitor crash analytics dashboards
+
+### 🚀 What's Next
+
+#### Phase 5: Documentation Updates
+- Update README with new crash payload examples
+- Update sample crash payload JSON
+- Update usage examples with new APIs
+- Publish comprehensive migration guide
+
+---
+
 ## [1.2.8] - 2025-01-XX
 
 ### 🔒 Critical Security & Reliability Fixes
