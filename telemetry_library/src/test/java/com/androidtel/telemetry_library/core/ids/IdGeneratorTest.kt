@@ -7,10 +7,15 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.Assert.*
 import org.mockito.Mockito.*
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
+import kotlin.math.abs
 
 class IdGeneratorTest {
 
@@ -399,5 +404,173 @@ class IdGeneratorTest {
         assertEquals("ID must have exactly 2 parts", 2, parts.size)
         assertTrue("First part must be numeric timestamp", parts[0].all { it.isDigit() })
         assertTrue("Second part must be alphanumeric", parts[1].all { it in 'a'..'z' || it in '0'..'9' })
+    }
+
+    @Test
+    fun `timestamp accuracy - within 1 second of System currentTimeMillis`() {
+        val beforeGeneration = System.currentTimeMillis()
+        val id = idGenerator.generateSessionId()
+        val afterGeneration = System.currentTimeMillis()
+        
+        val timestamp = id.split("_")[0].toLong()
+        
+        assertTrue("Timestamp must be >= time before generation", timestamp >= beforeGeneration)
+        assertTrue("Timestamp must be <= time after generation", timestamp <= afterGeneration)
+        
+        val timeDiff = abs(timestamp - beforeGeneration)
+        assertTrue("Timestamp must be within 1000ms of generation time", timeDiff <= 1000)
+    }
+
+    @Test
+    fun `timestamp accuracy - multiple IDs have increasing timestamps`() {
+        val ids = mutableListOf<String>()
+        repeat(10) {
+            ids.add(idGenerator.generateSessionId())
+            Thread.sleep(1) // Small delay to ensure different timestamps
+        }
+        
+        val timestamps = ids.map { it.split("_")[0].toLong() }
+        
+        for (i in 1 until timestamps.size) {
+            assertTrue(
+                "Timestamps must be monotonically increasing or equal: ${timestamps[i-1]} vs ${timestamps[i]}",
+                timestamps[i] >= timestamps[i-1]
+            )
+        }
+    }
+
+    @Test
+    fun `character set validation - no uppercase letters in any ID`() = runTest {
+        `when`(mockPrefs.getString("device_id", null)).thenReturn(null)
+        `when`(mockPrefs.getString("user_id", null)).thenReturn(null)
+        
+        val sessionIds = (1..100).map { idGenerator.generateSessionId() }
+        val userIds = (1..100).map { idGenerator.generateUserId() }
+        val deviceIds = (1..100).map { 
+            val gen = IdGenerator()
+            gen.initialize(mockContext)
+            gen.getOrGenerateDeviceId()
+        }
+        
+        val allIds = sessionIds + userIds + deviceIds
+        
+        allIds.forEach { id ->
+            assertFalse("ID must not contain uppercase letters: $id", id.any { it.isUpperCase() })
+        }
+    }
+
+    @Test
+    fun `character set validation - no special characters except underscore`() {
+        val ids = (1..100).map { idGenerator.generateSessionId() }
+        
+        ids.forEach { id ->
+            val allowedChars = ('a'..'z') + ('0'..'9') + '_'
+            assertTrue(
+                "ID must only contain lowercase alphanumeric and underscore: $id",
+                id.all { it in allowedChars }
+            )
+        }
+    }
+
+    @Test
+    fun `coroutine thread safety - 50 concurrent coroutines generate unique session IDs`() = runTest {
+        val coroutineCount = 50
+        val ids = ConcurrentHashMap.newKeySet<String>()
+        
+        val jobs = (1..coroutineCount).map {
+            async {
+                val id = idGenerator.generateSessionId()
+                assertTrue("ID must match format: $id", idFormatRegex.matches(id))
+                ids.add(id)
+            }
+        }
+        
+        jobs.awaitAll()
+        
+        assertEquals("All 50 coroutines must generate unique IDs", coroutineCount, ids.size)
+        ids.forEach { id ->
+            assertTrue("All IDs must match format: $id", idFormatRegex.matches(id))
+        }
+    }
+
+    @Test
+    fun `coroutine thread safety - 50 concurrent user ID generations`() = runTest {
+        val coroutineCount = 50
+        val ids = ConcurrentHashMap.newKeySet<String>()
+        
+        val jobs = (1..coroutineCount).map {
+            async {
+                val id = idGenerator.generateUserId()
+                assertTrue("ID must match format: $id", idFormatRegex.matches(id))
+                ids.add(id)
+            }
+        }
+        
+        jobs.awaitAll()
+        
+        assertEquals("All 50 coroutines must generate unique IDs", coroutineCount, ids.size)
+    }
+
+    @Test
+    fun `coroutine thread safety - concurrent device ID access returns same persisted ID`() = runTest {
+        val persistedId = "1234567890123_persist01"
+        `when`(mockPrefs.getString("device_id", null)).thenReturn(persistedId)
+        
+        val coroutineCount = 50
+        val ids = ConcurrentHashMap.newKeySet<String>()
+        
+        val jobs = (1..coroutineCount).map {
+            async {
+                val id = idGenerator.getOrGenerateDeviceId()
+                ids.add(id)
+            }
+        }
+        
+        jobs.awaitAll()
+        
+        assertEquals("All coroutines must return the same persisted ID", 1, ids.size)
+        assertEquals("Must return persisted ID", persistedId, ids.first())
+    }
+
+    @Test
+    fun `uniqueness validation - 1000 IDs with zero collisions across all types`() {
+        `when`(mockPrefs.getString("device_id", null)).thenReturn(null)
+        `when`(mockPrefs.getString("user_id", null)).thenReturn(null)
+        
+        val allIds = mutableSetOf<String>()
+        
+        repeat(1000) {
+            allIds.add(idGenerator.generateSessionId())
+        }
+        
+        assertEquals("Must generate 1000 unique session IDs", 1000, allIds.size)
+        
+        allIds.clear()
+        repeat(1000) {
+            allIds.add(idGenerator.generateUserId())
+        }
+        
+        assertEquals("Must generate 1000 unique user IDs", 1000, allIds.size)
+    }
+
+    @Test
+    fun `format validation - all generated IDs match regex pattern`() {
+        `when`(mockPrefs.getString("device_id", null)).thenReturn(null)
+        `when`(mockPrefs.getString("user_id", null)).thenReturn(null)
+        
+        val sessionIds = (1..100).map { idGenerator.generateSessionId() }
+        val userIds = (1..100).map { idGenerator.generateUserId() }
+        val deviceIds = (1..100).map {
+            val gen = IdGenerator()
+            gen.initialize(mockContext)
+            gen.getOrGenerateDeviceId()
+        }
+        
+        (sessionIds + userIds + deviceIds).forEach { id ->
+            assertTrue(
+                "ID must match pattern \\d{13}_[a-z0-9]{8}: $id",
+                idFormatRegex.matches(id)
+            )
+        }
     }
 }

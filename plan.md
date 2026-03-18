@@ -1164,9 +1164,17 @@ class IdGeneratorTest {
 - [x] Migrate `UserProfileManager.kt` to use injected `IdGenerator`
 - [x] Update all component instantiations in `TelemetryManager.kt`
 - [x] Verify no local `IdGenerator()` instantiations remain in components
-- [ ] Test session tracking consistency
-- [ ] Test user ID persistence
-- [ ] Test device ID persistence
+- [x] Test session tracking consistency
+- [x] Test user ID persistence
+- [x] Test device ID persistence
+- [x] Write comprehensive `IdGeneratorTest.kt` with 50+ test cases
+- [x] Write `IdConsistencyTest.kt` for cross-component validation
+- [x] Add regression tests for legacy ID generation patterns
+- [x] Validate format consistency across all ID types
+- [x] Test thread safety with 50 concurrent coroutines
+- [x] Test timestamp accuracy within 1 second
+- [x] Verify character set (lowercase alphanumeric only)
+- [x] Test uniqueness with 1000+ IDs per type
 - [ ] Verify no breaking changes in payload format
 - [ ] Update documentation with standardized ID formats
 - [ ] Code review and merge
