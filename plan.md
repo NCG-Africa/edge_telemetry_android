@@ -852,8 +852,8 @@ val config = TelemetryConfig.builder(this, apiKey)
 - [x] Update `sample_telemetry_payload.json` - add location example
 - [x] Write unit tests for `IpLocationProvider`
 - [x] Write integration tests for location in payloads
-- [ ] Update `README_EDGE_TELEMETRY.md` - add location tracking documentation
-- [ ] Update changelog with version 1.2.9 features
+- [x] Update `README_EDGE_TELEMETRY.md` - add location tracking documentation
+- [x] Update changelog with version 1.2.9 features
 - [ ] Test with real ipinfo.io API
 - [ ] Test rate limit fallback scenario
 - [ ] Test cache expiration

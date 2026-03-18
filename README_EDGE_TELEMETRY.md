@@ -10,7 +10,8 @@ A comprehensive Android telemetry SDK that produces **identical backend payloads
 - 🍞 **Breadcrumb System** - Detailed activity trail for debugging
 - 📱 **Session Management** - Automatic session tracking and analytics
 - 🌐 **Network Monitoring** - HTTP request tracking with OkHttp integration
-- 🔄 **Offline Support** - Network-aware retry with exponential backoff
+- � **Location Tracking** - IP-based city/country tracking (no permissions required)
+- � **Offline Support** - Network-aware retry with exponential backoff
 - 📐 **Compose Integration** - Automatic navigation and screen tracking
 - 🎯 **Flutter SDK Compatible** - Identical payload structure for unified analytics
 
@@ -229,6 +230,43 @@ val httpClient = OkHttpClient.Builder()
 // All HTTP requests will now be automatically tracked
 ```
 
+### Location Tracking
+
+The SDK automatically includes city/country location in telemetry payloads using IP-based geolocation (no permissions required).
+
+#### Configuration
+
+```kotlin
+val config = TelemetryConfig.builder(this, BuildConfig.TELEMETRY_API_KEY)
+    .enableLocationTracking(true)  // Default: true
+    .locationApiEndpoint("https://ipinfo.io/json")  // Default
+    .locationCacheDuration(3600000)  // 1 hour cache (in milliseconds)
+    .locationFallbackToIp(true)  // Send IP if API fails (default: true)
+    .build()
+```
+
+#### How It Works
+
+- Uses ipinfo.io API (50,000 free requests/month)
+- Location cached for 1 hour per session
+- Falls back to IP address if rate limit exceeded
+- No location permissions required
+- Minimal performance impact (single API call per session)
+
+#### Location Format
+
+- **Success**: `"Nairobi/Kenya"` (City/Country)
+- **Fallback**: `"105.163.0.47"` (IP address for backend processing)
+- **Disabled**: `null` (location field omitted)
+
+#### Disable Location Tracking
+
+```kotlin
+val config = TelemetryConfig.builder(this, BuildConfig.TELEMETRY_API_KEY)
+    .enableLocationTracking(false)
+    .build()
+```
+
 ### Compose Integration
 
 ```kotlin
@@ -372,8 +410,10 @@ The SDK generates payloads that match the Flutter SDK exactly:
 ```json
 {
   "timestamp": "2025-01-15T10:30:45.123Z",
+  "device_id": "device_1704067200000_a8b9c2d1_android",
   "data": {
     "type": "batch",
+    "device_id": "device_1704067200000_a8b9c2d1_android",
     "events": [
       {
         "type": "event",
@@ -388,7 +428,8 @@ The SDK generates payloads that match the Flutter SDK exactly:
       }
     ],
     "batch_size": 1,
-    "timestamp": "2025-01-15T10:30:45.123Z"
+    "timestamp": "2025-01-15T10:30:45.123Z",
+    "location": "Nairobi/Kenya"
   }
 }
 ```
@@ -413,6 +454,10 @@ val config = TelemetryConfig.builder(application, BuildConfig.TELEMETRY_API_KEY)
     .enableCrashReporting(true)          // Automatic crash detection (default: true)
     .enableUserProfiles(true)            // User profile management (default: true)
     .enableSessionTracking(true)         // Enhanced session tracking (default: true)
+    .enableLocationTracking(true)        // IP-based location tracking (default: true)
+    .locationApiEndpoint("https://ipinfo.io/json")  // Location API endpoint
+    .locationCacheDuration(3600000)      // Location cache duration (1 hour)
+    .locationFallbackToIp(true)          // Fallback to IP on API failure (default: true)
     .globalAttributes(emptyMap())        // Global attributes for all events
     .build()
 
@@ -497,7 +542,15 @@ For issues, feature requests, or questions:
 
 ## Changelog
 
-### Version 1.2.8 (Upcoming)
+### Version 1.2.9 (Upcoming)
+- ✨ **NEW**: IP-based location tracking (city/country)
+- ✨ **NEW**: Automatic fallback to IP address on rate limit
+- ✨ **NEW**: Location caching to minimize API calls
+- 🔧 **IMPROVED**: Payload structure includes location field
+- 📚 **UPDATED**: Documentation with location tracking guide
+- 🔒 **PRIVACY**: No location permissions required
+
+### Version 1.2.8
 - 🔒 **SECURITY**: API key authentication now required for all requests
 - ✨ **NEW**: TelemetryConfig builder pattern for cleaner initialization
 - ✨ **NEW**: API key validation with "edge_" prefix requirement
