@@ -69,13 +69,16 @@ class TelemetryManager private constructor(
     val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
     private var batchSendJob: Job? = null
 
+    // ID Generator - single source of truth for all IDs
+    private lateinit var idGenerator: IdGenerator
+
     // Core attributes for every event
-    private val deviceId: String = getOrCreateDeviceId()
+    private lateinit var deviceId: String
     private val appInfo = collectAppInfo()
-    private val deviceInfo = collectDeviceInfo()
-    private var sessionId = generateSessionId()
+    private lateinit var deviceInfo: DeviceInfo
+    private lateinit var sessionId: String
     private var sessionStartTime = System.currentTimeMillis()
-    private lateinit var userId: String // Will be set during initialization - must never be null/empty
+    private lateinit var userId: String
     
     // Device capabilities for runtime feature detection
     private lateinit var deviceCapabilities: DeviceCapabilities
@@ -197,7 +200,8 @@ class TelemetryManager private constructor(
                     debugMode = debugMode,
                 ).also { manager ->
                     instance = manager
-                    manager.initializeCapabilities() // Initialize device capabilities first
+                    manager.initializeIdGenerator() // Initialize ID generator first
+                    manager.initializeCapabilities() // Initialize device capabilities
                     manager.initializeUserId() // Initialize user ID
                     manager.initializeFlutterComponents(
                         enableCrashReporting,
@@ -250,6 +254,21 @@ class TelemetryManager private constructor(
     }
 
     /**
+     * Initialize IdGenerator before any ID is accessed
+     */
+    private fun initializeIdGenerator() {
+        idGenerator = IdGenerator()
+        idGenerator.initialize(context)
+        
+        // Initialize core IDs
+        deviceId = idGenerator.getOrGenerateDeviceId()
+        sessionId = idGenerator.generateSessionId()
+        deviceInfo = collectDeviceInfo()
+        
+        Log.i("TelemetryManager", "IdGenerator initialized - Device ID: $deviceId, Session ID: $sessionId")
+    }
+
+    /**
      * Initializes the user ID automatically during SDK setup.
      * Creates a new user ID if none exists, or loads existing one from SharedPreferences.
      * This ensures permanent user identity across app lifecycle with zero developer intervention.
@@ -257,33 +276,12 @@ class TelemetryManager private constructor(
      */
     private fun initializeUserId() {
         try {
-            val prefs = context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE)
-            val existingUserId = prefs.getString("sdk_managed_user_id", null)
-            
-            if (!existingUserId.isNullOrBlank()) {
-                // Load existing user ID (validated to be non-empty)
-                userId = existingUserId
-                Log.i("TelemetryManager", "Loaded existing user ID: $userId")
-            } else {
-                // Generate new user ID and store it permanently
-                userId = generateUserId()
-                if (userId.isBlank()) {
-                    Log.e("TelemetryManager", "CRITICAL ERROR: Generated userId is blank. Using fallback.")
-                    userId = "user_fallback_${System.currentTimeMillis()}"
-                }
-                prefs.edit().putString("sdk_managed_user_id", userId).apply()
-                Log.i("TelemetryManager", "Generated new user ID: $userId")
-            }
+            userId = idGenerator.getUserId()
+            Log.i("TelemetryManager", "Loaded/generated user ID: $userId")
         } catch (e: Exception) {
-            // Handle SharedPreferences failures gracefully
-            Log.e("TelemetryManager", "Failed to initialize user ID from SharedPreferences: ${e.localizedMessage}", e)
-            // Fallback: generate user ID but don't persist (will be regenerated on next launch)
-            userId = generateUserId()
-            if (userId.isBlank()) {
-                Log.e("TelemetryManager", "CRITICAL ERROR: Fallback userId is blank. Using emergency fallback.")
-                userId = "user_emergency_${System.currentTimeMillis()}"
-            }
-            Log.w("TelemetryManager", "Using fallback user ID (not persisted): $userId")
+            Log.e("TelemetryManager", "Failed to initialize user ID: ${e.localizedMessage}", e)
+            userId = "user_emergency_${System.currentTimeMillis()}"
+            Log.w("TelemetryManager", "Using emergency fallback user ID: $userId")
         }
         
         // Final safety check - ensure userId is initialized
@@ -704,41 +702,6 @@ class TelemetryManager private constructor(
         this.userId = id
     }
 
-    // Expected format: user_1704067200123_abcd1234
-    // Made private - SDK manages user ID automatically
-    private fun generateUserId(): String {
-        val timestamp = System.currentTimeMillis()
-        val randomPart = generateRandomString(8)
-        return "user_${timestamp}_$randomPart"
-    }
-
-
-    fun generateRandomString(length: Int): String {
-        val charPool: List<Char> = ('a'..'z') + ('A'..'Z') + ('0'..'9')
-        val random = SecureRandom()
-        return (1..length)
-            .map { charPool[random.nextInt(charPool.size)] }
-            .joinToString("")
-    }
-
-    // Expected format: device_1704067200000_a8b9c2d1_android
-    private fun generateDeviceId(): String {
-        val timestamp = System.currentTimeMillis()
-        val randomPart = generateRandomString(8)
-        val platform = "android"
-
-        return "device_${timestamp}_${randomPart}_$platform"
-    }
-
-    // Expected format: session_1704067200000_x9y8z7w6_android
-    private fun generateSessionId(): String {
-        val timestamp = System.currentTimeMillis()
-        val randomPart = generateRandomString(8)
-        val platform = "android"
-
-        return "session_${timestamp}_${randomPart}_$platform"
-    }
-
     // A new method to set additional user profile information.
     // Made private - SDK manages user profile automatically
     private fun setUserProfile(name: String, email: String, phone: String, profileVersion: Int) {
@@ -928,27 +891,6 @@ class TelemetryManager private constructor(
     }
 
 
-    // Generates a structured device ID and stores it persistently in SharedPreferences.
-    // CRITICAL: deviceId must NEVER be null or empty - uses fallback if generation fails.
-    private fun getOrCreateDeviceId(): String {
-        val prefs = context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE)
-        var deviceId = prefs.getString("device.id", null)
-        if (deviceId.isNullOrBlank()) {
-            deviceId = generateDeviceId()
-            if (deviceId.isBlank()) {
-                Log.e("TelemetryManager", "CRITICAL ERROR: Generated deviceId is blank. Using fallback.")
-                deviceId = "device_fallback_${System.currentTimeMillis()}_android"
-            }
-            prefs.edit().putString("device.id", deviceId).apply()
-        }
-        
-        // Final safety check - ensure deviceId is not blank
-        if (deviceId.isBlank()) {
-            Log.e("TelemetryManager", "CRITICAL ERROR: deviceId is blank. Using emergency fallback.")
-            deviceId = "device_emergency_${System.currentTimeMillis()}_android"
-        }
-        return deviceId
-    }
 
     /**
      * Initialize device capabilities for runtime feature detection
@@ -1209,7 +1151,7 @@ class TelemetryManager private constructor(
             enhancedSessionManager!!.startNewSession()
         } else {
             // Fallback to legacy session management
-            sessionId = generateSessionId()
+            sessionId = idGenerator.generateSessionId()
             sessionStartTime = System.currentTimeMillis()
             eventCount = 0
             metricCount = 0
