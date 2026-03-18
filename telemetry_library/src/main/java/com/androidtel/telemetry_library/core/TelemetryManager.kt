@@ -386,6 +386,9 @@ class TelemetryManager private constructor(
                     try {
                         currentLocation = locationProvider?.getLocation()
                         Log.d("TelemetryManager", "Location initialized: $currentLocation")
+                        
+                        // Update crash reporter with location
+                        crashReporter?.setLocation(currentLocation)
                     } catch (e: Exception) {
                         Log.w("TelemetryManager", "Failed to initialize location: ${e.message}")
                     }
@@ -1157,6 +1160,29 @@ class TelemetryManager private constructor(
             Log.w("TelemetryManager", "Crash reporting not enabled. Call initialize() with enableCrashReporting = true")
         }
     }
+    
+    /**
+     * Track error with enhanced context (v2.0.0)
+     * 
+     * @param error The throwable to track
+     * @param errorCode Optional app-specific error code (max 100 chars)
+     * @param productId Optional product/module identifier (max 255 chars)
+     * @param userAction Optional last user action (max 500 chars)
+     * @param attributes Optional additional attributes
+     */
+    fun trackError(
+        error: Throwable,
+        errorCode: String? = null,
+        productId: String? = null,
+        userAction: String? = null,
+        attributes: Map<String, String>? = null
+    ) {
+        if (crashReportingEnabled && crashReporter != null) {
+            crashReporter!!.trackError(error, errorCode, productId, userAction, attributes)
+        } else {
+            Log.w("TelemetryManager", "Crash reporting not enabled. Call initialize() with enableCrashReporting = true")
+        }
+    }
 
     /**
      * Track error with message (Flutter-compatible)
@@ -1164,6 +1190,34 @@ class TelemetryManager private constructor(
     fun trackError(message: String, stackTrace: String? = null, attributes: Map<String, String>? = null) {
         if (crashReportingEnabled && crashReporter != null) {
             crashReporter!!.trackError(message, stackTrace, attributes)
+        } else {
+            Log.w("TelemetryManager", "Crash reporting not enabled")
+        }
+    }
+    
+    /**
+     * Set product context for crash reporting (v2.0.0)
+     * This context will be included in all subsequent crash reports
+     * 
+     * @param productId Product/module identifier (max 255 chars)
+     */
+    fun setProductContext(productId: String) {
+        if (crashReportingEnabled && crashReporter != null) {
+            crashReporter!!.setProductContext(productId)
+        } else {
+            Log.w("TelemetryManager", "Crash reporting not enabled")
+        }
+    }
+    
+    /**
+     * Set last user action for crash context (v2.0.0)
+     * This context will be included in all subsequent crash reports
+     * 
+     * @param action Description of user action (max 500 chars)
+     */
+    fun setLastUserAction(action: String) {
+        if (crashReportingEnabled && crashReporter != null) {
+            crashReporter!!.setLastUserAction(action)
         } else {
             Log.w("TelemetryManager", "Crash reporting not enabled")
         }

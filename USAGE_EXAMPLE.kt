@@ -177,10 +177,15 @@ fun HomeScreen(navController: NavController) {
             Text("Go to Profile")
         }
         
-        // Test crash reporting
+        // Test crash reporting (v2.0.0 with enhanced context)
         Button(
             onClick = {
                 TelemetryManager.getInstance().addBreadcrumb("User initiated crash test", "user")
+                
+                // Set product context for crash reporting
+                TelemetryManager.getInstance().setProductContext("home_module")
+                TelemetryManager.getInstance().setLastUserAction("Clicked test crash button")
+                
                 TelemetryManager.getInstance().testCrashReporting("User initiated test crash")
             },
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
@@ -329,10 +334,17 @@ fun SettingsScreen(navController: NavController) {
                     // Simulate an error
                     throw RuntimeException("Simulated error for testing")
                 } catch (e: Exception) {
-                    TelemetryManager.getInstance().trackError(e, mapOf(
-                        "error_source" to "settings_screen",
-                        "user_action" to "simulate_error"
-                    ))
+                    // v2.0.0: Enhanced error tracking with context
+                    TelemetryManager.getInstance().trackError(
+                        error = e,
+                        errorCode = "SETTINGS_001",
+                        productId = "settings_module",
+                        userAction = "Clicked simulate error button",
+                        attributes = mapOf(
+                            "error_source" to "settings_screen",
+                            "screen" to "settings"
+                        )
+                    )
                 }
             },
             modifier = Modifier.fillMaxWidth()

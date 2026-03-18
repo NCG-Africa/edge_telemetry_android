@@ -41,6 +41,11 @@ class CrashReporter(
     private val deviceInfoCollector = DeviceInfoCollector(context, idGenerator)
     private var originalHandler: Thread.UncaughtExceptionHandler? = null
     
+    // Product context and user action tracking (Phase 2C)
+    private var currentProductId: String? = null
+    private var lastUserAction: String? = null
+    private var currentLocation: String? = null
+    
     init {
         if (enabled) {
             installGlobalExceptionHandler()
@@ -76,8 +81,37 @@ class CrashReporter(
         
         scope.launch {
             try {
-                val stackTrace = generateStackTrace(error)
-                val crashData = createCrashPayload(error, stackTrace, attributes)
+                val crashData = createCrashBatchEnvelope(error, attributes)
+                sendCrashData(crashData)
+                
+                Log.d(TAG, "✅ Error tracked successfully: ${error.javaClass.simpleName}")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Failed to track error", e)
+            }
+        }
+    }
+    
+    /**
+     * Track an error with enhanced context (v2.0.0)
+     */
+    fun trackError(
+        error: Throwable,
+        errorCode: String? = null,
+        productId: String? = null,
+        userAction: String? = null,
+        attributes: Map<String, String>? = null
+    ) {
+        if (!enabled) return
+        
+        scope.launch {
+            try {
+                val crashData = createCrashBatchEnvelope(
+                    error = error,
+                    errorCode = errorCode,
+                    productId = productId ?: currentProductId,
+                    userAction = userAction ?: lastUserAction,
+                    additionalAttributes = attributes
+                )
                 sendCrashData(crashData)
                 
                 Log.d(TAG, "✅ Error tracked successfully: ${error.javaClass.simpleName}")
@@ -96,7 +130,7 @@ class CrashReporter(
         scope.launch {
             try {
                 val finalStackTrace = stackTrace ?: generateCurrentStackTrace()
-                val crashData = createCrashPayload(message, finalStackTrace, attributes)
+                val crashData = createCrashBatchEnvelope(message, finalStackTrace, attributes)
                 sendCrashData(crashData)
                 
                 Log.d(TAG, "✅ Error tracked successfully: $message")
@@ -112,8 +146,7 @@ class CrashReporter(
     private fun handleCrash(exception: Throwable, additionalAttributes: Map<String, String> = emptyMap()) {
         scope.launch {
             try {
-                val stackTrace = generateStackTrace(exception)
-                val crashData = createCrashPayload(exception, stackTrace, additionalAttributes)
+                val crashData = createCrashBatchEnvelope(exception, additionalAttributes)
                 sendCrashData(crashData)
                 
                 Log.d(TAG, "💥 Crash reported: ${exception.javaClass.simpleName}")
@@ -124,66 +157,69 @@ class CrashReporter(
     }
     
     /**
-     * Create crash payload with exact structure matching Flutter SDK
+     * Create crash batch envelope with new v2.0.0 structure
      */
-    private fun createCrashPayload(
-        error: Throwable, 
-        stackTrace: String, 
-        additionalAttributes: Map<String, String>? = null
+    private fun createCrashBatchEnvelope(
+        error: Throwable,
+        additionalAttributes: Map<String, String>? = null,
+        errorCode: String? = null,
+        productId: String? = null,
+        userAction: String? = null
     ): Map<String, Any> {
-        val errorMessage = "${error.javaClass.name}: ${error.message ?: ""}"
-        val fingerprint = CrashFingerprinter.generateCrashFingerprint(error, stackTrace)
+        val baseAttributes = deviceInfoCollector.getCrashAttributes()
         val breadcrumbs = breadcrumbManager.getBreadcrumbsAsJson()
         
-        val baseAttributes = deviceInfoCollector.getCrashAttributes()
-        val crashAttributes = FlutterPayloadFactory.createCrashAttributes(
-            baseAttributes = baseAttributes,
-            fingerprint = fingerprint,
-            breadcrumbs = breadcrumbs,
-            breadcrumbCount = breadcrumbManager.getBreadcrumbCount(),
+        // Add breadcrumbs to base attributes
+        val enrichedAttributes = baseAttributes.toMutableMap()
+        enrichedAttributes["breadcrumbs"] = breadcrumbs
+        
+        // Add additional attributes if provided
+        additionalAttributes?.let { enrichedAttributes.putAll(it) }
+        
+        val envelope = FlutterPayloadFactory.createCrashBatchEnvelope(
+            throwable = error,
+            deviceId = idGenerator.getDeviceId(),
+            baseAttributes = enrichedAttributes,
+            location = currentLocation,
+            productId = productId ?: currentProductId,
+            userAction = userAction ?: lastUserAction,
+            errorCode = errorCode,
             additionalAttributes = additionalAttributes ?: emptyMap()
         )
         
-        val payload = FlutterPayloadFactory.createCrashPayload(
-            error = errorMessage,
-            stackTrace = stackTrace,
-            fingerprint = fingerprint,
-            attributes = crashAttributes,
-            deviceId = idGenerator.getDeviceId()
-        )
-        
-        return gson.fromJson(payload.toJson(), Map::class.java) as Map<String, Any>
+        return gson.fromJson(envelope.toJson(), Map::class.java) as Map<String, Any>
     }
     
     /**
-     * Create crash payload from message and stack trace
+     * Create crash batch envelope from message and stack trace
      */
-    private fun createCrashPayload(
+    private fun createCrashBatchEnvelope(
         message: String,
         stackTrace: String,
         additionalAttributes: Map<String, String>? = null
     ): Map<String, Any> {
-        val fingerprint = CrashFingerprinter.generateCrashFingerprint(message, stackTrace)
+        val baseAttributes = deviceInfoCollector.getCrashAttributes()
         val breadcrumbs = breadcrumbManager.getBreadcrumbsAsJson()
         
-        val baseAttributes = deviceInfoCollector.getCrashAttributes()
-        val crashAttributes = FlutterPayloadFactory.createCrashAttributes(
-            baseAttributes = baseAttributes,
-            fingerprint = fingerprint,
-            breadcrumbs = breadcrumbs,
-            breadcrumbCount = breadcrumbManager.getBreadcrumbCount(),
+        // Add breadcrumbs to base attributes
+        val enrichedAttributes = baseAttributes.toMutableMap()
+        enrichedAttributes["breadcrumbs"] = breadcrumbs
+        
+        // Add additional attributes if provided
+        additionalAttributes?.let { enrichedAttributes.putAll(it) }
+        
+        val envelope = FlutterPayloadFactory.createCrashBatchEnvelope(
+            message = message,
+            stackTrace = stackTrace,
+            deviceId = idGenerator.getDeviceId(),
+            baseAttributes = enrichedAttributes,
+            location = currentLocation,
+            productId = currentProductId,
+            userAction = lastUserAction,
             additionalAttributes = additionalAttributes ?: emptyMap()
         )
         
-        val payload = FlutterPayloadFactory.createCrashPayload(
-            error = message,
-            stackTrace = stackTrace,
-            fingerprint = fingerprint,
-            attributes = crashAttributes,
-            deviceId = idGenerator.getDeviceId()
-        )
-        
-        return gson.fromJson(payload.toJson(), Map::class.java) as Map<String, Any>
+        return gson.fromJson(envelope.toJson(), Map::class.java) as Map<String, Any>
     }
     
     
@@ -221,6 +257,30 @@ class CrashReporter(
     private fun generateCurrentStackTrace(): String {
         val exception = Exception("Manual error tracking")
         return generateStackTrace(exception)
+    }
+    
+    /**
+     * Set product context for crash reporting (Phase 2C)
+     */
+    fun setProductContext(productId: String) {
+        this.currentProductId = productId.take(255)
+        Log.d(TAG, "Product context set: $productId")
+    }
+    
+    /**
+     * Set last user action for crash context (Phase 2C)
+     */
+    fun setLastUserAction(action: String) {
+        this.lastUserAction = action.take(500)
+        Log.d(TAG, "User action set: $action")
+    }
+    
+    /**
+     * Set current location for crash reporting
+     */
+    fun setLocation(location: String?) {
+        this.currentLocation = location
+        Log.d(TAG, "Location set: $location")
     }
     
     /**
