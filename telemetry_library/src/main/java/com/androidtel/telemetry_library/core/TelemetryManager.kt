@@ -323,7 +323,7 @@ class TelemetryManager private constructor(
 
             // Initialize user profile manager if enabled
             if (enableUserProfiles) {
-                userProfileManager = UserProfileManager(context)
+                userProfileManager = UserProfileManager(context, flutterIdGenerator!!)
             }
 
             // Initialize enhanced session manager if enabled
@@ -386,7 +386,7 @@ class TelemetryManager private constructor(
     }
 
     private fun createDummyUserProfileManager(): UserProfileManager {
-        return UserProfileManager(context)
+        return UserProfileManager(context, flutterIdGenerator!!)
     }
 
     private fun register() {

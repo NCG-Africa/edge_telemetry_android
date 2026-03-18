@@ -1152,12 +1152,18 @@ class IdGeneratorTest {
 
 ### Phase 4: Migration Checklist
 
-- [ ] Update `IdGenerator.kt` to use `SecureRandom`
-- [ ] Standardize session ID format to 8-char with `_android` suffix
-- [ ] Add comprehensive tests for `IdGenerator`
-- [ ] Refactor `TelemetryManager` to use `IdGenerator`
-- [ ] Remove legacy ID generation methods from `TelemetryManager`
-- [ ] Update all direct calls to legacy methods
+- [x] Update `IdGenerator.kt` to use `SecureRandom`
+- [x] Standardize session ID format to 8-char with `_android` suffix
+- [x] Add comprehensive tests for `IdGenerator`
+- [x] Refactor `TelemetryManager` to use `IdGenerator`
+- [x] Remove legacy ID generation methods from `TelemetryManager`
+- [x] Update all direct calls to legacy methods
+- [x] Migrate `SessionManager.kt` to use injected `IdGenerator`
+- [x] Migrate `DeviceInfoCollector.kt` to use injected `IdGenerator`
+- [x] Migrate `CrashReporter.kt` to use injected `IdGenerator`
+- [x] Migrate `UserProfileManager.kt` to use injected `IdGenerator`
+- [x] Update all component instantiations in `TelemetryManager.kt`
+- [x] Verify no local `IdGenerator()` instantiations remain in components
 - [ ] Test session tracking consistency
 - [ ] Test user ID persistence
 - [ ] Test device ID persistence
