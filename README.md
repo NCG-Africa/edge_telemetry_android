@@ -332,24 +332,64 @@ if (telemetryManager != null) {
 }
 ```
 
-### 5. Navigation Monitoring
+### 5. Navigation Tracking
+
+The SDK automatically tracks all navigation events with comprehensive data structure aligned with backend requirements.
+
+#### Navigation Event Structure
+
+All navigation events include the following fields:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `navigation.from_screen` | String | Optional | Source screen (null on app launch) |
+| `navigation.to_screen` | String | Required | Destination screen name |
+| `navigation.method` | String | Required | Navigation action: `push`, `pop`, or `replace` |
+| `navigation.route_type` | String | Optional | Route classification (e.g., `main_flow`, `modal`, `deeplink`) |
+| `navigation.has_arguments` | Boolean | Optional | Whether navigation includes data/arguments |
+| `navigation.timestamp` | String | Required | ISO 8601 formatted datetime |
+
+#### Navigation Methods
+
+The SDK automatically detects and reports the correct navigation method:
+
+- **`push`** - Forward navigation to a new screen (Activity/Fragment resumed, Compose navigation forward)
+- **`pop`** - Back navigation to previous screen (back button, up navigation)
+- **`replace`** - Screen replacement (Activity finish + start, Fragment replace)
+
+#### Route Types
+
+The SDK automatically classifies navigation routes:
+
+- **`main_flow`** - Primary app navigation (default for Activities)
+- **`fragment_flow`** - Fragment-based navigation
+- **`deeplink`** - Deep link navigation (detected from Intent data)
+- **`modal`** - Modal/dialog screens
+- **`onboarding`** - Onboarding flow screens
+- **`settings`** - Settings screens
 
 #### For XML-based Navigation (Activities/Fragments)
 
-Activities are automatically tracked. For manual screen tracking:
+Activities and Fragments are automatically tracked with full navigation context:
 
-#### Kotlin
+**Kotlin**
 ```kotlin
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
         // Activities are automatically tracked by the SDK
+        // Navigation events include:
+        // - from_screen: Previous activity (null on first launch)
+        // - to_screen: "MainActivity"
+        // - method: "push"
+        // - route_type: "main_flow" or "deeplink" (if launched via deep link)
+        // - has_arguments: true if intent has extras
     }
 }
 ```
 
-#### Java
+**Java**
 ```java
 public class MainActivity extends AppCompatActivity {
     @Override
@@ -357,28 +397,107 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         
         // Activities are automatically tracked by the SDK
+        // Navigation events include full context
+    }
+}
+```
+
+**Fragment Navigation**
+```kotlin
+class ProfileFragment : Fragment() {
+    override fun onResume() {
+        super.onResume()
+        
+        // Fragments are automatically tracked
+        // - from_screen: Previous fragment
+        // - to_screen: "ProfileFragment"
+        // - method: "push"
+        // - route_type: "fragment_flow"
+        // - has_arguments: true if fragment has arguments
     }
 }
 ```
 
 #### For Jetpack Compose Navigation (Java 11+ Version Only)
 
+**Automatic Tracking**
 ```kotlin
 @Composable
 fun MyApp() {
     val navController = rememberNavController()
-    val telemetry = TelemetryManager.getInstance()
-    telemetry.trackComposeScreens(navController)
     
     NavHost(navController = navController, startDestination = "home") {
-        composable("home") { HomeScreen() }
-        composable("profile") { ProfileScreen() }
-        composable("settings") { SettingsScreen() }
+        composable("home") { 
+            TrackComposeScreen(navController = navController, screenName = "HomeScreen")
+            HomeScreen() 
+        }
+        composable("profile") { 
+            TrackComposeScreen(navController = navController, screenName = "ProfileScreen")
+            ProfileScreen() 
+        }
+        composable("settings") { 
+            TrackComposeScreen(navController = navController, screenName = "SettingsScreen")
+            SettingsScreen() 
+        }
     }
 }
 ```
 
-> **Note**: Compose features are only available in the Java 11+ version (`1.2.1`). For Java 8 projects, use Activity/Fragment-based navigation.
+**Custom Route Types**
+```kotlin
+@Composable
+fun ModalScreen() {
+    TrackComposeScreen(
+        navController = navController,
+        screenName = "ModalScreen",
+        additionalData = mapOf("route_type" to "modal")
+    )
+    
+    // Your modal UI
+}
+```
+
+**Deep Link Navigation**
+```kotlin
+composable(
+    route = "product/{productId}",
+    deepLinks = listOf(navDeepLink { uriPattern = "myapp://product/{productId}" })
+) { backStackEntry ->
+    val productId = backStackEntry.arguments?.getString("productId")
+    
+    TrackComposeScreen(
+        navController = navController,
+        screenName = "ProductDetailScreen",
+        additionalData = mapOf("route_type" to "deeplink")
+    )
+    
+    ProductDetailScreen(productId)
+}
+```
+
+#### Sample Navigation Event
+
+```json
+{
+  "type": "event",
+  "eventName": "navigation",
+  "timestamp": "2024-03-18T14:50:23.456Z",
+  "attributes": {
+    "navigation.from_screen": "HomeScreen",
+    "navigation.to_screen": "ProfileScreen",
+    "navigation.method": "push",
+    "navigation.route_type": "main_flow",
+    "navigation.has_arguments": true,
+    "navigation.timestamp": "2024-03-18T14:50:23.456Z",
+    "app.name": "MyApp",
+    "app.version": "1.0.0",
+    "session.id": "session_1234567890",
+    "user.id": "user_abcd1234"
+  }
+}
+```
+
+> **Note**: Compose features are only available in the Java 11+ version. For Java 8 projects, use Activity/Fragment-based navigation.
 
 ## 📖 Usage Examples
 

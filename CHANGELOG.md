@@ -5,6 +5,231 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-03-18
+
+### 💥 BREAKING CHANGES
+
+#### Navigation Event Structure Completely Redesigned
+- **🔴 CRITICAL**: Navigation event structure updated to align with backend Kafka processor and `rum_navigation_events` database schema
+- **Event Name Change**: Navigation events now use `"navigation"` (previously `"navigation.route_change"`)
+- **Field Name Changes**: `navigation.to` → `navigation.to_screen`, `navigation.type` → `navigation.route_type`
+- **Method Values Updated**: Now uses `push`/`pop`/`replace` (previously `resumed`/`paused`/`navigation`)
+- **Backend Compatibility**: New structure required for backend processor to correctly store navigation events
+- **Migration Required**: No code changes needed - SDK handles everything automatically
+
+#### New Required Navigation Fields
+- **`navigation.from_screen`** (String, nullable): Source screen name for tracking user journey (null on app launch)
+- **`navigation.to_screen`** (String, required): Destination screen name (renamed from `navigation.to`)
+- **`navigation.method`** (String, required): Navigation action - MUST be `push`, `pop`, or `replace`
+- **`navigation.route_type`** (String, optional): Route classification (e.g., `main_flow`, `modal`, `deeplink`)
+- **`navigation.has_arguments`** (Boolean, optional): Whether navigation includes data/arguments
+- **`navigation.timestamp`** (String, required): ISO 8601 formatted datetime
+
+#### Navigation Method Values (Database Constraint)
+- **✅ VALID**: `"push"` - Forward navigation to new screen
+- **✅ VALID**: `"pop"` - Back navigation to previous screen
+- **✅ VALID**: `"replace"` - Screen replacement
+- **❌ REMOVED**: `"resumed"`, `"paused"`, `"navigation"`, `"closed"`, `"destroyed"` (lifecycle states)
+
+**Impact**: Backend database has CHECK constraint requiring method to be push/pop/replace. Old values cause constraint violations.
+
+#### Timestamp Format Change
+- **Old Format**: `System.currentTimeMillis().toString()` → `"1710770400000"`
+- **New Format**: `Instant.now().toString()` → `"2024-03-18T14:50:23.456Z"`
+- **Impact**: Backend expects ISO 8601 format. Old format causes parsing errors.
+
+### ✨ New Features
+
+#### Navigation Stack Management
+- **NavigationStackTracker**: Thread-safe navigation history tracking with ArrayDeque
+- **Automatic Method Detection**: SDK automatically determines if navigation is push/pop/replace
+- **From Screen Tracking**: Tracks previous screen for complete user journey analysis
+- **Concurrent Access Safe**: ReentrantReadWriteLock ensures thread safety
+
+#### Enhanced Route Classification
+- **Auto-Detection**: Activities automatically classified as `main_flow` or `deeplink`
+- **Deep Link Detection**: Automatically detects deep link navigation from Intent data
+- **Fragment Classification**: All fragments classified as `fragment_flow`
+- **Custom Route Types**: Compose navigation supports custom route types via `additionalData`
+
+#### Argument Tracking
+- **Intent Extras**: Automatically detects when Activities have intent extras
+- **Fragment Arguments**: Tracks when Fragments have arguments bundle
+- **Compose Arguments**: Detects navigation arguments in Compose routes
+- **Deep Link Parameters**: Tracks deep link parameter presence
+
+### 🔧 Technical Improvements
+
+#### New Navigation Event Structure
+```json
+{
+  "type": "event",
+  "eventName": "navigation",
+  "timestamp": "2024-03-18T14:50:23.456Z",
+  "attributes": {
+    "navigation.from_screen": "HomeScreen",
+    "navigation.to_screen": "ProfileScreen",
+    "navigation.method": "push",
+    "navigation.route_type": "main_flow",
+    "navigation.has_arguments": true,
+    "navigation.timestamp": "2024-03-18T14:50:23.456Z"
+  }
+}
+```
+
+#### Core Components Added
+- **NavigationStackTracker.kt**: Thread-safe navigation stack management
+- **NavigationEvent.kt**: Data class for navigation event structure
+- **NavigationMethod.kt**: Enum for push/pop/replace methods
+- **Helper Methods**: `detectRouteType()`, `hasIntentExtras()` for Activity observers
+
+#### Updated Components
+- **TelemetryActivityLifecycleObserver.kt**: Updated with navigation stack tracking and proper field names
+- **TelemetryFragmentLifecycleObserver.kt**: Updated with navigation tracking and argument detection
+- **EdgeTelemetryCompose.kt**: Updated Compose tracking with proper navigation structure
+
+### 📝 Migration Guide
+
+#### For SDK Users (App Developers)
+
+**Good News**: No code changes required! Just update the SDK version.
+
+**Step 1: Update Dependency**
+```kotlin
+dependencies {
+    // Old version
+    implementation 'com.github.NCG-Africa:edge_telemetry_android:2.0.0'
+    
+    // New version
+    implementation 'com.github.NCG-Africa:edge_telemetry_android:2.1.0'
+}
+```
+
+**Step 2: Verify (Optional)**
+Enable debug mode to see new navigation event structure:
+```kotlin
+TelemetryManager.initialize(
+    application = this,
+    apiKey = BuildConfig.TELEMETRY_API_KEY,
+    debugMode = true  // See navigation events in logs
+)
+```
+
+#### For Backend Teams
+
+**Step 1: Update Kafka Processor**
+Ensure processor handles new field names:
+- `navigation.to_screen` (not `navigation.to`)
+- `navigation.from_screen` (new field, can be null)
+- `navigation.method` with values: `push`, `pop`, `replace`
+- `navigation.route_type` (renamed from `navigation.type`)
+- `navigation.has_arguments` (new field)
+
+**Step 2: Verify Database Schema**
+```sql
+CREATE TABLE rum_navigation_events (
+    from_screen VARCHAR(255),  -- Nullable
+    to_screen VARCHAR(255) NOT NULL,
+    navigation_method VARCHAR(20) NOT NULL 
+        CHECK (navigation_method IN ('push', 'pop', 'replace')),
+    route_type VARCHAR(100),
+    has_arguments BOOLEAN DEFAULT FALSE,
+    timestamp TIMESTAMP NOT NULL
+);
+```
+
+### 🧪 Testing & Validation
+
+#### Comprehensive Test Coverage (37+ Tests)
+- **NavigationStackTrackerTest.kt**: 10 unit tests for stack management
+- **ActivityNavigationIntegrationTest.kt**: 14 integration tests for Activity navigation
+- **FragmentNavigationIntegrationTest.kt**: 14 integration tests for Fragment navigation
+- **ComposeNavigationIntegrationTest.kt**: Tests for Compose navigation (Java 11+ only)
+
+#### Test Scenarios Covered
+- ✅ Navigation stack push/pop/replace operations
+- ✅ From screen tracking (null on first launch)
+- ✅ Navigation method detection (push/pop/replace)
+- ✅ Route type classification (main_flow, deeplink, fragment_flow)
+- ✅ Argument detection (intent extras, fragment arguments)
+- ✅ ISO 8601 timestamp format validation
+- ✅ Thread safety under concurrent access
+- ✅ Kafka schema compliance validation
+
+### 📊 Field Mapping Reference
+
+| Old Field (v2.0.x) | New Field (v2.1.0) | Status |
+|--------------------|--------------------|--------|
+| `navigation.to` | `navigation.to_screen` | ✅ Renamed |
+| N/A | `navigation.from_screen` | ✅ New |
+| `navigation.method: "resumed"` | `navigation.method: "push"` | ✅ Updated |
+| `navigation.type` | `navigation.route_type` | ✅ Renamed |
+| N/A | `navigation.has_arguments` | ✅ New |
+| `currentTimeMillis()` | ISO 8601 timestamp | ✅ Updated |
+| `"navigation.route_change"` | `"navigation"` | ✅ Simplified |
+
+### ⚠️ Important Notes
+
+#### Backend Compatibility
+- **Required**: Backend Kafka processor must support new navigation event structure
+- **Database**: `rum_navigation_events` table must have correct schema with CHECK constraint
+- **Testing**: Test integration in staging before production deployment
+- **Monitoring**: Monitor navigation event processing logs during rollout
+
+#### Breaking Change Impact
+- **SDK Users**: No code changes needed - update dependency only
+- **Backend Teams**: Must update Kafka processor and verify database schema
+- **Old Events**: v2.0.x navigation events will be rejected by backend
+
+#### Navigation Stack Behavior
+- **First Launch**: `from_screen` is `null` on first app launch (expected)
+- **Back Navigation**: SDK automatically detects back button and sets method to `pop`
+- **Deep Links**: Automatically detected and classified as `deeplink` route type
+
+### 🎯 Success Criteria
+
+#### Phase 5 (Documentation) - ✅ COMPLETE
+- [x] README.md updated with navigation tracking section
+- [x] NAVIGATION_MIGRATION_GUIDE.md created
+- [x] navigation_event_examples.md created with comprehensive examples
+- [x] CHANGELOG.md updated with v2.1.0 breaking changes
+
+#### Next Phase: Backend Integration Testing
+- [ ] Test navigation events reach Kafka successfully
+- [ ] Verify events stored in `rum_navigation_events` table
+- [ ] Validate field mapping in database
+- [ ] Test with real backend processor
+- [ ] Performance testing (overhead measurement)
+
+### 📊 Files Modified/Created
+
+#### Core Implementation (Phases 1-3)
+- `NavigationStackTracker.kt` - New navigation stack management
+- `NavigationEvent.kt` - Navigation event data class
+- `NavigationMethod.kt` - Navigation method enum
+- `TelemetryActivityLifecycleObserver.kt` - Updated with navigation tracking
+- `TelemetryFragmentLifecycleObserver.kt` - Updated with navigation tracking
+- `EdgeTelemetryCompose.kt` - Updated Compose navigation tracking
+
+#### Test Files (Phase 4)
+- `NavigationStackTrackerTest.kt` - 10 unit tests
+- `ActivityNavigationIntegrationTest.kt` - 14 integration tests
+- `FragmentNavigationIntegrationTest.kt` - 14 integration tests
+
+#### Documentation (Phase 5)
+- `README.md` - Updated with comprehensive navigation tracking section
+- `docs/NAVIGATION_MIGRATION_GUIDE.md` - Complete migration guide
+- `docs/navigation_event_examples.md` - 13 detailed examples
+- `CHANGELOG.md` - This changelog entry
+
+### 🔗 Related Documentation
+
+- [Navigation Migration Guide](docs/NAVIGATION_MIGRATION_GUIDE.md) - Detailed migration instructions
+- [Navigation Event Examples](docs/navigation_event_examples.md) - Comprehensive examples
+- [README.md](README.md#5-navigation-tracking) - Navigation tracking documentation
+
+---
+
 ## [2.0.0] - 2025-03-18
 
 ### 💥 BREAKING CHANGES
