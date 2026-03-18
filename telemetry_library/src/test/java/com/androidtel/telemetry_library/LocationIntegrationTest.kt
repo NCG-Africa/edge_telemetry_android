@@ -3,6 +3,7 @@ package com.androidtel.telemetry_library
 import com.androidtel.telemetry_library.core.location.IpLocationProvider
 import com.androidtel.telemetry_library.core.models.*
 import com.androidtel.telemetry_library.core.payload.FlutterPayloadFactory
+import com.androidtel.telemetry_library.core.payload.EventData
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
@@ -19,7 +20,6 @@ class LocationIntegrationTest {
     private lateinit var mockWebServer: MockWebServer
     private lateinit var httpClient: OkHttpClient
     private lateinit var locationProvider: IpLocationProvider
-    private lateinit var payloadFactory: FlutterPayloadFactory
 
     @Before
     fun setUp() {
@@ -30,8 +30,6 @@ class LocationIntegrationTest {
             .connectTimeout(5, TimeUnit.SECONDS)
             .readTimeout(5, TimeUnit.SECONDS)
             .build()
-        
-        payloadFactory = FlutterPayloadFactory()
     }
 
     @After
@@ -64,7 +62,7 @@ class LocationIntegrationTest {
         val events = createTestEvents()
         val deviceId = "test_device_123"
         
-        val payload = payloadFactory.createEventBatchPayload(
+        val payload = FlutterPayloadFactory.createEventBatchPayload(
             events = events,
             deviceId = deviceId,
             location = location
@@ -79,7 +77,7 @@ class LocationIntegrationTest {
         val events = createTestEvents()
         val deviceId = "test_device_123"
         
-        val payload = payloadFactory.createEventBatchPayload(
+        val payload = FlutterPayloadFactory.createEventBatchPayload(
             events = events,
             deviceId = deviceId,
             location = null
@@ -150,7 +148,7 @@ class LocationIntegrationTest {
         val events = createTestEvents()
         val deviceId = "test_device_123"
         
-        val payload = payloadFactory.createEventBatchPayload(
+        val payload = FlutterPayloadFactory.createEventBatchPayload(
             events = events,
             deviceId = deviceId,
             location = location
@@ -177,7 +175,7 @@ class LocationIntegrationTest {
         val events = createTestEvents()
         val deviceId = "test_device_123"
         
-        val payload = payloadFactory.createEventBatchPayload(
+        val payload = FlutterPayloadFactory.createEventBatchPayload(
             events = events,
             deviceId = deviceId,
             location = location
@@ -212,13 +210,13 @@ class LocationIntegrationTest {
         val events = createTestEvents()
         val deviceId = "test_device_123"
         
-        val payload = payloadFactory.createEventBatchPayload(
+        val payload = FlutterPayloadFactory.createEventBatchPayload(
             events = events,
             deviceId = deviceId,
             location = location
         )
         
-        val jsonString = payloadFactory.toJson(payload)
+        val jsonString = payload.toJson()
         val jsonObject = JSONObject(jsonString)
         
         assertTrue(jsonObject.has("data"))
@@ -232,13 +230,13 @@ class LocationIntegrationTest {
         val events = createTestEvents()
         val deviceId = "test_device_123"
         
-        val payload = payloadFactory.createEventBatchPayload(
+        val payload = FlutterPayloadFactory.createEventBatchPayload(
             events = events,
             deviceId = deviceId,
             location = null
         )
         
-        val jsonString = payloadFactory.toJson(payload)
+        val jsonString = payload.toJson()
         val jsonObject = JSONObject(jsonString)
         
         assertTrue(jsonObject.has("data"))
@@ -274,13 +272,13 @@ class LocationIntegrationTest {
         val events2 = createTestEvents()
         val deviceId = "test_device_123"
         
-        val payload1 = payloadFactory.createEventBatchPayload(
+        val payload1 = FlutterPayloadFactory.createEventBatchPayload(
             events = events1,
             deviceId = deviceId,
             location = location1
         )
         
-        val payload2 = payloadFactory.createEventBatchPayload(
+        val payload2 = FlutterPayloadFactory.createEventBatchPayload(
             events = events2,
             deviceId = deviceId,
             location = location2
@@ -316,7 +314,7 @@ class LocationIntegrationTest {
         val events = createMultipleTestEvents(5)
         val deviceId = "test_device_123"
         
-        val payload = payloadFactory.createEventBatchPayload(
+        val payload = FlutterPayloadFactory.createEventBatchPayload(
             events = events,
             deviceId = deviceId,
             location = location
