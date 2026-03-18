@@ -229,8 +229,7 @@ object FlutterPayloadFactory {
         val crashAttributes = baseAttributes.toMutableMap()
         
         // Add crash-specific fields
-        crashAttributes["crash.fingerprint"] = fingerprint
-        crashAttributes["crash.breadcrumb_count"] = breadcrumbCount.toString()
+        // Note: crash.fingerprint and crash.breadcrumb_count removed - backend generates crash_hash and counts breadcrumbs
         crashAttributes["error.timestamp"] = Instant.now().toString()
         crashAttributes["error.has_stack_trace"] = "true"
         crashAttributes["breadcrumbs"] = breadcrumbs

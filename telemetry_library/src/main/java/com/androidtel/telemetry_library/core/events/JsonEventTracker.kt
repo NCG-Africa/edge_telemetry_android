@@ -210,8 +210,7 @@ class JsonEventTracker(
         val attributes = getEnrichedAttributes(additionalAttributes).toMutableMap()
         
         // Add crash-specific attributes
-        attributes["crash.fingerprint"] = fingerprint
-        attributes["crash.breadcrumb_count"] = breadcrumbManager.getBreadcrumbCount().toString()
+        // Note: crash.fingerprint and crash.breadcrumb_count removed - backend generates crash_hash and counts breadcrumbs
         attributes["error.timestamp"] = Instant.now().toString()
         attributes["error.has_stack_trace"] = "true"
         attributes["breadcrumbs"] = breadcrumbs

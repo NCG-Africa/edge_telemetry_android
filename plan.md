@@ -469,6 +469,9 @@ fun trackError(
 - [x] Phase 2C: Context persistence and override logic
 - [x] Phase 2C: TelemetryManager API exposure
 - [x] Phase 2C: Comprehensive test coverage
+- [x] Phase 2D: crash.fingerprint removed (backend generates crash_hash)
+- [x] Phase 2D: crash.breadcrumb_count removed (backend auto-counts)
+- [x] Phase 2D: breadcrumbs JSON array retained for debugging context
 
 ### Phase 3 (Testing)
 - [ ] All unit tests passing
