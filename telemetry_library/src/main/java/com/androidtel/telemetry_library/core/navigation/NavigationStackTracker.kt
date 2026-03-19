@@ -1,6 +1,6 @@
 package com.androidtel.telemetry_library.core.navigation
 
-import java.time.Instant
+import com.androidtel.telemetry_library.utils.DateTimeUtils
 import java.util.ArrayDeque
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
@@ -18,7 +18,7 @@ class NavigationStackTracker {
                 fromScreen = fromScreen,
                 toScreen = screenName,
                 method = NavigationMethod.PUSH,
-                timestamp = Instant.now().toString()
+                timestamp = DateTimeUtils.nowAsIso8601()
             )
         }
     }
@@ -32,7 +32,7 @@ class NavigationStackTracker {
                 fromScreen = fromScreen,
                 toScreen = toScreen,
                 method = NavigationMethod.POP,
-                timestamp = Instant.now().toString()
+                timestamp = DateTimeUtils.nowAsIso8601()
             )
         }
     }
@@ -47,7 +47,7 @@ class NavigationStackTracker {
                 fromScreen = fromScreen,
                 toScreen = screenName,
                 method = NavigationMethod.REPLACE,
-                timestamp = Instant.now().toString()
+                timestamp = DateTimeUtils.nowAsIso8601()
             )
         }
     }
