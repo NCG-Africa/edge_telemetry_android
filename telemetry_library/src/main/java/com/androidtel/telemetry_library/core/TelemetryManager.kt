@@ -74,7 +74,7 @@ class TelemetryManager private constructor(
 
     // Core attributes for every event
     private lateinit var deviceId: String
-    private val appInfo = collectAppInfo()
+    private var appInfo = collectAppInfo()
     private lateinit var deviceInfo: DeviceInfo
     private lateinit var sessionId: String
     private var sessionStartTime = System.currentTimeMillis()
