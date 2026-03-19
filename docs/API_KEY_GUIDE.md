@@ -133,7 +133,7 @@ Ensure your `.gitignore` includes:
 
 ```gitignore
 # API Keys and Secrets
-local.properties
+../local.properties
 *.keystore
 *.jks
 secrets.properties

@@ -1077,7 +1077,7 @@ TelemetryManager.initialize(
 If issues persist:
 
 1. **Check logs** with `debugMode = true`
-2. **Review documentation** at [API Key Guide](API_KEY_GUIDE.md)
+2. **Review documentation** at [API Key Guide](docs/API_KEY_GUIDE.md)
 3. **Verify backend** accepts your API key
 4. **Test connectivity** using `TelemetryManager.getInstance().testConnectivity()`
 5. **Report issues** at [GitHub Issues](https://github.com/NCG-Africa/edge-telemetry-android/issues)
