@@ -3,13 +3,15 @@ package com.androidtel.telemetry_library.compose
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.androidtel.telemetry_library.EdgeTelemetry
-import com.androidtel.telemetry_library.utils.DateTimeUtils
+import com.androidtel.telemetry_library.core.navigation.NavigationStackTracker
+import java.time.Instant
 
 /**
  * Enhanced Compose integration for EdgeTelemetry that provides automatic navigation tracking
@@ -32,44 +34,62 @@ fun TrackComposeScreen(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     
+    // Use remember to maintain tracker across recompositions
+    val navigationTracker = remember { NavigationStackTracker() }
+    
     DisposableEffect(navBackStackEntry) {
         val route = navBackStackEntry?.destination?.route ?: "unknown"
         val finalScreenName = screenName ?: route
         val startTime = System.currentTimeMillis()
         
-        // Track screen entry
-        val entryData = mutableMapOf<String, String>(
-            "route" to route,
-            "method" to "navigation",
-            "type" to "screen_entry",
-            "timestamp" to DateTimeUtils.nowAsIso8601()
+        // Track navigation with proper structure
+        val navEvent = navigationTracker.push(finalScreenName)
+        val hasArguments = navBackStackEntry?.arguments?.isEmpty == false
+        
+        // For breadcrumb (requires Map<String, String>)
+        val breadcrumbData = mutableMapOf(
+            "navigation.from_screen" to (navEvent.fromScreen ?: ""),
+            "navigation.to_screen" to navEvent.toScreen,
+            "navigation.method" to navEvent.method.toLowerCaseString(),
+            "navigation.route_type" to (additionalData?.get("route_type") ?: "main_flow"),
+            "navigation.has_arguments" to hasArguments.toString(),
+            "navigation.timestamp" to navEvent.timestamp
         )
-        additionalData?.let { entryData.putAll(it) }
+        
+        // For event (can have mixed types)
+        val eventData = mapOf(
+            "navigation.from_screen" to (navEvent.fromScreen ?: ""),
+            "navigation.to_screen" to navEvent.toScreen,
+            "navigation.method" to navEvent.method.toLowerCaseString(),
+            "navigation.route_type" to (additionalData?.get("route_type") ?: "main_flow"),
+            "navigation.has_arguments" to hasArguments,
+            "navigation.timestamp" to navEvent.timestamp
+        )
         
         // Add navigation breadcrumb
         EdgeTelemetry.getInstance().addBreadcrumb(
             message = "Navigated to $finalScreenName",
             category = "navigation",
             level = "info",
-            data = entryData
+            data = breadcrumbData
         )
         
         // Track navigation event
-        EdgeTelemetry.getInstance().trackEvent("navigation.route_change", entryData)
+        EdgeTelemetry.getInstance().recordEvent("navigation", eventData)
         
         // Set up lifecycle observer for screen duration tracking
         val lifecycleObserver = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
                     // Track screen resume
-                    EdgeTelemetry.getInstance().trackEvent("navigation.screen_resume", mapOf(
+                    EdgeTelemetry.getInstance().recordEvent("navigation.screen_resume", mapOf(
                         "screen" to finalScreenName,
                         "route" to route
                     ))
                 }
                 Lifecycle.Event.ON_PAUSE -> {
                     // Track screen pause
-                    EdgeTelemetry.getInstance().trackEvent("navigation.screen_pause", mapOf(
+                    EdgeTelemetry.getInstance().recordEvent("navigation.screen_pause", mapOf(
                         "screen" to finalScreenName,
                         "route" to route
                     ))
@@ -89,7 +109,7 @@ fun TrackComposeScreen(
                 "route" to route,
                 "exit_method" to "navigation",
                 "duration_ms" to duration.toString(),
-                "timestamp" to DateTimeUtils.nowAsIso8601()
+                "timestamp" to Instant.now().toString()
             )
             
             // Add exit breadcrumb
@@ -101,7 +121,7 @@ fun TrackComposeScreen(
             )
             
             // Track screen duration metric
-            EdgeTelemetry.getInstance().trackEvent("performance.screen_duration", exitData)
+            EdgeTelemetry.getInstance().recordEvent("performance.screen_duration", exitData)
             
             lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
         }
@@ -139,7 +159,7 @@ fun TrackScreen(
             "screen" to screenName,
             "category" to category,
             "type" to "screen_entry",
-            "timestamp" to DateTimeUtils.nowAsIso8601()
+            "timestamp" to Instant.now().toString()
         )
         attributes?.let { entryData.putAll(it) }
         
@@ -152,19 +172,19 @@ fun TrackScreen(
         )
         
         // Track screen entry event
-        EdgeTelemetry.getInstance().trackEvent("screen.entry", entryData)
+        EdgeTelemetry.getInstance().recordEvent("screen.entry", entryData)
         
         // Set up lifecycle observer
         val lifecycleObserver = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
-                    EdgeTelemetry.getInstance().trackEvent("screen.resume", mapOf(
+                    EdgeTelemetry.getInstance().recordEvent("screen.resume", mapOf(
                         "screen" to screenName,
                         "category" to category
                     ))
                 }
                 Lifecycle.Event.ON_PAUSE -> {
-                    EdgeTelemetry.getInstance().trackEvent("screen.pause", mapOf(
+                    EdgeTelemetry.getInstance().recordEvent("screen.pause", mapOf(
                         "screen" to screenName,
                         "category" to category
                     ))
@@ -183,7 +203,7 @@ fun TrackScreen(
                 "screen" to screenName,
                 "category" to category,
                 "duration_ms" to duration.toString(),
-                "timestamp" to DateTimeUtils.nowAsIso8601()
+                "timestamp" to Instant.now().toString()
             )
             attributes?.let { exitData.putAll(it) }
             
@@ -196,7 +216,7 @@ fun TrackScreen(
             )
             
             // Track screen exit and duration
-            EdgeTelemetry.getInstance().trackEvent("screen.exit", exitData)
+            EdgeTelemetry.getInstance().recordEvent("screen.exit", exitData)
             
             lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
         }
@@ -218,7 +238,7 @@ fun trackUserInteraction(
     val interactionData = mutableMapOf<String, String>(
         "action" to action,
         "target" to target,
-        "timestamp" to DateTimeUtils.nowAsIso8601()
+        "timestamp" to Instant.now().toString()
     )
     attributes?.let { interactionData.putAll(it) }
     
@@ -231,7 +251,7 @@ fun trackUserInteraction(
     )
     
     // Track user interaction event
-    EdgeTelemetry.getInstance().trackEvent("user.interaction", interactionData)
+    EdgeTelemetry.getInstance().recordEvent("user.interaction", interactionData)
 }
 
 /**
@@ -252,10 +272,10 @@ fun trackComposePerformance(
         "metric" to metricName,
         "value" to value.toString(),
         "unit" to unit,
-        "timestamp" to DateTimeUtils.nowAsIso8601()
+        "timestamp" to Instant.now().toString()
     )
     attributes?.let { performanceData.putAll(it) }
     
     // Track performance event
-    EdgeTelemetry.getInstance().trackEvent("performance.compose", performanceData)
+    EdgeTelemetry.getInstance().recordEvent("performance.compose", performanceData)
 }

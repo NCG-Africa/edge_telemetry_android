@@ -10,7 +10,8 @@ A comprehensive Android telemetry SDK that produces **identical backend payloads
 - 🍞 **Breadcrumb System** - Detailed activity trail for debugging
 - 📱 **Session Management** - Automatic session tracking and analytics
 - 🌐 **Network Monitoring** - HTTP request tracking with OkHttp integration
-- 🔄 **Offline Support** - Network-aware retry with exponential backoff
+- � **Location Tracking** - IP-based city/country tracking (no permissions required)
+- � **Offline Support** - Network-aware retry with exponential backoff
 - 📐 **Compose Integration** - Automatic navigation and screen tracking
 - 🎯 **Flutter SDK Compatible** - Identical payload structure for unified analytics
 
@@ -49,14 +50,35 @@ Add to your `AndroidManifest.xml`:
 
 ### 1. Initialize in Application
 
+> **🔐 SECURITY**: Never hardcode API keys! Use BuildConfig, local.properties, or environment variables.
+
 ```kotlin
 class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         
+        // Option 1: Using TelemetryConfig (Recommended)
+        val config = TelemetryConfig.builder(this, BuildConfig.TELEMETRY_API_KEY)
+            .endpoint("https://edgetelemetry.ncgafrica.com/collector/telemetry")
+            .debugMode(BuildConfig.DEBUG)
+            .batchSize(30)
+            .enableCrashReporting(true)
+            .enableUserProfiles(true)
+            .enableSessionTracking(true)
+            .globalAttributes(mapOf(
+                "app.environment" to if (BuildConfig.DEBUG) "development" else "production",
+                "app.flavor" to BuildConfig.FLAVOR
+            ))
+            .build()
+        
+        TelemetryManager.initialize(config)
+        
+        // Option 2: Direct parameters (Legacy)
+        /*
         TelemetryManager.initialize(
             application = this,
-            endpoint = "https://your-telemetry-endpoint.com/collector/telemetry",
+            apiKey = BuildConfig.TELEMETRY_API_KEY,  // ⚠️ REQUIRED (v1.2.6+)
+            endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
             debugMode = BuildConfig.DEBUG,
             batchSize = 30,
             enableCrashReporting = true, // enabled by default
@@ -67,9 +89,12 @@ class MyApplication : Application() {
                 "app.flavor" to BuildConfig.FLAVOR
             )
         )
+        */
     }
 }
 ```
+
+> **⚠️ Breaking Change (v1.2.6+)**: The `apiKey` parameter is now **required**. Get your API key from your backend administrator.
 
 ### 2. Basic Usage
 
@@ -203,6 +228,43 @@ val httpClient = OkHttpClient.Builder()
     .build()
 
 // All HTTP requests will now be automatically tracked
+```
+
+### Location Tracking
+
+The SDK automatically includes city/country location in telemetry payloads using IP-based geolocation (no permissions required).
+
+#### Configuration
+
+```kotlin
+val config = TelemetryConfig.builder(this, BuildConfig.TELEMETRY_API_KEY)
+    .enableLocationTracking(true)  // Default: true
+    .locationApiEndpoint("https://ipinfo.io/json")  // Default
+    .locationCacheDuration(3600000)  // 1 hour cache (in milliseconds)
+    .locationFallbackToIp(true)  // Send IP if API fails (default: true)
+    .build()
+```
+
+#### How It Works
+
+- Uses ipinfo.io API (50,000 free requests/month)
+- Location cached for 1 hour per session
+- Falls back to IP address if rate limit exceeded
+- No location permissions required
+- Minimal performance impact (single API call per session)
+
+#### Location Format
+
+- **Success**: `"Nairobi/Kenya"` (City/Country)
+- **Fallback**: `"105.163.0.47"` (IP address for backend processing)
+- **Disabled**: `null` (location field omitted)
+
+#### Disable Location Tracking
+
+```kotlin
+val config = TelemetryConfig.builder(this, BuildConfig.TELEMETRY_API_KEY)
+    .enableLocationTracking(false)
+    .build()
 ```
 
 ### Compose Integration
@@ -348,8 +410,10 @@ The SDK generates payloads that match the Flutter SDK exactly:
 ```json
 {
   "timestamp": "2025-01-15T10:30:45.123Z",
+  "device_id": "device_1704067200000_a8b9c2d1_android",
   "data": {
     "type": "batch",
+    "device_id": "device_1704067200000_a8b9c2d1_android",
     "events": [
       {
         "type": "event",
@@ -364,7 +428,8 @@ The SDK generates payloads that match the Flutter SDK exactly:
       }
     ],
     "batch_size": 1,
-    "timestamp": "2025-01-15T10:30:45.123Z"
+    "timestamp": "2025-01-15T10:30:45.123Z",
+    "location": "Nairobi/Kenya"
   }
 }
 ```
@@ -379,10 +444,33 @@ The SDK generates IDs that match the Flutter SDK format exactly:
 
 ## Configuration Options
 
+### Using TelemetryConfig (Recommended)
+
+```kotlin
+val config = TelemetryConfig.builder(application, BuildConfig.TELEMETRY_API_KEY)
+    .endpoint("https://edgetelemetry.ncgafrica.com/collector/telemetry")
+    .debugMode(false)                    // Enable debug logging
+    .batchSize(30)                       // Events per batch
+    .enableCrashReporting(true)          // Automatic crash detection (default: true)
+    .enableUserProfiles(true)            // User profile management (default: true)
+    .enableSessionTracking(true)         // Enhanced session tracking (default: true)
+    .enableLocationTracking(true)        // IP-based location tracking (default: true)
+    .locationApiEndpoint("https://ipinfo.io/json")  // Location API endpoint
+    .locationCacheDuration(3600000)      // Location cache duration (1 hour)
+    .locationFallbackToIp(true)          // Fallback to IP on API failure (default: true)
+    .globalAttributes(emptyMap())        // Global attributes for all events
+    .build()
+
+TelemetryManager.initialize(config)
+```
+
+### Using Direct Parameters (Legacy)
+
 ```kotlin
 TelemetryManager.initialize(
     application = applicationContext,
-    endpoint = "https://your-endpoint.com/collector/telemetry",
+    apiKey = BuildConfig.TELEMETRY_API_KEY,  // ⚠️ REQUIRED (v1.2.6+)
+    endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
     debugMode = false,                    // Enable debug logging
     batchSize = 30,                       // Events per batch
     enableCrashReporting = true,          // Automatic crash detection (default: true)
@@ -390,6 +478,33 @@ TelemetryManager.initialize(
     enableSessionTracking = true,         // Enhanced session tracking (default: true)
     globalAttributes = emptyMap()         // Global attributes for all events
 )
+```
+
+### API Key Security
+
+**Store API key in `local.properties`:**
+```properties
+# local.properties (gitignored)
+TELEMETRY_API_KEY=edge_your_api_key_here
+```
+
+**Access in `build.gradle.kts`:**
+```kotlin
+android {
+    defaultConfig {
+        val properties = Properties()
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            properties.load(FileInputStream(localPropertiesFile))
+        }
+        
+        buildConfigField(
+            "String",
+            "TELEMETRY_API_KEY",
+            "\"${properties.getProperty("TELEMETRY_API_KEY", "")}\""
+        )
+    }
+}
 ```
 
 ## Requirements
@@ -426,6 +541,35 @@ For issues, feature requests, or questions:
 3. Include SDK version, Android version, and reproduction steps
 
 ## Changelog
+
+### Version 1.2.9 (Upcoming)
+- ✨ **NEW**: IP-based location tracking (city/country)
+- ✨ **NEW**: Automatic fallback to IP address on rate limit
+- ✨ **NEW**: Location caching to minimize API calls
+- 🔧 **IMPROVED**: Payload structure includes location field
+- 📚 **UPDATED**: Documentation with location tracking guide
+- 🔒 **PRIVACY**: No location permissions required
+
+### Version 1.2.8
+- 🔒 **SECURITY**: API key authentication now required for all requests
+- ✨ **NEW**: TelemetryConfig builder pattern for cleaner initialization
+- ✨ **NEW**: API key validation with "edge_" prefix requirement
+- ✨ **NEW**: Automatic API key redaction in debug logs
+- 🔧 **IMPROVED**: Enhanced crash retry mechanism with API key support
+- 🔧 **IMPROVED**: Comprehensive unit test coverage for API key logic
+- 📚 **UPDATED**: Documentation with security best practices
+- ⚠️ **BREAKING**: `apiKey` parameter now required in initialization
+
+### Version 1.2.7
+- 🔒 **IMPROVED**: Guaranteed non-null ID generation
+- 📊 **NEW**: Top-level device_id in all payloads
+- 🛡️ **IMPROVED**: Enhanced ID validation and fallback mechanisms
+- 🔧 **IMPROVED**: Payload structure improvements for backend filtering
+
+### Version 1.2.6
+- 🔒 **SECURITY**: API key authentication introduced
+- 🛡️ **IMPROVED**: Critical ID validation with safe error handling
+- 📊 **IMPROVED**: Enhanced JSON response structure
 
 ### Version 1.2.1
 - 🔧 **IMPROVED**: Unified API - single TelemetryManager initialization

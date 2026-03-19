@@ -10,19 +10,32 @@ We have successfully **enhanced the existing TelemetryManager** to include all F
 
 #### 1. **Enhanced TelemetryManager Initialization**
 ```kotlin
-// BEFORE (still works)
+// BEFORE (v1.2.1 and earlier)
 TelemetryManager.initialize(application, batchSize = 5, endpoint = "...")
 
-// AFTER (enhanced with Flutter features)
+// AFTER v1.2.6+ (API key required)
 TelemetryManager.initialize(
     application = app,
+    apiKey = BuildConfig.TELEMETRY_API_KEY,  // ⚠️ REQUIRED (v1.2.6+)
     batchSize = 30,
     endpoint = "...",
-    enableCrashReporting = true,    // NEW: enabled by default
-    enableUserProfiles = true,      // NEW: enabled by default  
-    enableSessionTracking = true,   // NEW: enabled by default
-    globalAttributes = mapOf()      // NEW: global attributes
+    enableCrashReporting = true,    // enabled by default
+    enableUserProfiles = true,      // enabled by default  
+    enableSessionTracking = true,   // enabled by default
+    globalAttributes = mapOf()      // global attributes
 )
+
+// RECOMMENDED (v1.2.8+): Use TelemetryConfig builder
+val config = TelemetryConfig.builder(app, BuildConfig.TELEMETRY_API_KEY)
+    .batchSize(30)
+    .endpoint("...")
+    .enableCrashReporting(true)
+    .enableUserProfiles(true)
+    .enableSessionTracking(true)
+    .globalAttributes(mapOf())
+    .build()
+
+TelemetryManager.initialize(config)
 ```
 
 #### 2. **New Flutter-Compatible Methods Added**
@@ -74,23 +87,86 @@ fun TrackComposeScreen(
 
 ### Migration Guide
 
-#### For Existing Users (No Changes Required)
+#### From v1.2.1 to v1.2.6+ (API Key Required)
+
+**Breaking Change:** API key is now required.
+
 ```kotlin
-// This continues to work exactly as before
-TelemetryManager.initialize(application, endpoint = "...")
-TelemetryManager.getInstance().trackEvent("action", attributes)
+// ❌ BEFORE (v1.2.1) - No longer works
+TelemetryManager.initialize(
+    application = this,
+    endpoint = "..."
+)
+
+// ✅ AFTER (v1.2.6+) - API key required
+TelemetryManager.initialize(
+    application = this,
+    apiKey = BuildConfig.TELEMETRY_API_KEY,  // Required!
+    endpoint = "..."
+)
+```
+
+**Migration Steps:**
+
+1. **Obtain API Key** from your backend administrator
+2. **Store API Key Securely** in `local.properties`:
+   ```properties
+   # local.properties (gitignored)
+   TELEMETRY_API_KEY=edge_your_api_key_here
+   ```
+3. **Configure BuildConfig** in `app/build.gradle.kts`:
+   ```kotlin
+   android {
+       defaultConfig {
+           val properties = Properties()
+           val localPropertiesFile = rootProject.file("local.properties")
+           if (localPropertiesFile.exists()) {
+               properties.load(FileInputStream(localPropertiesFile))
+           }
+           
+           buildConfigField(
+               "String",
+               "TELEMETRY_API_KEY",
+               "\"${properties.getProperty("TELEMETRY_API_KEY", "")}\""
+           )
+       }
+   }
+   ```
+4. **Update Initialization** to include API key parameter
+5. **Test** that telemetry data reaches backend
+
+#### From v1.2.6 to v1.2.8+ (TelemetryConfig Recommended)
+
+**Non-Breaking:** TelemetryConfig builder pattern introduced for cleaner code.
+
+```kotlin
+// ✅ Still works (v1.2.6+ style)
+TelemetryManager.initialize(
+    application = this,
+    apiKey = BuildConfig.TELEMETRY_API_KEY,
+    endpoint = "..."
+)
+
+// ✅ Recommended (v1.2.8+ style)
+val config = TelemetryConfig.builder(this, BuildConfig.TELEMETRY_API_KEY)
+    .endpoint("...")
+    .debugMode(BuildConfig.DEBUG)
+    .build()
+
+TelemetryManager.initialize(config)
 ```
 
 #### For New Flutter-Compatible Users
 ```kotlin
-// Enable Flutter features
-TelemetryManager.initialize(
-    application = app,
-    endpoint = "...",
-    enableCrashReporting = true,
-    enableUserProfiles = true,
-    enableSessionTracking = true
-)
+// Enable all Flutter features with TelemetryConfig
+val config = TelemetryConfig.builder(app, BuildConfig.TELEMETRY_API_KEY)
+    .endpoint("...")
+    .enableCrashReporting(true)
+    .enableUserProfiles(true)
+    .enableSessionTracking(true)
+    .build()
+
+TelemetryManager.initialize(config)
 
 // Now all Flutter-compatible methods are available
 val telemetry = TelemetryManager.getInstance()
@@ -167,10 +243,19 @@ telemetry.trackError(exception) // with fingerprinting and breadcrumbs
 
 ### Version Information
 
-- **Version**: 1.2.1
+- **Current Version**: 1.2.8 (in development)
 - **Minimum SDK**: 24 (Android 7.0)
 - **Dependencies**: Work, Room, OkHttp, Gson, Compose
-- **Backward Compatibility**: 100% with existing TelemetryManager API
+- **Breaking Changes**: API key required since v1.2.6
+- **Backward Compatibility**: Parameter-based initialization still supported
+
+### Security Enhancements (v1.2.6+)
+
+- **API Key Authentication**: All requests include `X-API-Key` header
+- **API Key Validation**: Enforces blank check and "edge_" prefix
+- **API Key Redaction**: Automatic redaction in debug logs (e.g., `edge_****_xyz1`)
+- **Secure Storage**: BuildConfig/local.properties recommended
+- **ProGuard/R8**: Consumer rules protect API keys in release builds
 
 ### Next Steps
 

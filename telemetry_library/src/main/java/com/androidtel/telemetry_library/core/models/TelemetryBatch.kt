@@ -6,6 +6,7 @@ import java.util.UUID
 // ---- Payload + Data ----
 data class TelemetryPayload(
     val timestamp: String,
+    val device_id: String,  // Device ID at top level for easy filtering/routing
     val data: TelemetryDataOut
 ) {
     fun toJson(): String = Gson().toJson(this)
@@ -13,9 +14,11 @@ data class TelemetryPayload(
 
 data class TelemetryDataOut(
     val type: String = "batch",
+    val device_id: String,
     val events: List<TelemetryEventOut>,
     val batch_size: Int,
-    val timestamp: String
+    val timestamp: String,
+    val location: String? = null
 )
 
 // ---- Flattened Event ----
@@ -34,7 +37,8 @@ data class TelemetryBatch(
     val type: String = "telemetry_batch",
     val batchSize: Int,
     val timestamp: String,
-    val events: List<TelemetryEvent>
+    val events: List<TelemetryEvent>,
+    val location: String? = null
 )
 
 // ---- Original Event ----
@@ -78,7 +82,7 @@ data class DeviceInfo(
 )
 
 data class UserInfo(
-    val userId: String? = null,
+    val userId: String,  // Non-nullable - always required
     val name: String? = null,
     val email: String? = null,
     val phone: String? = null,

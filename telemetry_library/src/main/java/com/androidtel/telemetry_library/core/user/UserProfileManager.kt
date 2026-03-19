@@ -11,7 +11,10 @@ import kotlin.concurrent.write
 /**
  * User Profile Manager that handles user profile lifecycle and persistence
  */
-class UserProfileManager(context: Context) {
+class UserProfileManager(
+    context: Context,
+    private val idGenerator: IdGenerator
+) {
     
     companion object {
         private const val TAG = "UserProfileManager"
@@ -24,7 +27,6 @@ class UserProfileManager(context: Context) {
     }
     
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    private val idGenerator = IdGenerator()
     private val lock = ReentrantReadWriteLock()
     
     // Current user profile state
@@ -32,7 +34,6 @@ class UserProfileManager(context: Context) {
     private val userProfile = mutableMapOf<String, String?>()
     
     init {
-        idGenerator.initialize(context)
         loadUserProfile()
     }
     
@@ -46,12 +47,8 @@ class UserProfileManager(context: Context) {
         customAttributes: Map<String, String>? = null
     ) {
         lock.write {
-            // Generate user ID if not exists
-            val userId = getUserId() ?: run {
-                val newUserId = idGenerator.generateUserId()
-                idGenerator.setUserId(newUserId)
-                newUserId
-            }
+            // Get or auto-generate user ID (never null)
+            val userId = getUserId()
             
             // Update profile
             name?.let { userProfile["name"] = it }
@@ -99,14 +96,14 @@ class UserProfileManager(context: Context) {
             Log.i(TAG, "🧹 User profile cleared: $userId (version: $profileVersion)")
             
             // Send profile updated event with only user.id and version
-            userId?.let { sendProfileUpdatedEvent(it) }
+            sendProfileUpdatedEvent(userId)
         }
     }
     
     /**
-     * Get user ID
+     * Get user ID - NEVER returns null, auto-generates if needed
      */
-    fun getUserId(): String? {
+    fun getUserId(): String {
         return idGenerator.getUserId()
     }
     

@@ -1,6 +1,7 @@
 package com.androidtel.telemetry_library.core
 
 import android.util.Log
+import com.androidtel.telemetry_library.core.interceptors.ApiKeyRedactionInterceptor
 import com.androidtel.telemetry_library.core.models.EventAttributes
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.androidtel.telemetry_library.core.models.TelemetryDataOut
@@ -24,18 +25,29 @@ class ClientException(code: Int, message: String) : IOException("Client error $c
 class ServerException(code: Int, message: String) : IOException("Server error $code: $message")
 class UnknownException(code: Int) : IOException("Unknown HTTP error code: $code")
 
-class TelemetryHttpClient(private val telemetryUrl: String, private val debugMode: Boolean) {
+class TelemetryHttpClient(
+    private val telemetryUrl: String,
+    private val apiKey: String,
+    private val debugMode: Boolean
+) {
 
 
     private val okHttpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor(ApiKeyRedactionInterceptor(debugMode))
         .addInterceptor(HttpLoggingInterceptor().apply {
             level =
                 if (debugMode) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
+            redactHeader("X-API-Key")
         })
         .build()
+    
+    /**
+     * Expose OkHttpClient for location provider and other internal uses
+     */
+    fun getOkHttpClient(): OkHttpClient = okHttpClient
 
     // Public method to send a batch with built-in retry logic.
     suspend fun sendBatch(batch: TelemetryBatch): Result<Unit> {
@@ -106,6 +118,7 @@ class TelemetryHttpClient(private val telemetryUrl: String, private val debugMod
             .post(jsonPayload.toRequestBody("application/json".toMediaType()))
             .addHeader("Content-Type", "application/json")
             .addHeader("User-Agent", "EdgeTelemetryAndroid/1.0.0")
+            .addHeader("X-API-Key", apiKey)
             .build()
         return okHttpClient.newCall(request).execute()
     }
@@ -113,8 +126,23 @@ class TelemetryHttpClient(private val telemetryUrl: String, private val debugMod
 
     // --- Extension: Convert Batch -> Outgoing JSON ---
     fun TelemetryBatch.toJson(): String {
+        // Extract device_id from the first event's attributes
+        val deviceId = this.events.firstOrNull()?.attributes?.device?.deviceId
+        
+        // CRITICAL: device_id must NEVER be null or empty
+        // This should never happen due to validation in TelemetryManager.sendBatch()
+        if (deviceId.isNullOrBlank()) {
+            throw IllegalStateException(
+                "CRITICAL ERROR: device_id is null or empty in telemetry batch. " +
+                "This indicates IDs were not properly validated before sending."
+            )
+        }
+        
+        val safeDeviceId = deviceId
+        
         val out = TelemetryDataOut(
             type = "batch",
+            device_id = safeDeviceId,
             batch_size = this.batchSize,
             timestamp = this.timestamp,
             events = this.events.map { event ->
@@ -126,9 +154,18 @@ class TelemetryHttpClient(private val telemetryUrl: String, private val debugMod
                     timestamp = event.timestamp,
                     attributes = flattenAttributes(event.attributes)
                 )
-            }
+            },
+            location = this.location
         )
-        return Gson().toJson(out)
+        
+        // Wrap in TelemetryPayload with device_id at top level
+        val payload = TelemetryPayload(
+            timestamp = this.timestamp,
+            device_id = safeDeviceId,
+            data = out
+        )
+        
+        return Gson().toJson(payload)
     }
 
     // ---- Helper: Flatten attributes into map ----
@@ -141,7 +178,14 @@ class TelemetryHttpClient(private val telemetryUrl: String, private val debugMod
         flat["app.build_number"] = attrs.app.appBuildNumber
         flat["app.package_name"] = attrs.app.appPackageName
 
-        // Device
+        // Device - CRITICAL: device.id must never be null or empty
+        // This should never happen due to validation in TelemetryManager.sendBatch()
+        if (attrs.device.deviceId.isBlank()) {
+            throw IllegalStateException(
+                "CRITICAL ERROR: device.id is blank in event attributes. " +
+                "This indicates IDs were not properly validated before sending."
+            )
+        }
         flat["device.id"] = attrs.device.deviceId
         flat["device.platform"] = attrs.device.platform
         flat["device.platform_version"] = attrs.device.platformVersion
@@ -154,7 +198,14 @@ class TelemetryHttpClient(private val telemetryUrl: String, private val debugMod
         flat["device.hardware"] = attrs.device.hardware
         flat["device.product"] = attrs.device.product
 
-        // User
+        // User - CRITICAL: user.id must never be null or empty
+        // This should never happen due to validation in TelemetryManager.sendBatch()
+        if (attrs.user.userId.isBlank()) {
+            throw IllegalStateException(
+                "CRITICAL ERROR: user.id is blank in event attributes. " +
+                "This indicates IDs were not properly validated before sending."
+            )
+        }
         flat["user.id"] = attrs.user.userId
         flat["user.name"] = attrs.user.name
         flat["user.email"] = attrs.user.email
