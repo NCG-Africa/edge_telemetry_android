@@ -158,14 +158,8 @@ class TelemetryHttpClient(
             location = this.location
         )
         
-        // Wrap in TelemetryPayload with device_id at top level
-        val payload = TelemetryPayload(
-            timestamp = this.timestamp,
-            device_id = safeDeviceId,
-            data = out
-        )
-        
-        return Gson().toJson(payload)
+        // Send TelemetryDataOut directly (no wrapper) to match backend's expected format
+        return Gson().toJson(out)
     }
 
     // ---- Helper: Flatten attributes into map ----
