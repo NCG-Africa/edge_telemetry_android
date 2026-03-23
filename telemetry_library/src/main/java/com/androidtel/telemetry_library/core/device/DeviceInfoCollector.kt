@@ -23,19 +23,21 @@ class DeviceInfoCollector(
     
     /**
      * Collect all device information for telemetry events
+     * Aligned with Phase 2 backend processor requirements
      */
     fun collectDeviceInfo(): Map<String, String> {
         return mapOf(
             "device.id" to idGenerator.getDeviceId(),
             "device.platform" to "android",
+            "device.platform_version" to Build.VERSION.RELEASE,
             "device.model" to Build.MODEL,
             "device.manufacturer" to Build.MANUFACTURER,
-            "device.os_version" to Build.VERSION.RELEASE,
-            "device.api_level" to Build.VERSION.SDK_INT.toString(),
             "device.brand" to Build.BRAND,
+            "device.android_sdk" to Build.VERSION.SDK_INT.toString(),
+            "device.android_release" to Build.VERSION.RELEASE,
+            "device.fingerprint" to Build.FINGERPRINT,
             "device.hardware" to Build.HARDWARE,
-            "device.product" to Build.PRODUCT,
-            "device.fingerprint" to Build.FINGERPRINT
+            "device.product" to Build.PRODUCT
         )
     }
     
