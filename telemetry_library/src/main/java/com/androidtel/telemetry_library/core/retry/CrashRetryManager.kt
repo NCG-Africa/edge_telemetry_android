@@ -16,6 +16,8 @@ import java.io.File
 import java.io.IOException
 import java.time.Duration
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Network-aware retry system for crash data with exponential backoff
@@ -24,7 +26,8 @@ class CrashRetryManager(
     private val context: Context,
     private val apiKey: String,
     private val telemetryEndpoint: String,
-    private val debugMode: Boolean = false
+    private val debugMode: Boolean = false,
+    private val enableWorkManager: Boolean = true
 ) {
     
     companion object {
@@ -32,6 +35,12 @@ class CrashRetryManager(
         private const val MAX_RETRIES = 3
         private const val OFFLINE_STORAGE_FILE = "pending_crashes.json"
         private const val WORK_TAG = "crash_retry_work"
+        private const val HTTP_TOO_MANY_REQUESTS = 429
+        private const val RATE_LIMIT_COOLDOWN_MS = 60_000L // 1 minute
+        
+        // Shared circuit breaker state across all instances
+        private val isRateLimited = AtomicBoolean(false)
+        private val rateLimitUntil = AtomicLong(0L)
     }
     
     private val gson = Gson()
@@ -53,6 +62,19 @@ class CrashRetryManager(
      * Send crash data with retry mechanism
      */
     suspend fun sendCrashWithRetry(crashData: Map<String, Any>) {
+        // Check circuit breaker - if we're rate limited, skip immediately
+        if (isRateLimited.get() && System.currentTimeMillis() < rateLimitUntil.get()) {
+            Log.w(TAG, "🚫 Circuit breaker open - rate limited until ${rateLimitUntil.get() - System.currentTimeMillis()}ms")
+            storeCrashOffline(crashData)
+            return
+        }
+        
+        // Reset circuit breaker if cooldown expired
+        if (isRateLimited.get() && System.currentTimeMillis() >= rateLimitUntil.get()) {
+            Log.i(TAG, "✅ Circuit breaker reset - rate limit cooldown expired")
+            isRateLimited.set(false)
+        }
+        
         var attempt = 0
         var lastException: Exception? = null
         
@@ -60,6 +82,16 @@ class CrashRetryManager(
             try {
                 sendCrashData(crashData)
                 logCrashSuccess(crashData)
+                return
+            } catch (e: RateLimitException) {
+                // HTTP 429 - activate circuit breaker and stop all retries
+                val cooldownUntil = System.currentTimeMillis() + RATE_LIMIT_COOLDOWN_MS
+                isRateLimited.set(true)
+                rateLimitUntil.set(cooldownUntil)
+                
+                Log.w(TAG, "⚠️ Rate limit hit (HTTP 429) - circuit breaker activated for ${RATE_LIMIT_COOLDOWN_MS}ms")
+                storeCrashOffline(crashData)
+                if (enableWorkManager) scheduleRetry()
                 return
             } catch (e: Exception) {
                 lastException = e
@@ -96,13 +128,16 @@ class CrashRetryManager(
             .addHeader("X-API-Key", apiKey)
             .build()
         
-        val response = httpClient.newCall(request).execute()
-        
-        if (!response.isSuccessful) {
-            throw IOException("HTTP ${response.code}: ${response.message}")
+        httpClient.newCall(request).execute().use { response ->
+            when {
+                response.code == HTTP_TOO_MANY_REQUESTS -> {
+                    throw RateLimitException("Rate limit exceeded (HTTP 429)")
+                }
+                !response.isSuccessful -> {
+                    throw IOException("HTTP ${response.code}: ${response.message}")
+                }
+            }
         }
-        
-        response.close()
     }
     
     /**
@@ -144,6 +179,10 @@ class CrashRetryManager(
      * Schedule retry using WorkManager
      */
     private fun scheduleRetry() {
+        if (!enableWorkManager) {
+            Log.d(TAG, "⏭️ WorkManager disabled, skipping retry scheduling")
+            return
+        }
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
@@ -283,3 +322,8 @@ class CrashRetryWorker(
         }
     }
 }
+
+/**
+ * Exception thrown when rate limit is hit
+ */
+class RateLimitException(message: String) : IOException(message)

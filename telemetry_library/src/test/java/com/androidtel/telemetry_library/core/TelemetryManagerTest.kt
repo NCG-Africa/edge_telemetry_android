@@ -67,9 +67,10 @@ class TelemetryManagerTest {
     @Test
     fun `setUserProfile called before init stores pending profile`() {
         // Given: SDK not initialized
-        val config = TelemetryConfig.builder(application, "edge_test_key")
-            .enableUserProfiles(true)
-            .build()
+        val config = TelemetryConfig(
+            apiKey = "edge_test_key",
+            endpoint = "https://telemetry.ncgafrica.com/telemetry"
+        )
 
         // When: setUserProfile is called before init
         // Note: We can't directly call setUserProfile on uninitialized manager
@@ -83,13 +84,13 @@ class TelemetryManagerTest {
     @Test
     fun `pending profile is applied after init completes`() {
         // Given: Config with user profiles enabled
-        val config = TelemetryConfig.builder(application, "edge_test_key")
-            .enableUserProfiles(true)
-            .debugMode(true)
-            .build()
+        val config = TelemetryConfig(
+            apiKey = "edge_test_key",
+            endpoint = "https://telemetry.ncgafrica.com/telemetry"
+        )
 
         // When: SDK is initialized
-        val manager = TelemetryManager.initialize(config)
+        val manager = TelemetryManager.initialize(application, config)
 
         // Then: Manager should be ready to accept profile
         assertNotNull(manager)
@@ -105,10 +106,11 @@ class TelemetryManagerTest {
     @Test
     fun `userId is always present in events`() {
         // Given: SDK initialized
-        val config = TelemetryConfig.builder(application, "edge_test_key")
-            .enableUserProfiles(true)
-            .build()
-        val manager = TelemetryManager.initialize(config)
+        val config = TelemetryConfig(
+            apiKey = "edge_test_key",
+            endpoint = "https://telemetry.ncgafrica.com/telemetry"
+        )
+        val manager = TelemetryManager.initialize(application, config)
 
         // When: getUserId is called
         val userId = manager.getUserId()
@@ -122,10 +124,11 @@ class TelemetryManagerTest {
     @Test
     fun `setUserProfile updates profile correctly`() {
         // Given: SDK initialized with user profiles enabled
-        val config = TelemetryConfig.builder(application, "edge_test_key")
-            .enableUserProfiles(true)
-            .build()
-        val manager = TelemetryManager.initialize(config)
+        val config = TelemetryConfig(
+            apiKey = "edge_test_key",
+            endpoint = "https://telemetry.ncgafrica.com/telemetry"
+        )
+        val manager = TelemetryManager.initialize(application, config)
 
         // When: setUserProfile is called with all fields
         manager.setUserProfile("Alice", "alice@test.com", "+1234567890")
@@ -140,10 +143,11 @@ class TelemetryManagerTest {
     @Test
     fun `setUserProfile with nulls clears profile`() {
         // Given: SDK initialized with existing profile
-        val config = TelemetryConfig.builder(application, "edge_test_key")
-            .enableUserProfiles(true)
-            .build()
-        val manager = TelemetryManager.initialize(config)
+        val config = TelemetryConfig(
+            apiKey = "edge_test_key",
+            endpoint = "https://telemetry.ncgafrica.com/telemetry"
+        )
+        val manager = TelemetryManager.initialize(application, config)
         manager.setUserProfile("Bob", "bob@test.com", "+9876543210")
 
         // When: setUserProfile is called with nulls
@@ -158,10 +162,11 @@ class TelemetryManagerTest {
     @Test
     fun `clearUserProfile clears all fields`() {
         // Given: SDK initialized with profile
-        val config = TelemetryConfig.builder(application, "edge_test_key")
-            .enableUserProfiles(true)
-            .build()
-        val manager = TelemetryManager.initialize(config)
+        val config = TelemetryConfig(
+            apiKey = "edge_test_key",
+            endpoint = "https://telemetry.ncgafrica.com/telemetry"
+        )
+        val manager = TelemetryManager.initialize(application, config)
         manager.setUserProfile("Charlie", "charlie@test.com", "+5555555555")
 
         // When: clearUserProfile is called
@@ -183,19 +188,21 @@ class TelemetryManagerTest {
             editor
         }
 
-        val config1 = TelemetryConfig.builder(application, "edge_test_key")
-            .enableUserProfiles(true)
-            .build()
-        val manager1 = TelemetryManager.initialize(config1)
+        val config1 = TelemetryConfig(
+            apiKey = "edge_test_key",
+            endpoint = "https://telemetry.ncgafrica.com/telemetry"
+        )
+        val manager1 = TelemetryManager.initialize(application, config1)
         val userId1 = manager1.getUserId()
 
         // When: SDK is "restarted" (reset and re-initialized)
         TelemetryManager.resetForTesting()
         
-        val config2 = TelemetryConfig.builder(application, "edge_test_key")
-            .enableUserProfiles(true)
-            .build()
-        val manager2 = TelemetryManager.initialize(config2)
+        val config2 = TelemetryConfig(
+            apiKey = "edge_test_key",
+            endpoint = "https://telemetry.ncgafrica.com/telemetry"
+        )
+        val manager2 = TelemetryManager.initialize(application, config2)
         val userId2 = manager2.getUserId()
 
         // Then: userId should be the same
@@ -209,12 +216,13 @@ class TelemetryManagerTest {
         // The pending profile mechanism is for internal use during init sequence
         
         // Given: SDK initialized with user profiles enabled
-        val config = TelemetryConfig.builder(application, "edge_test_key")
-            .enableUserProfiles(true)
-            .build()
+        val config = TelemetryConfig(
+            apiKey = "edge_test_key",
+            endpoint = "https://telemetry.ncgafrica.com/telemetry"
+        )
         
         // When: SDK is initialized (pending profile would be applied here if set)
-        val manager = TelemetryManager.initialize(config)
+        val manager = TelemetryManager.initialize(application, config)
         
         // Then: Manager is ready
         assertNotNull(manager)
@@ -231,10 +239,11 @@ class TelemetryManagerTest {
     @Test
     fun `phone field is optional and can be omitted`() {
         // Given: SDK initialized
-        val config = TelemetryConfig.builder(application, "edge_test_key")
-            .enableUserProfiles(true)
-            .build()
-        val manager = TelemetryManager.initialize(config)
+        val config = TelemetryConfig(
+            apiKey = "edge_test_key",
+            endpoint = "https://telemetry.ncgafrica.com/telemetry"
+        )
+        val manager = TelemetryManager.initialize(application, config)
 
         // When: setUserProfile is called without phone (using default parameter)
         manager.setUserProfile("TestUser", "test@example.com")

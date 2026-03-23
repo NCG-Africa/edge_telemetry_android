@@ -1,7 +1,7 @@
 package com.androidtel.telemetry_library.core.crash
 
 import android.content.Context
-import androidx.test.core.app.ApplicationProvider
+import com.androidtel.telemetry_library.core.TelemetryConfig
 import com.androidtel.telemetry_library.core.TelemetryManager
 import com.androidtel.telemetry_library.core.breadcrumbs.BreadcrumbManager
 import com.androidtel.telemetry_library.core.ids.IdGenerator
@@ -10,6 +10,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
@@ -29,17 +30,20 @@ class EnhancedCrashContextTest {
 
     @Before
     fun setup() {
-        context = ApplicationProvider.getApplicationContext()
+        context = RuntimeEnvironment.getApplication()
         idGenerator = IdGenerator()
         idGenerator.initialize(context)
         breadcrumbManager = BreadcrumbManager()
         
         // Initialize TelemetryManager (required for CrashReporter)
+        val config = TelemetryConfig(
+            apiKey = "edge_test_key_12345",
+            endpoint = "https://telemetry.ncgafrica.com/telemetry",
+            enableCrashReporting = true
+        )
         telemetryManager = TelemetryManager.initialize(
             application = context as android.app.Application,
-            apiKey = "edge_test_key_12345",
-            debugMode = true,
-            enableCrashReporting = true
+            config = config
         )
         
         crashReporter = CrashReporter(
