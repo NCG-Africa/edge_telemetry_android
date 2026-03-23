@@ -1,6 +1,7 @@
 package com.androidtel.telemetry_library.core
 
 import android.util.Log
+import com.androidtel.telemetry_library.core.interceptors.ApiKeyRedactionInterceptor
 import com.androidtel.telemetry_library.core.models.EventAttributes
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.androidtel.telemetry_library.core.models.TelemetryDataOut
@@ -35,11 +36,18 @@ class TelemetryHttpClient(
         .connectTimeout(10, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor(ApiKeyRedactionInterceptor(debugMode))
         .addInterceptor(HttpLoggingInterceptor().apply {
             level =
                 if (debugMode) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
+            redactHeader("X-API-Key")
         })
         .build()
+    
+    /**
+     * Expose OkHttpClient for location provider and other internal uses
+     */
+    fun getOkHttpClient(): OkHttpClient = okHttpClient
 
     // Public method to send a batch with built-in retry logic.
     suspend fun sendBatch(batch: TelemetryBatch): Result<Unit> {
@@ -122,21 +130,18 @@ class TelemetryHttpClient(
         val deviceId = this.events.firstOrNull()?.attributes?.device?.deviceId
         
         // CRITICAL: device_id must NEVER be null or empty
-        // Log error but use fallback to prevent crashing the instrumented app
+        // This should never happen due to validation in TelemetryManager.sendBatch()
         if (deviceId.isNullOrBlank()) {
-            Log.e(
-                "TelemetryHttpClient",
-                "CRITICAL ERROR: device_id is null or empty in telemetry batch. Using fallback 'unknown_device'."
+            throw IllegalStateException(
+                "CRITICAL ERROR: device_id is null or empty in telemetry batch. " +
+                "This indicates IDs were not properly validated before sending."
             )
         }
         
-        val safeDeviceId = deviceId?.takeIf { it.isNotBlank() } ?: "unknown_device"
+        val safeDeviceId = deviceId
         
         val out = TelemetryDataOut(
             type = "batch",
-            device_id = safeDeviceId,
-            batch_size = this.batchSize,
-            timestamp = this.timestamp,
             events = this.events.map { event ->
                 TelemetryEventOut(
                     type = event.type,
@@ -146,17 +151,15 @@ class TelemetryHttpClient(
                     timestamp = event.timestamp,
                     attributes = flattenAttributes(event.attributes)
                 )
-            }
-        )
-        
-        // Wrap in TelemetryPayload with device_id at top level
-        val payload = TelemetryPayload(
+            },
+            batch_size = this.batchSize,
             timestamp = this.timestamp,
             device_id = safeDeviceId,
-            data = out
+            location = this.location
         )
         
-        return Gson().toJson(payload)
+        // Send TelemetryDataOut directly (no wrapper) to match backend's expected format
+        return Gson().toJson(out)
     }
 
     // ---- Helper: Flatten attributes into map ----
@@ -170,14 +173,14 @@ class TelemetryHttpClient(
         flat["app.package_name"] = attrs.app.appPackageName
 
         // Device - CRITICAL: device.id must never be null or empty
-        // Log error but use fallback to prevent crashing the instrumented app
+        // This should never happen due to validation in TelemetryManager.sendBatch()
         if (attrs.device.deviceId.isBlank()) {
-            Log.e(
-                "TelemetryHttpClient",
-                "CRITICAL ERROR: device.id is blank in event attributes. Using fallback 'unknown_device'."
+            throw IllegalStateException(
+                "CRITICAL ERROR: device.id is blank in event attributes. " +
+                "This indicates IDs were not properly validated before sending."
             )
         }
-        flat["device.id"] = attrs.device.deviceId.takeIf { it.isNotBlank() } ?: "unknown_device"
+        flat["device.id"] = attrs.device.deviceId
         flat["device.platform"] = attrs.device.platform
         flat["device.platform_version"] = attrs.device.platformVersion
         flat["device.model"] = attrs.device.model
@@ -190,14 +193,14 @@ class TelemetryHttpClient(
         flat["device.product"] = attrs.device.product
 
         // User - CRITICAL: user.id must never be null or empty
-        // Log error but use fallback to prevent crashing the instrumented app
+        // This should never happen due to validation in TelemetryManager.sendBatch()
         if (attrs.user.userId.isBlank()) {
-            Log.e(
-                "TelemetryHttpClient",
-                "CRITICAL ERROR: user.id is blank in event attributes. Using fallback 'unknown_user'."
+            throw IllegalStateException(
+                "CRITICAL ERROR: user.id is blank in event attributes. " +
+                "This indicates IDs were not properly validated before sending."
             )
         }
-        flat["user.id"] = attrs.user.userId.takeIf { it.isNotBlank() } ?: "unknown_user"
+        flat["user.id"] = attrs.user.userId
         flat["user.name"] = attrs.user.name
         flat["user.email"] = attrs.user.email
         flat["user.phone"] = attrs.user.phone

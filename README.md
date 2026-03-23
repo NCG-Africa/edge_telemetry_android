@@ -12,6 +12,27 @@
 
 A comprehensive, production-ready Android SDK for collecting and transmitting telemetry data including app performance metrics, user interactions, crash reports, and system analytics. Built with modern Android development practices and optimized for performance and reliability.
 
+---
+
+## 🔴 v2.0.0 Breaking Changes
+
+**Version 2.0.0** introduces breaking changes to crash reporting payload structure to align with backend Kafka processor requirements.
+
+### What Changed
+- Crash events now sent as `type: "event"` with `eventName: "app.crash"` (batch envelope structure)
+- New required crash attributes: `message`, `stacktrace`, `exception_type`, `error_context`, `is_fatal`, `cause`
+- New optional context APIs: `setProductContext()`, `setLastUserAction()`, error code support
+- Removed SDK-generated fields: `crash.fingerprint`, `crash.breadcrumb_count` (backend auto-generates)
+
+### Migration Required
+- **Public API**: No changes required - existing `trackError()` calls work unchanged
+- **Backend**: Kafka processor must support new crash event structure
+- **Recommended**: Use new context APIs for enhanced crash analytics
+
+📖 **[Read Full Migration Guide](docs/MIGRATION_GUIDE_V2.md)** | 📋 **[View Changelog](CHANGELOG.md#200---2025-03-18)**
+
+---
+
 ## 🚀 Features
 
 ### Core Telemetry
@@ -19,7 +40,7 @@ A comprehensive, production-ready Android SDK for collecting and transmitting te
 - **🔄 Session Management**: Automatic session tracking with detailed analytics
 - **📱 Screen Analytics**: Activity and Fragment lifecycle monitoring with timing data
 - **🎯 Custom Events**: Track custom business events and user interactions
-- **💥 Crash Reporting**: Comprehensive crash detection and reporting with stack traces
+- **💥 Crash Reporting**: Comprehensive crash detection with automatic classification, context tracking, and backend-compatible event structure (v2.0.0)
 - **🧠 Memory Intelligence**: Enhanced memory tracking with detailed insights (API 24+)
 
 ### Advanced Capabilities
@@ -46,7 +67,7 @@ A comprehensive, production-ready Android SDK for collecting and transmitting te
 
 | Feature | **Java 11+ Version** | **Java 8 Version** |
 |---------|---------------------|--------------------|
-| **Latest Version** | `1.2.1` | `1.2.3-java8` |
+| **Latest Version** | `2.0.0` | `1.2.3-java8` |
 | **Java Requirement** | Java 11+ | Java 8+ |
 | **Gradle** | 8.4+ | 7.5.1+ |
 | **AGP** | 8.0+ | 7.2.2+ |
@@ -102,7 +123,7 @@ Add the dependency to your app's `build.gradle`:
 
 ```kotlin
 dependencies {
-    implementation 'com.github.NCG-Africa:edge_telemetry_android:1.2.1'
+    implementation 'com.github.NCG-Africa:edge_telemetry_android:2.0.0'
 }
 ```
 
@@ -143,18 +164,75 @@ dependencies {
 
 ### 1. Initialize the SDK
 
+> **🔐 SECURITY FIRST**: Never hardcode API keys! Use BuildConfig, local.properties, or environment variables. See [API Key Security](#-api-key-security-best-practices) section below.
+
 Initialize the SDK in your `Application` class:
 
-#### Kotlin
+#### Option A: TelemetryConfig (Recommended)
+
+**Kotlin**
 ```kotlin
 class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         
-        // Initialize telemetry SDK
+        // Create configuration
+        val config = TelemetryConfig.builder(this, BuildConfig.TELEMETRY_API_KEY)
+            .batchSize(30)
+            .endpoint("https://edgetelemetry.ncgafrica.com/collector/telemetry")
+            .debugMode(BuildConfig.DEBUG)
+            .enableCrashReporting(true)
+            .enableUserProfiles(true)
+            .enableSessionTracking(true)
+            .globalAttributes(mapOf(
+                "app_environment" to if (BuildConfig.DEBUG) "dev" else "prod"
+            ))
+            .build()
+        
+        // Initialize SDK
+        TelemetryManager.initialize(config)
+    }
+}
+```
+
+**Java**
+```java
+public class MyApplication extends Application {
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        
+        // Create configuration
+        Map<String, String> globalAttrs = new HashMap<>();
+        globalAttrs.put("app_environment", BuildConfig.DEBUG ? "dev" : "prod");
+        
+        TelemetryConfig config = TelemetryConfig.builder(this, BuildConfig.TELEMETRY_API_KEY)
+            .batchSize(30)
+            .endpoint("https://edgetelemetry.ncgafrica.com/collector/telemetry")
+            .debugMode(BuildConfig.DEBUG)
+            .enableCrashReporting(true)
+            .enableUserProfiles(true)
+            .enableSessionTracking(true)
+            .globalAttributes(globalAttrs)
+            .build();
+        
+        // Initialize SDK
+        TelemetryManager.initialize(config);
+    }
+}
+```
+
+#### Option B: Direct Parameters (Legacy)
+
+**Kotlin**
+```kotlin
+class MyApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        
         TelemetryManager.initialize(
             application = this,
-            apiKey = "your-api-key-here",  // ⚠️ REQUIRED - Get from your backend
+            apiKey = BuildConfig.TELEMETRY_API_KEY,  // ✅ From BuildConfig
             batchSize = 30,
             endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
             debugMode = BuildConfig.DEBUG,
@@ -166,17 +244,16 @@ class MyApplication : Application() {
 }
 ```
 
-#### Java
+**Java**
 ```java
 public class MyApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
         
-        // Initialize telemetry SDK
         TelemetryManager.initialize(
             this,                                                      // application
-            "your-api-key-here",                                      // apiKey (REQUIRED)
+            BuildConfig.TELEMETRY_API_KEY,                            // apiKey ✅ From BuildConfig
             30,                                                        // batchSize
             "https://edgetelemetry.ncgafrica.com/collector/telemetry", // endpoint
             BuildConfig.DEBUG,                                         // debugMode
@@ -188,7 +265,7 @@ public class MyApplication extends Application {
 }
 ```
 
-> **⚠️ Important**: The `apiKey` parameter is **required** as of version 1.2.6. Get your API key from your backend administrator.
+> **⚠️ Breaking Change (v1.2.6+)**: The `apiKey` parameter is **required**. Get your API key from your backend administrator and store it securely using BuildConfig.
 
 ### 2. Register Application in Manifest
 
@@ -255,24 +332,64 @@ if (telemetryManager != null) {
 }
 ```
 
-### 5. Navigation Monitoring
+### 5. Navigation Tracking
+
+The SDK automatically tracks all navigation events with comprehensive data structure aligned with backend requirements.
+
+#### Navigation Event Structure
+
+All navigation events include the following fields:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `navigation.from_screen` | String | Optional | Source screen (null on app launch) |
+| `navigation.to_screen` | String | Required | Destination screen name |
+| `navigation.method` | String | Required | Navigation action: `push`, `pop`, or `replace` |
+| `navigation.route_type` | String | Optional | Route classification (e.g., `main_flow`, `modal`, `deeplink`) |
+| `navigation.has_arguments` | Boolean | Optional | Whether navigation includes data/arguments |
+| `navigation.timestamp` | String | Required | ISO 8601 formatted datetime |
+
+#### Navigation Methods
+
+The SDK automatically detects and reports the correct navigation method:
+
+- **`push`** - Forward navigation to a new screen (Activity/Fragment resumed, Compose navigation forward)
+- **`pop`** - Back navigation to previous screen (back button, up navigation)
+- **`replace`** - Screen replacement (Activity finish + start, Fragment replace)
+
+#### Route Types
+
+The SDK automatically classifies navigation routes:
+
+- **`main_flow`** - Primary app navigation (default for Activities)
+- **`fragment_flow`** - Fragment-based navigation
+- **`deeplink`** - Deep link navigation (detected from Intent data)
+- **`modal`** - Modal/dialog screens
+- **`onboarding`** - Onboarding flow screens
+- **`settings`** - Settings screens
 
 #### For XML-based Navigation (Activities/Fragments)
 
-Activities are automatically tracked. For manual screen tracking:
+Activities and Fragments are automatically tracked with full navigation context:
 
-#### Kotlin
+**Kotlin**
 ```kotlin
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
         // Activities are automatically tracked by the SDK
+        // Navigation events include:
+        // - from_screen: Previous activity (null on first launch)
+        // - to_screen: "MainActivity"
+        // - method: "push"
+        // - route_type: "main_flow" or "deeplink" (if launched via deep link)
+        // - has_arguments: true if intent has extras
     }
 }
 ```
 
-#### Java
+**Java**
 ```java
 public class MainActivity extends AppCompatActivity {
     @Override
@@ -280,28 +397,107 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         
         // Activities are automatically tracked by the SDK
+        // Navigation events include full context
+    }
+}
+```
+
+**Fragment Navigation**
+```kotlin
+class ProfileFragment : Fragment() {
+    override fun onResume() {
+        super.onResume()
+        
+        // Fragments are automatically tracked
+        // - from_screen: Previous fragment
+        // - to_screen: "ProfileFragment"
+        // - method: "push"
+        // - route_type: "fragment_flow"
+        // - has_arguments: true if fragment has arguments
     }
 }
 ```
 
 #### For Jetpack Compose Navigation (Java 11+ Version Only)
 
+**Automatic Tracking**
 ```kotlin
 @Composable
 fun MyApp() {
     val navController = rememberNavController()
-    val telemetry = TelemetryManager.getInstance()
-    telemetry.trackComposeScreens(navController)
     
     NavHost(navController = navController, startDestination = "home") {
-        composable("home") { HomeScreen() }
-        composable("profile") { ProfileScreen() }
-        composable("settings") { SettingsScreen() }
+        composable("home") { 
+            TrackComposeScreen(navController = navController, screenName = "HomeScreen")
+            HomeScreen() 
+        }
+        composable("profile") { 
+            TrackComposeScreen(navController = navController, screenName = "ProfileScreen")
+            ProfileScreen() 
+        }
+        composable("settings") { 
+            TrackComposeScreen(navController = navController, screenName = "SettingsScreen")
+            SettingsScreen() 
+        }
     }
 }
 ```
 
-> **Note**: Compose features are only available in the Java 11+ version (`1.2.1`). For Java 8 projects, use Activity/Fragment-based navigation.
+**Custom Route Types**
+```kotlin
+@Composable
+fun ModalScreen() {
+    TrackComposeScreen(
+        navController = navController,
+        screenName = "ModalScreen",
+        additionalData = mapOf("route_type" to "modal")
+    )
+    
+    // Your modal UI
+}
+```
+
+**Deep Link Navigation**
+```kotlin
+composable(
+    route = "product/{productId}",
+    deepLinks = listOf(navDeepLink { uriPattern = "myapp://product/{productId}" })
+) { backStackEntry ->
+    val productId = backStackEntry.arguments?.getString("productId")
+    
+    TrackComposeScreen(
+        navController = navController,
+        screenName = "ProductDetailScreen",
+        additionalData = mapOf("route_type" to "deeplink")
+    )
+    
+    ProductDetailScreen(productId)
+}
+```
+
+#### Sample Navigation Event
+
+```json
+{
+  "type": "event",
+  "eventName": "navigation",
+  "timestamp": "2024-03-18T14:50:23.456Z",
+  "attributes": {
+    "navigation.from_screen": "HomeScreen",
+    "navigation.to_screen": "ProfileScreen",
+    "navigation.method": "push",
+    "navigation.route_type": "main_flow",
+    "navigation.has_arguments": true,
+    "navigation.timestamp": "2024-03-18T14:50:23.456Z",
+    "app.name": "MyApp",
+    "app.version": "1.0.0",
+    "session.id": "session_1234567890",
+    "user.id": "user_abcd1234"
+  }
+}
+```
+
+> **Note**: Compose features are only available in the Java 11+ version. For Java 8 projects, use Activity/Fragment-based navigation.
 
 ## 📖 Usage Examples
 
@@ -460,16 +656,40 @@ TelemetryManager.initialize(
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `application` | `Application` | ✅ Yes | - | Application context |
-| `apiKey` | `String` | ✅ Yes | - | **API key for backend authentication** (v1.2.6+) |
+| `apiKey` | `String` | ✅ Yes | - | **API key for backend authentication** (v1.2.6+) - Must start with `edge_` |
 | `batchSize` | `Int` | No | `30` | Number of events to batch before sending |
 | `endpoint` | `String` | No | `https://edgetelemetry.ncgafrica.com/collector/telemetry` | Telemetry backend endpoint |
-| `debugMode` | `Boolean` | No | `false` | Enable verbose logging |
+| `debugMode` | `Boolean` | No | `false` | Enable verbose logging (API keys auto-redacted) |
 | `enableCrashReporting` | `Boolean` | No | `true` | Enable automatic crash reporting |
 | `enableUserProfiles` | `Boolean` | No | `true` | Enable user profile tracking |
 | `enableSessionTracking` | `Boolean` | No | `true` | Enable session analytics |
 | `globalAttributes` | `Map<String, String>` | No | `emptyMap()` | Custom attributes added to all events |
 
-> **⚠️ Breaking Change (v1.2.6)**: The `apiKey` parameter is now **required**. All HTTP requests include the API key in the `X-API-Key` header for backend authentication.
+> **⚠️ Breaking Change (v1.2.6+)**: The `apiKey` parameter is now **required**. All HTTP requests include the API key in the `X-API-Key` header for backend authentication.
+
+### TelemetryConfig Builder
+
+For cleaner, more maintainable code, use the `TelemetryConfig` builder:
+
+```kotlin
+val config = TelemetryConfig.builder(application, apiKey)
+    .batchSize(30)
+    .endpoint("your-endpoint")
+    .debugMode(true)
+    .enableCrashReporting(true)
+    .enableUserProfiles(true)
+    .enableSessionTracking(true)
+    .globalAttributes(mapOf("key" to "value"))
+    .build()
+
+TelemetryManager.initialize(config)
+```
+
+**Benefits:**
+- Type-safe configuration
+- Immutable config object
+- Validation at build time
+- Cleaner initialization code
 
 ### User Profile Management (Both Versions)
 
@@ -583,6 +803,124 @@ The SDK collects various event types:
 - **Configurable**: All data collection can be customized
 - **Secure**: HTTPS-only transmission with proper error handling
 
+### 🔐 API Key Security Best Practices
+
+**⚠️ CRITICAL: Never hardcode API keys in your source code or commit them to version control.**
+
+#### Recommended Approach 1: BuildConfig (Recommended)
+
+Store your API key in `local.properties` (which is gitignored by default):
+
+```properties
+# local.properties
+TELEMETRY_API_KEY=your-api-key-here
+```
+
+Access it in your `build.gradle.kts`:
+
+```kotlin
+// app/build.gradle.kts
+android {
+    defaultConfig {
+        // Read API key from local.properties
+        val properties = Properties()
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            properties.load(FileInputStream(localPropertiesFile))
+        }
+        
+        buildConfigField(
+            "String",
+            "TELEMETRY_API_KEY",
+            "\"${properties.getProperty("TELEMETRY_API_KEY", "")}\""
+        )
+    }
+}
+```
+
+Use it in your code:
+
+```kotlin
+TelemetryManager.initialize(
+    application = this,
+    apiKey = BuildConfig.TELEMETRY_API_KEY,  // ✅ Secure
+    // ... other parameters
+)
+```
+
+#### Recommended Approach 2: Environment Variables
+
+For CI/CD pipelines, use environment variables:
+
+```kotlin
+// build.gradle.kts
+android {
+    defaultConfig {
+        buildConfigField(
+            "String",
+            "TELEMETRY_API_KEY",
+            "\"${System.getenv("TELEMETRY_API_KEY") ?: ""}\""
+        )
+    }
+}
+```
+
+#### Recommended Approach 3: Android Keystore (Advanced)
+
+For maximum security in production apps:
+
+```kotlin
+// Use Android Keystore System to encrypt/decrypt API key
+// See: https://developer.android.com/training/articles/keystore
+```
+
+#### What NOT to Do ❌
+
+```kotlin
+// ❌ NEVER hardcode API keys
+TelemetryManager.initialize(
+    application = this,
+    apiKey = "edge_1234567890abcdef",  // ❌ INSECURE!
+    // ...
+)
+
+// ❌ NEVER commit API keys to git
+// ❌ NEVER include API keys in strings.xml
+// ❌ NEVER log API keys in plain text
+```
+
+#### .gitignore Configuration
+
+Ensure your `.gitignore` includes:
+
+```gitignore
+# API Keys and Secrets
+local.properties
+*.keystore
+*.jks
+secrets.properties
+```
+
+#### API Key Redaction in Logs
+
+The SDK automatically redacts API keys in debug logs:
+- **Full key**: `edge_1234567890abcdef_xyz123`
+- **Logged as**: `edge_**************_xyz1`
+
+This applies to:
+- HTTP request logs (when `debugMode = true`)
+- Crash report logs
+- WorkManager retry logs
+
+#### ProGuard/R8 Protection
+
+The SDK includes ProGuard/R8 rules in `consumer-rules.pro` to:
+- Obfuscate string constants in release builds
+- Protect API keys from reverse engineering
+- Maintain SDK public API
+
+**Note**: ProGuard provides basic obfuscation but is not a substitute for proper API key management.
+
 ## 🏗 Architecture
 
 ### Core Components
@@ -635,10 +973,47 @@ TelemetryManager (Main SDK Interface)
 
 ### Common Issues
 
+#### API Key Issues
+
+**Error: "API key cannot be blank"**
+```kotlin
+// ❌ Wrong - API key is blank or missing
+TelemetryManager.initialize(
+    application = this,
+    apiKey = "",  // Blank!
+    // ...
+)
+
+// ✅ Correct - Use BuildConfig
+TelemetryManager.initialize(
+    application = this,
+    apiKey = BuildConfig.TELEMETRY_API_KEY,
+    // ...
+)
+```
+
+**Error: "API key is invalid"**
+```kotlin
+// API key must start with "edge_"
+// Get the correct format from your backend administrator
+```
+
+**401 Unauthorized from backend:**
+- Verify API key is correct
+- Check API key is active in backend
+- Ensure API key hasn't expired
+- Review backend logs for authentication errors
+
+#### SDK Initialization Issues
+
 **SDK not collecting data:**
 ```kotlin
-// Ensure proper initialization
-TelemetryManager.initialize(context, endpoint, batchSize)
+// Ensure proper initialization with API key
+TelemetryManager.initialize(
+    application = this,
+    apiKey = BuildConfig.TELEMETRY_API_KEY,  // Required!
+    endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry"
+)
 
 // Check if instance is available
 val telemetry = TelemetryManager.getInstance()
@@ -647,14 +1022,34 @@ if (telemetry == null) {
 }
 ```
 
-**Network issues:**
-- Verify endpoint URL is correct and accessible
-- Check network permissions in manifest
-- Review logs for HTTP error codes
+**IllegalArgumentException during initialization:**
+- Check API key is not blank
+- Verify API key starts with "edge_"
+- Ensure batch size > 0
+- Verify endpoint is not blank
 
-**Memory issues:**
+#### Network Issues
+
+**Data not reaching backend:**
+- Verify endpoint URL is correct and accessible
+- Check network permissions in `AndroidManifest.xml`
+- Review logs for HTTP error codes (401, 403, 500, etc.)
+- Enable debug mode to see detailed HTTP logs
+- Verify API key is included in `X-API-Key` header
+
+**Offline data not syncing:**
+- SDK automatically retries failed requests
+- Check device has network connectivity
+- Review WorkManager logs for retry attempts
+- Verify crash retry mechanism is working
+
+#### Memory Issues
+
+**Out of memory errors:**
 - SDK automatically manages memory and prevents leaks
 - Ensure proper app lifecycle management
+- Reduce batch size if processing large volumes
+- Check for memory leaks in your app code
 
 ### Debug Logging
 
@@ -662,12 +1057,30 @@ Enable debug logging to troubleshoot issues:
 
 ```kotlin
 TelemetryManager.initialize(
-    context = this,
+    application = this,
+    apiKey = BuildConfig.TELEMETRY_API_KEY,
     endpoint = "your-endpoint",
-    batchSize = 10,
-    enableDebugLogging = true  // Enable for debugging
+    debugMode = true  // ✅ Enable for debugging
 )
 ```
+
+**What debug mode shows:**
+- API key validation (redacted: `edge_****_xyz1`)
+- HTTP request/response details
+- Batch processing logs
+- Crash report generation
+- Retry mechanism activity
+- WorkManager job status
+
+### Getting Help
+
+If issues persist:
+
+1. **Check logs** with `debugMode = true`
+2. **Review documentation** at [API Key Guide](docs/API_KEY_GUIDE.md)
+3. **Verify backend** accepts your API key
+4. **Test connectivity** using `TelemetryManager.getInstance().testConnectivity()`
+5. **Report issues** at [GitHub Issues](https://github.com/NCG-Africa/edge-telemetry-android/issues)
 
 ## 🤝 Contributing
 

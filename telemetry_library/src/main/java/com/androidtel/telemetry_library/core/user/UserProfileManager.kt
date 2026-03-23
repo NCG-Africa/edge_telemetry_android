@@ -11,7 +11,10 @@ import kotlin.concurrent.write
 /**
  * User Profile Manager that handles user profile lifecycle and persistence
  */
-class UserProfileManager(context: Context) {
+class UserProfileManager(
+    context: Context,
+    private val idGenerator: IdGenerator
+) {
     
     companion object {
         private const val TAG = "UserProfileManager"
@@ -24,7 +27,6 @@ class UserProfileManager(context: Context) {
     }
     
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    private val idGenerator = IdGenerator()
     private val lock = ReentrantReadWriteLock()
     
     // Current user profile state
@@ -32,7 +34,6 @@ class UserProfileManager(context: Context) {
     private val userProfile = mutableMapOf<String, String?>()
     
     init {
-        idGenerator.initialize(context)
         loadUserProfile()
     }
     

@@ -3,12 +3,14 @@ package com.androidtel.telemetry_library.compose
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.androidtel.telemetry_library.EdgeTelemetry
+import com.androidtel.telemetry_library.core.navigation.NavigationStackTracker
 import java.time.Instant
 
 /**
@@ -32,30 +34,48 @@ fun TrackComposeScreen(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     
+    // Use remember to maintain tracker across recompositions
+    val navigationTracker = remember { NavigationStackTracker() }
+    
     DisposableEffect(navBackStackEntry) {
         val route = navBackStackEntry?.destination?.route ?: "unknown"
         val finalScreenName = screenName ?: route
         val startTime = System.currentTimeMillis()
         
-        // Track screen entry
-        val entryData = mutableMapOf<String, String>(
-            "route" to route,
-            "method" to "navigation",
-            "type" to "screen_entry",
-            "timestamp" to Instant.now().toString()
+        // Track navigation with proper structure
+        val navEvent = navigationTracker.push(finalScreenName)
+        val hasArguments = navBackStackEntry?.arguments?.isEmpty == false
+        
+        // For breadcrumb (requires Map<String, String>)
+        val breadcrumbData = mutableMapOf(
+            "navigation.from_screen" to (navEvent.fromScreen ?: ""),
+            "navigation.to_screen" to navEvent.toScreen,
+            "navigation.method" to navEvent.method.toLowerCaseString(),
+            "navigation.route_type" to (additionalData?.get("route_type") ?: "main_flow"),
+            "navigation.has_arguments" to hasArguments.toString(),
+            "navigation.timestamp" to navEvent.timestamp
         )
-        additionalData?.let { entryData.putAll(it) }
+        
+        // For event (can have mixed types)
+        val eventData = mapOf(
+            "navigation.from_screen" to (navEvent.fromScreen ?: ""),
+            "navigation.to_screen" to navEvent.toScreen,
+            "navigation.method" to navEvent.method.toLowerCaseString(),
+            "navigation.route_type" to (additionalData?.get("route_type") ?: "main_flow"),
+            "navigation.has_arguments" to hasArguments,
+            "navigation.timestamp" to navEvent.timestamp
+        )
         
         // Add navigation breadcrumb
         EdgeTelemetry.getInstance().addBreadcrumb(
             message = "Navigated to $finalScreenName",
             category = "navigation",
             level = "info",
-            data = entryData
+            data = breadcrumbData
         )
         
         // Track navigation event
-        EdgeTelemetry.getInstance().recordEvent("navigation.route_change", entryData)
+        EdgeTelemetry.getInstance().recordEvent("navigation", eventData)
         
         // Set up lifecycle observer for screen duration tracking
         val lifecycleObserver = LifecycleEventObserver { _, event ->

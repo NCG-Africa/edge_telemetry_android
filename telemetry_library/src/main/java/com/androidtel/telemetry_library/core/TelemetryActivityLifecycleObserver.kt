@@ -6,12 +6,14 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.fragment.app.FragmentActivity
+import com.androidtel.telemetry_library.core.navigation.NavigationStackTracker
 
 class TelemetryActivityLifecycleObserver(
     private val telemetryManager: TelemetryManager = TelemetryManager.getInstance()
 ) : Application.ActivityLifecycleCallbacks {
 
     private val screenTimingTracker = ScreenTimingTracker()
+    private val navigationTracker = NavigationStackTracker()
     // Unified performance tracker - automatically selects appropriate implementation
     private val performanceTracker: PerformanceTracker = PerformanceTrackerFactory.createPerformanceTracker(telemetryManager)
 
@@ -41,15 +43,17 @@ class TelemetryActivityLifecycleObserver(
         // Start performance tracking (automatically uses appropriate implementation)
         performanceTracker.start(activity)
 
-        // Record navigation event
+        // Track navigation with proper structure
+        val navEvent = navigationTracker.push(screenName)
         telemetryManager.recordEvent(
-            eventName = "navigation.route_change",
+            eventName = "navigation",
             attributes = mapOf(
-                "navigation.to" to screenName,
-                "navigation.method" to "resumed",
-                "navigation.type" to "activity_change",
-                "navigation.timestamp" to System.currentTimeMillis().toString(),
-                "screen.type" to "activity"
+                "navigation.from_screen" to (navEvent.fromScreen ?: ""),
+                "navigation.to_screen" to navEvent.toScreen,
+                "navigation.method" to navEvent.method.toLowerCaseString(),
+                "navigation.route_type" to detectRouteType(activity),
+                "navigation.has_arguments" to hasIntentExtras(activity),
+                "navigation.timestamp" to navEvent.timestamp
             )
         )
     }
@@ -143,5 +147,17 @@ class TelemetryActivityLifecycleObserver(
         } else {
             activity.javaClass.simpleName
         }
+    }
+
+    private fun detectRouteType(activity: Activity): String {
+        return when {
+            activity.isTaskRoot -> "main_flow"
+            activity.intent?.data != null -> "deeplink"
+            else -> "main_flow"
+        }
+    }
+
+    private fun hasIntentExtras(activity: Activity): Boolean {
+        return activity.intent?.extras?.isEmpty == false
     }
 }

@@ -1,9 +1,6 @@
 {
-  "timestamp": "2025-09-22T13:42:10.123Z",
-  "data": {
-    "type": "batch",
-    "device_id": "device_1727012247_ghi789_android",
-    "events": [
+  "type": "batch",
+  "events": [
       {
         "type": "event",
         "eventName": "navigation.route_change",
@@ -177,7 +174,8 @@
         }
       }
     ],
-    "batch_size": 7,
-    "timestamp": "2025-09-22T13:42:10.123Z"
-  }
+  "batch_size": 7,
+  "timestamp": "2025-09-22T13:42:10.123Z",
+  "device_id": "device_1727012247_ghi789_android",
+  "location": "Nairobi/Kenya"
 }

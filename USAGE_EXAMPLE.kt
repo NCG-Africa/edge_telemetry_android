@@ -1,5 +1,13 @@
-// Example usage of the EdgeTelemetry Android SDK
+// Example usage of the EdgeTelemetry Android SDK v2.0.0
 // This file demonstrates how to integrate and use the SDK in your Android application
+// 
+// v2.0.0 Features:
+// - Enhanced crash reporting with automatic classification
+// - Product context tracking (setProductContext)
+// - User action tracking (setLastUserAction)
+// - Error code support for better crash analytics
+// - Automatic character limit enforcement
+// - Backend-compatible crash event structure
 
 import android.app.Application
 import android.os.Bundle
@@ -15,6 +23,7 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.androidtel.telemetry_library.core.TelemetryConfig
 import com.androidtel.telemetry_library.core.TelemetryManager
 import com.androidtel.telemetry_library.core.TrackComposeScreen
 import com.androidtel.telemetry_library.testing.EdgeTelemetryTester
@@ -25,9 +34,35 @@ class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         
-        // Initialize TelemetryManager with Flutter-compatible features
+        // ⚠️ SECURITY: Never hardcode API keys in source code!
+        // Use BuildConfig, local.properties, or environment variables instead.
+        // See README.md "API Key Security Best Practices" section for details.
+        // For comprehensive guide, see: API_KEY_GUIDE.md
+        
+        // Option 1: Initialize with TelemetryConfig (Recommended)
+        // Cleaner, more maintainable approach for complex configurations
+        val config = TelemetryConfig.builder(this, BuildConfig.TELEMETRY_API_KEY)
+            .debugMode(true) // Set to false in production
+            .batchSize(30)
+            .endpoint("https://edgetelemetry.ncgafrica.com/collector/telemetry")
+            .enableCrashReporting(true)
+            .enableUserProfiles(true)
+            .enableSessionTracking(true)
+            .globalAttributes(mapOf(
+                "app.environment" to "development",
+                "app.version" to "1.0.0"
+            ))
+            .build()
+        
+        TelemetryManager.initialize(config)
+        
+        // Option 2: Initialize with individual parameters (Legacy)
+        // Still fully supported for backward compatibility
+        /*
         TelemetryManager.initialize(
             application = this,
+            apiKey = BuildConfig.TELEMETRY_API_KEY,  // ✅ Secure: API key from BuildConfig
+            // apiKey = "your-api-key",  // ❌ NEVER hardcode API keys!
             endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
             debugMode = true, // Set to false in production
             batchSize = 30,
@@ -39,6 +74,7 @@ class MyApplication : Application() {
                 "app.version" to "1.0.0"
             )
         )
+        */
         
         // Set initial user profile (if user is logged in)
         TelemetryManager.getInstance().setUserProfile(
@@ -149,10 +185,15 @@ fun HomeScreen(navController: NavController) {
             Text("Go to Profile")
         }
         
-        // Test crash reporting
+        // Test crash reporting (v2.0.0 with enhanced context)
         Button(
             onClick = {
                 TelemetryManager.getInstance().addBreadcrumb("User initiated crash test", "user")
+                
+                // Set product context for crash reporting
+                TelemetryManager.getInstance().setProductContext("home_module")
+                TelemetryManager.getInstance().setLastUserAction("Clicked test crash button")
+                
                 TelemetryManager.getInstance().testCrashReporting("User initiated test crash")
             },
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
@@ -301,10 +342,18 @@ fun SettingsScreen(navController: NavController) {
                     // Simulate an error
                     throw RuntimeException("Simulated error for testing")
                 } catch (e: Exception) {
-                    TelemetryManager.getInstance().trackError(e, mapOf(
-                        "error_source" to "settings_screen",
-                        "user_action" to "simulate_error"
-                    ))
+                    // v2.0.0: Enhanced error tracking with context
+                    // New parameters: errorCode, productId, userAction
+                    TelemetryManager.getInstance().trackError(
+                        error = e,
+                        errorCode = "SETTINGS_001",
+                        productId = "settings_module",
+                        userAction = "Clicked simulate error button",
+                        attributes = mapOf(
+                            "error_source" to "settings_screen",
+                            "screen" to "settings"
+                        )
+                    )
                 }
             },
             modifier = Modifier.fillMaxWidth()
@@ -406,4 +455,316 @@ object AnalyticsHelper {
             "timestamp" to System.currentTimeMillis().toString()
         ))
     }
+}
+
+// 10. Phase 2C: Enhanced Context Tracking Examples (v2.0.0)
+object Phase2cExamples {
+    
+    /**
+     * Example 1: Authentication Module Error Tracking
+     * Demonstrates user_action and error_code in authentication context
+     */
+    fun trackAuthenticationError() {
+        val telemetry = TelemetryManager.getInstance()
+        
+        // Set product context for the authentication module
+        telemetry.setProductContext("authentication_module")
+        
+        // Track user action before critical operation
+        telemetry.setLastUserAction("Clicked login button")
+        
+        try {
+            // Simulate authentication logic
+            performLogin()
+        } catch (e: NullPointerException) {
+            // Track error with enhanced context
+            telemetry.trackError(
+                error = e,
+                errorCode = "AUTH_001",
+                attributes = mapOf(
+                    "screen" to "LoginActivity",
+                    "method" to "performLogin",
+                    "user_input_valid" to "true"
+                )
+            )
+        }
+    }
+    
+    /**
+     * Example 2: Payment Processing Error Tracking
+     * Demonstrates error_code with payment-specific context
+     */
+    fun trackPaymentError(amount: Double, currency: String) {
+        val telemetry = TelemetryManager.getInstance()
+        
+        // Set product context
+        telemetry.setProductContext("payment_module")
+        telemetry.setLastUserAction("Initiated payment transaction")
+        
+        try {
+            processPayment(amount, currency)
+        } catch (e: TimeoutException) {
+            telemetry.trackError(
+                error = e,
+                errorCode = "PAY_TIMEOUT_001",
+                attributes = mapOf(
+                    "amount" to amount.toString(),
+                    "currency" to currency,
+                    "gateway" to "stripe",
+                    "retry_count" to "0"
+                )
+            )
+        } catch (e: IllegalStateException) {
+            telemetry.trackError(
+                error = e,
+                errorCode = "PAY_INVALID_STATE",
+                attributes = mapOf(
+                    "amount" to amount.toString(),
+                    "currency" to currency,
+                    "payment_state" to "pending"
+                )
+            )
+        }
+    }
+    
+    /**
+     * Example 3: Shopping Cart Error Tracking
+     * Demonstrates context persistence across multiple operations
+     */
+    fun trackShoppingCartErrors() {
+        val telemetry = TelemetryManager.getInstance()
+        
+        // Set context once - persists for all errors in this module
+        telemetry.setProductContext("shopping_cart")
+        
+        // Add item to cart
+        telemetry.setLastUserAction("Added item to cart")
+        try {
+            addItemToCart(itemId = "12345")
+        } catch (e: Exception) {
+            telemetry.trackError(
+                error = e,
+                errorCode = "CART_ADD_FAILED"
+            )
+        }
+        
+        // Update quantity
+        telemetry.setLastUserAction("Updated item quantity")
+        try {
+            updateCartQuantity(itemId = "12345", quantity = 2)
+        } catch (e: Exception) {
+            telemetry.trackError(
+                error = e,
+                errorCode = "CART_UPDATE_FAILED"
+            )
+        }
+        
+        // Checkout
+        telemetry.setLastUserAction("Clicked checkout button")
+        try {
+            proceedToCheckout()
+        } catch (e: Exception) {
+            telemetry.trackError(
+                error = e,
+                errorCode = "CART_CHECKOUT_FAILED"
+            )
+        }
+    }
+    
+    /**
+     * Example 4: Explicit Context Override
+     * Demonstrates overriding stored context with explicit parameters
+     */
+    fun trackWithContextOverride() {
+        val telemetry = TelemetryManager.getInstance()
+        
+        // Set default context
+        telemetry.setProductContext("module_a")
+        telemetry.setLastUserAction("Action A")
+        
+        // Track error - uses stored context
+        try {
+            performOperationA()
+        } catch (e: Exception) {
+            telemetry.trackError(
+                error = e,
+                errorCode = "ERR_A"
+            )
+        }
+        
+        // Track error with explicit override
+        try {
+            performOperationB()
+        } catch (e: Exception) {
+            telemetry.trackError(
+                error = e,
+                errorCode = "ERR_B",
+                productId = "module_b",  // Overrides stored "module_a"
+                userAction = "Action B"   // Overrides stored "Action A"
+            )
+        }
+    }
+    
+    /**
+     * Example 5: Database Error Tracking
+     * Demonstrates error tracking in data layer
+     */
+    fun trackDatabaseError(operation: String) {
+        val telemetry = TelemetryManager.getInstance()
+        
+        telemetry.setProductContext("database_module")
+        telemetry.setLastUserAction("Executing database $operation")
+        
+        try {
+            executeDatabaseOperation(operation)
+        } catch (e: SQLException) {
+            telemetry.trackError(
+                error = e,
+                errorCode = "DB_${operation.uppercase()}_FAILED",
+                attributes = mapOf(
+                    "operation" to operation,
+                    "table" to "users",
+                    "sql_state" to (e.sqlState ?: "unknown")
+                )
+            )
+        }
+    }
+    
+    /**
+     * Example 6: Network Error Tracking
+     * Demonstrates error tracking for API calls
+     */
+    fun trackNetworkError(endpoint: String, method: String) {
+        val telemetry = TelemetryManager.getInstance()
+        
+        telemetry.setProductContext("network_module")
+        telemetry.setLastUserAction("API call to $endpoint")
+        
+        try {
+            makeApiCall(endpoint, method)
+        } catch (e: IOException) {
+            telemetry.trackError(
+                error = e,
+                errorCode = "NET_IO_ERROR",
+                attributes = mapOf(
+                    "endpoint" to endpoint,
+                    "method" to method,
+                    "network_type" to "wifi"
+                )
+            )
+        } catch (e: TimeoutException) {
+            telemetry.trackError(
+                error = e,
+                errorCode = "NET_TIMEOUT",
+                attributes = mapOf(
+                    "endpoint" to endpoint,
+                    "method" to method,
+                    "timeout_ms" to "30000"
+                )
+            )
+        }
+    }
+    
+    /**
+     * Example 7: UI Interaction Error Tracking
+     * Demonstrates tracking errors from user interactions
+     */
+    fun trackUIInteractionError(buttonId: String, action: String) {
+        val telemetry = TelemetryManager.getInstance()
+        
+        telemetry.setProductContext("ui_module")
+        telemetry.setLastUserAction("Clicked $buttonId button")
+        
+        try {
+            performUIAction(action)
+        } catch (e: Exception) {
+            telemetry.trackError(
+                error = e,
+                errorCode = "UI_ACTION_FAILED",
+                attributes = mapOf(
+                    "button_id" to buttonId,
+                    "action" to action,
+                    "screen" to "MainActivity"
+                )
+            )
+        }
+    }
+    
+    // Placeholder functions for examples
+    private fun performLogin() { throw NullPointerException("User object was null") }
+    private fun processPayment(amount: Double, currency: String) { }
+    private fun addItemToCart(itemId: String) { }
+    private fun updateCartQuantity(itemId: String, quantity: Int) { }
+    private fun proceedToCheckout() { }
+    private fun performOperationA() { }
+    private fun performOperationB() { }
+    private fun executeDatabaseOperation(operation: String) { }
+    private fun makeApiCall(endpoint: String, method: String) { }
+    private fun performUIAction(action: String) { }
+}
+
+// 11. Best Practices for Phase 2C Features
+object Phase2cBestPractices {
+    
+    /**
+     * Best Practice 1: Set context early in lifecycle
+     */
+    fun setContextInLifecycle() {
+        // In Activity onCreate() or Fragment onViewCreated()
+        TelemetryManager.getInstance().setProductContext("feature_module")
+    }
+    
+    /**
+     * Best Practice 2: Update user action before critical operations
+     */
+    fun updateActionBeforeOperation() {
+        // Before any operation that might fail
+        TelemetryManager.getInstance().setLastUserAction("User submitted form")
+        submitForm()
+    }
+    
+    /**
+     * Best Practice 3: Use meaningful error codes
+     */
+    fun useMeaningfulErrorCodes() {
+        // Good: Specific, categorized error codes
+        val goodErrorCodes = listOf(
+            "AUTH_LOGIN_FAILED",
+            "PAY_GATEWAY_TIMEOUT",
+            "DB_CONNECTION_LOST",
+            "NET_SSL_ERROR",
+            "UI_VALIDATION_FAILED"
+        )
+        
+        // Avoid: Generic error codes
+        val badErrorCodes = listOf(
+            "ERROR_001",
+            "FAILED",
+            "ERR"
+        )
+    }
+    
+    /**
+     * Best Practice 4: Include relevant attributes
+     */
+    fun includeRelevantAttributes(amount: Double, currency: String) {
+        try {
+            processPayment(amount, currency)
+        } catch (e: Exception) {
+            TelemetryManager.getInstance().trackError(
+                error = e,
+                errorCode = "PAY_DECLINED",
+                attributes = mapOf(
+                    "amount" to amount.toString(),
+                    "currency" to currency,
+                    "card_type" to "visa",
+                    "decline_reason" to "insufficient_funds",
+                    "retry_count" to "0"
+                )
+            )
+        }
+    }
+    
+    private fun submitForm() { }
+    private fun processPayment(amount: Double, currency: String) { }
 }
