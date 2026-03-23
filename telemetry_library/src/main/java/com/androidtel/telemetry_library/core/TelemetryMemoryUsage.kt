@@ -161,9 +161,10 @@ class TelemetryMemoryUsage(private val telemetryManager: TelemetryManager = Tele
                         "memory.pressure_level" to pressureLevel,
                         "memory.timestamp" to timestamp,
                         "memory.api_level" to Build.VERSION.SDK_INT,
-                    "memory.tracking_method" to "basic_runtime"
+                        "memory.tracking_method" to "basic_runtime"
+                    )
                 )
-            )
+            }
             
             // Record basic memory metric
             telemetryManager.recordMetric(
