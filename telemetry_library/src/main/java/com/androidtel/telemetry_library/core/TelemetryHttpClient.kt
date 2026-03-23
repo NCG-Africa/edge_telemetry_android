@@ -60,34 +60,32 @@ class TelemetryHttpClient(
         repeat(maxRetries) { attempt ->
             try {
                 val jsonPayload = batch.toJson()
-                val response = makeHttpRequest(jsonPayload, telemetryUrl)
-
-                when (response.code) {
-                    in 200..299 -> return Result.success(Unit)
-                    in 400..499 -> {
-                        Log.e(
-                            "TelemetryHttpClient",
-                            "Client error ${response.code}: ${response.message}"
-                        )
-                        return Result.failure(ClientException(response.code, response.message))
-                    }
-
-                    in 500..599 -> {
-                        Log.e(
-                            "TelemetryHttpClient",
-                            "Server error ${response.code}: ${response.message}. Retrying..."
-                        )
-
-                        if (attempt < maxRetries - 1) {
-                            delay(calculateBackoffDelay(attempt))
-                            // Continue to next retry attempt
-                        } else {
-                            // Last attempt - return failure
-                            return Result.failure(ServerException(response.code, response.message))
+                makeHttpRequest(jsonPayload, telemetryUrl).use { response ->
+                    when (response.code) {
+                        in 200..299 -> return Result.success(Unit)
+                        in 400..499 -> {
+                            Log.e(
+                                "TelemetryHttpClient",
+                                "Client error ${response.code}: ${response.message}"
+                            )
+                            return Result.failure(ClientException(response.code, response.message))
                         }
-                    }
 
-                    else -> return Result.failure(UnknownException(response.code))
+                        in 500..599 -> {
+                            Log.e(
+                                "TelemetryHttpClient",
+                                "Server error ${response.code}: ${response.message}. Retrying..."
+                            )
+
+                            if (attempt < maxRetries - 1) {
+                                delay(calculateBackoffDelay(attempt))
+                            } else {
+                                return Result.failure(ServerException(response.code, response.message))
+                            }
+                        }
+
+                        else -> return Result.failure(UnknownException(response.code))
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(

@@ -382,8 +382,7 @@ class LocationIntegrationTest {
             userId = "test_user_123",
             name = null,
             email = null,
-            phone = null,
-            profileVersion = null
+            phone = null
         )
 
         val sessionInfo = SessionInfo(

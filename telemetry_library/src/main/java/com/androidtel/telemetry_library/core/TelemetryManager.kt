@@ -107,8 +107,7 @@ class TelemetryManager private constructor(
     private lateinit var networkCapabilityDetector: NetworkCapabilityDetector
     private lateinit var memoryCapabilityTracker: MemoryCapabilityTracker
 
-    // Flutter-compatible components (initialized based on configuration)
-    private var flutterIdGenerator: IdGenerator? = null
+    // Core components (initialized based on configuration)
     private var breadcrumbManager: BreadcrumbManager? = null
     private var userProfileManager: UserProfileManager? = null
     private var enhancedSessionManager: SessionManager? = null
@@ -120,11 +119,7 @@ class TelemetryManager private constructor(
     private var locationProvider: LocationProvider? = null
     private var currentLocation: String? = null
 
-    // Configuration flags
-    private var crashReportingEnabled = false
-    private var userProfilesEnabled = false
-    private var sessionTrackingEnabled = false
-    private var locationTrackingEnabled = false
+    // Global attributes for custom event data
     private var globalAttributes = mutableMapOf<String, String>()
 
     // Pre-init user profile storage (for setUserProfile() called before init)
@@ -227,10 +222,6 @@ class TelemetryManager private constructor(
                 ?: throw IllegalStateException("TelemetryManager not initialized. Call init(application) first.")
         }
 
-        fun instance(): TelemetryManager {
-            return instance
-                ?: throw IllegalStateException("TelemetryManager not initialized. Call init(application) first.")
-        }
         
         /**
          * Creates a TelemetryInterceptor configured to avoid tracking SDK's own requests
@@ -295,14 +286,13 @@ class TelemetryManager private constructor(
             Log.d("TelemetryManager", "Step 4: Device info collected")
             
             // Step 5: Initialize UserProfileManager
-            flutterIdGenerator = IdGenerator().apply { initialize(context) }
-            deviceInfoCollector = DeviceInfoCollector(context, flutterIdGenerator!!)
-            userProfileManager = UserProfileManager(context, flutterIdGenerator!!)
+            deviceInfoCollector = DeviceInfoCollector(context, idGenerator)
+            userProfileManager = UserProfileManager(context, idGenerator)
             breadcrumbManager = BreadcrumbManager()
             Log.d("TelemetryManager", "Step 5: UserProfileManager initialized")
             
             // Step 6: Initialize SessionManager
-            enhancedSessionManager = SessionManager(flutterIdGenerator!!)
+            enhancedSessionManager = SessionManager(idGenerator)
             Log.d("TelemetryManager", "Step 6: SessionManager initialized")
             
             // Step 7: Event queue and offline buffer already initialized in constructor
@@ -340,7 +330,7 @@ class TelemetryManager private constructor(
                     context = context,
                     telemetryManager = this,
                     breadcrumbManager = breadcrumbManager!!,
-                    idGenerator = flutterIdGenerator!!,
+                    idGenerator = idGenerator,
                     apiKey = apiKey,
                     telemetryEndpoint = telemetryEndpoint,
                     enabled = true,
@@ -372,289 +362,6 @@ class TelemetryManager private constructor(
         }
     }
 
-    /**
-     * Initialize IdGenerator before any ID is accessed
-     */
-    private fun initializeIdGenerator() {
-        idGenerator = IdGenerator()
-        idGenerator.initialize(context)
-        
-        // Initialize core IDs
-        deviceId = idGenerator.getOrGenerateDeviceId()
-        sessionId = idGenerator.generateSessionId()
-        deviceInfo = collectDeviceInfo()
-        
-        Log.i("TelemetryManager", "IdGenerator initialized - Device ID: $deviceId, Session ID: $sessionId")
-    }
-
-    /**
-     * Initializes the user ID automatically during SDK setup.
-     * Creates a new user ID if none exists, or loads existing one from SharedPreferences.
-     * This ensures permanent user identity across app lifecycle with zero developer intervention.
-     * CRITICAL: userId must NEVER be null or empty - uses fallback if generation fails.
-     */
-    private fun initializeUserId() {
-        try {
-            userId = idGenerator.getUserId()
-            Log.i("TelemetryManager", "Loaded/generated user ID: $userId")
-            
-            // Mark IDs as initialized only if both device ID and user ID are valid
-            if (::deviceId.isInitialized && deviceId.isNotBlank() && 
-                ::userId.isInitialized && userId.isNotBlank() &&
-                !deviceId.startsWith("user_emergency_") && 
-                !userId.startsWith("user_emergency_")) {
-                idsInitialized = true
-                Log.i("TelemetryManager", "IDs successfully initialized and validated")
-            } else {
-                Log.w("TelemetryManager", "IDs initialized but validation failed")
-            }
-        } catch (e: Exception) {
-            Log.e("TelemetryManager", "Failed to initialize user ID: ${e.localizedMessage}", e)
-            userId = "user_emergency_${System.currentTimeMillis()}"
-            Log.w("TelemetryManager", "Using emergency fallback user ID: $userId")
-            idsInitialized = false
-        }
-        
-        // Final safety check - ensure userId is initialized
-        if (!::userId.isInitialized || userId.isBlank()) {
-            Log.e("TelemetryManager", "CRITICAL ERROR: userId not properly initialized. Using emergency fallback.")
-            userId = "user_emergency_${System.currentTimeMillis()}"
-            idsInitialized = false
-        }
-    }
-
-    /**
-     * Initialize Flutter-compatible components based on configuration
-     */
-    private fun initializeFlutterComponents(
-        enableCrashReporting: Boolean,
-        enableUserProfiles: Boolean,
-        enableSessionTracking: Boolean,
-        globalAttributes: Map<String, String>,
-        enableLocationTracking: Boolean,
-        locationApiEndpoint: String,
-        locationCacheDuration: Long,
-        locationFallbackToIp: Boolean
-    ) {
-        try {
-            // Set configuration flags
-            this.crashReportingEnabled = enableCrashReporting
-            this.userProfilesEnabled = enableUserProfiles
-            this.sessionTrackingEnabled = enableSessionTracking
-            this.locationTrackingEnabled = enableLocationTracking
-            this.globalAttributes.putAll(globalAttributes)
-
-            // Initialize ID generator (always enabled for Flutter compatibility)
-            flutterIdGenerator = IdGenerator().apply { initialize(context) }
-
-            // Initialize device info collector (always enabled)
-            deviceInfoCollector = DeviceInfoCollector(context, flutterIdGenerator!!)
-
-            // Initialize breadcrumb manager (always enabled for crash reporting)
-            breadcrumbManager = BreadcrumbManager()
-
-            // Initialize user profile manager if enabled
-            if (enableUserProfiles) {
-                userProfileManager = UserProfileManager(context, flutterIdGenerator!!)
-                
-                // Apply pending profile if setUserProfile() was called before init
-                if (hasPendingProfile) {
-                    userProfileManager!!.setUserProfile(pendingDisplayName, pendingEmail, pendingPhone)
-                    hasPendingProfile = false
-                    pendingDisplayName = null
-                    pendingEmail = null
-                    pendingPhone = null
-                }
-            }
-
-            // Initialize enhanced session manager if enabled
-            if (enableSessionTracking) {
-                enhancedSessionManager = SessionManager(flutterIdGenerator!!)
-            }
-
-            // Initialize crash reporter if enabled
-            if (enableCrashReporting) {
-                crashReporter = CrashReporter(
-                    context = context,
-                    telemetryManager = this,
-                    breadcrumbManager = breadcrumbManager!!,
-                    idGenerator = flutterIdGenerator!!,
-                    apiKey = apiKey,
-                    telemetryEndpoint = telemetryEndpoint,
-                    enabled = true,
-                    debugMode = debugMode
-                )
-            }
-
-            // Initialize JSON event tracker (always enabled)
-            jsonEventTracker = JsonEventTracker(
-                telemetryManager = this,
-                sessionManager = enhancedSessionManager ?: createDummySessionManager(),
-                userProfileManager = userProfileManager ?: createDummyUserProfileManager(),
-                breadcrumbManager = breadcrumbManager!!,
-                idGenerator = flutterIdGenerator!!,
-                batchSize = batchSize
-            )
-
-            // Initialize location provider if enabled
-            if (enableLocationTracking) {
-                locationProvider = IpLocationProvider(
-                    httpClient = httpClient.getOkHttpClient(),
-                    apiEndpoint = locationApiEndpoint,
-                    cacheDuration = locationCacheDuration,
-                    fallbackToIp = locationFallbackToIp
-                )
-                
-                // Fetch location asynchronously (don't block initialization)
-                scope.launch {
-                    try {
-                        currentLocation = locationProvider?.getLocation()
-                        Log.d("TelemetryManager", "Location initialized: $currentLocation")
-                        
-                        // Update crash reporter with location
-                        crashReporter?.setLocation(currentLocation)
-                    } catch (e: Exception) {
-                        Log.w("TelemetryManager", "Failed to initialize location: ${e.message}")
-                    }
-                }
-            }
-
-            Log.i("TelemetryManager", "Flutter components initialized - Crash: $enableCrashReporting, Users: $enableUserProfiles, Sessions: $enableSessionTracking, Location: $enableLocationTracking")
-        } catch (e: Exception) {
-            Log.e("TelemetryManager", "Failed to initialize Flutter components", e)
-        }
-    }
-
-    private fun createDummySessionManager(): SessionManager {
-        return SessionManager(flutterIdGenerator!!)
-    }
-
-    private fun createDummyUserProfileManager(): UserProfileManager {
-        return UserProfileManager(context, flutterIdGenerator!!)
-    }
-
-    private fun register() {
-        // Attach lifecycle observer
-        ProcessLifecycleOwner.get().lifecycle.addObserver(this)
-
-        // Attempt to send any persisted crash batch(s) on start
-        scope.launch {
-            try {
-                sendPersistedCrashIfAny()
-            } catch (e: Exception) {
-                Log.e(
-                    "TelemetryManager",
-                    "Error while sending persisted crash on init: ${e.localizedMessage}",
-                    e
-                )
-            }
-        }
-
-        scope.launch {
-            try {
-                val prefs = context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE)
-                totalSessions = prefs.getInt("total_sessions", 0) + 1
-                prefs.edit().putInt("total_sessions", totalSessions).apply()
-
-            } catch (e: Exception) {
-                Log.e(
-                    "TelemetryManager",
-                    "Errror storing events sessions: ${e.localizedMessage}",
-                    e
-                )
-            }
-        }
-        // Setup uncaught exception handler
-        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
-        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            // Handle uncaught exception synchronously-ish: persist, attempt short send, then delegate to default handler
-            handleUncaughtException(thread, throwable, defaultHandler)
-        }
-
-        trackActivities()
-        trackMemoryUsage()
-    }
-
-    private fun handleUncaughtException(
-        thread: Thread,
-        throwable: Throwable,
-        defaultHandler: Thread.UncaughtExceptionHandler?
-    ) {
-        val startTime = System.currentTimeMillis()
-        try {
-            // Build the crash attributes (stringified stacktrace etc.)
-            val sw = StringWriter()
-            throwable.printStackTrace(PrintWriter(sw))
-            val stackTrace = sw.toString()
-            
-            // Extract breadcrumbs if available
-            val breadcrumbs = breadcrumbManager?.getBreadcrumbsAsJson() ?: "[]"
-            val breadcrumbCount = breadcrumbManager?.getBreadcrumbCount() ?: 0
-            
-            val attributes = mapOf(
-                "error.message" to "${throwable.javaClass.name}: ${throwable.message ?: ""}".take(1000),
-                "error.stack_trace" to stackTrace.take(2000),
-                "error.exception_type" to throwable.javaClass.simpleName.take(255),
-                "error.context" to extractErrorContext(stackTrace).take(500),
-                "error.cause" to (throwable.cause?.message ?: "unknown").take(255),
-                "error.severity_level" to "critical",
-                "error.is_fatal" to true,
-                "error.breadcrumbs" to breadcrumbs.take(800),
-                "error.breadcrumb_count" to breadcrumbCount,
-                "crash.thread" to thread.name.take(255),
-                "crash.is_main_thread" to (thread == Thread.currentThread())
-            )
-
-            // Try to create a TelemetryEvent with full EventAttributes (includes app/device/session/user)
-            val crashEvent = buildAttributes(attributes)?.let {
-                TelemetryEvent(
-                    type = "event",
-                    eventName = "app.crash",
-                    timestamp = dateFormat.format(Date()),
-                    attributes = it
-                )
-            }
-
-            // If we could build a TelemetryEvent, persist it as a TelemetryBatch synchronously
-            if (crashEvent != null) {
-                val batch = TelemetryBatch(
-                    batchSize = 1,
-                    timestamp = dateFormat.format(Date()),
-                    events = listOf(crashEvent)
-                )
-
-                // Persist to disk synchronously — survives process death
-                persistBatchSync(batch)
-                Log.i(
-                    "TelemetryManager",
-                    "Crash data persisted successfully. Will be sent on next app launch."
-                )
-            } else {
-                // If buildAttributes failed for some reason, persist a minimal JSON so it can be inspected & uploaded later.
-                persistRawCrashSync(
-                    mapOf(
-                        "timestamp" to dateFormat.format(Date()),
-                        "message" to (throwable.message ?: ""),
-                        "stacktrace" to sw.toString()
-                    )
-                )
-            }
-        } catch (e: Exception) {
-            Log.e(
-                "TelemetryManager",
-                "Failed while handling uncaught exception: ${e.localizedMessage}",
-                e
-            )
-        } finally {
-            val executionTime = System.currentTimeMillis() - startTime
-            Log.i(
-                "TelemetryManager",
-                "Crash handler completed in ${executionTime}ms"
-            )
-            // Let the original handler proceed (will terminate the process)
-            defaultHandler?.uncaughtException(thread, throwable)
-        }
-    }
 
     // This is called when the app comes to the foreground. The session is already active.
     override fun onStart(owner: LifecycleOwner) {
@@ -910,14 +617,6 @@ class TelemetryManager private constructor(
         TrackComposeScreen(navController, telemetryManager = this)
     }
 
-    fun trackActivities() {
-        TelemetryActivityLifecycleObserver(this)
-    }
-
-    fun trackMemoryUsage() {
-        TelemetryMemoryUsage(this)
-
-    }
 
     // --- Screen Navigation Tracking ---
     @Deprecated(
@@ -981,7 +680,7 @@ class TelemetryManager private constructor(
         val sessionInfo = getSessionInfo()
         
         // Get user profile from UserProfileManager if available
-        val userProfile = if (userProfilesEnabled && userProfileManager != null) {
+        val userProfile = if (config.enableUserProfiles && userProfileManager != null) {
             userProfileManager!!.getUserProfile()
         } else {
             null
@@ -995,8 +694,7 @@ class TelemetryManager private constructor(
                     userId = userId,
                     name = userProfile?.displayName,
                     email = userProfile?.email,
-                    phone = userProfile?.phone,
-                    profileVersion = null
+                    phone = userProfile?.phone
                 ),
                 session = sessionInfo,
                 customAttributes = eventAttributes
@@ -1036,7 +734,7 @@ class TelemetryManager private constructor(
         if (eventsToSend.isEmpty()) return
 
         // Get current location (from cache if available)
-        val location = if (locationTrackingEnabled) {
+        val location = if (config.enableLocationTracking) {
             locationProvider?.getCachedLocation() ?: currentLocation
         } else {
             null
@@ -1394,7 +1092,7 @@ class TelemetryManager private constructor(
      * Clear user profile (Flutter-compatible)
      */
     fun clearUserProfile() {
-        if (userProfilesEnabled && userProfileManager != null) {
+        if (config.enableUserProfiles && userProfileManager != null) {
             userProfileManager!!.clearUserProfile()
         } else {
             Log.w("TelemetryManager", "User profiles not enabled")
@@ -1418,7 +1116,7 @@ class TelemetryManager private constructor(
      * Track error manually (Flutter-compatible)
      */
     fun trackError(error: Throwable, attributes: Map<String, String>? = null) {
-        if (crashReportingEnabled && crashReporter != null) {
+        if (config.enableCrashReporting && crashReporter != null) {
             crashReporter!!.trackError(error, attributes)
         } else {
             Log.w("TelemetryManager", "Crash reporting not enabled. Call initialize() with enableCrashReporting = true")
@@ -1441,7 +1139,7 @@ class TelemetryManager private constructor(
         userAction: String? = null,
         attributes: Map<String, String>? = null
     ) {
-        if (crashReportingEnabled && crashReporter != null) {
+        if (config.enableCrashReporting && crashReporter != null) {
             crashReporter!!.trackError(error, errorCode, productId, userAction, attributes)
         } else {
             Log.w("TelemetryManager", "Crash reporting not enabled. Call initialize() with enableCrashReporting = true")
@@ -1452,7 +1150,7 @@ class TelemetryManager private constructor(
      * Track error with message (Flutter-compatible)
      */
     fun trackError(message: String, stackTrace: String? = null, attributes: Map<String, String>? = null) {
-        if (crashReportingEnabled && crashReporter != null) {
+        if (config.enableCrashReporting && crashReporter != null) {
             crashReporter!!.trackError(message, stackTrace, attributes)
         } else {
             Log.w("TelemetryManager", "Crash reporting not enabled")
@@ -1466,7 +1164,7 @@ class TelemetryManager private constructor(
      * @param productId Product/module identifier (max 255 chars)
      */
     fun setProductContext(productId: String) {
-        if (crashReportingEnabled && crashReporter != null) {
+        if (config.enableCrashReporting && crashReporter != null) {
             crashReporter!!.setProductContext(productId)
         } else {
             Log.w("TelemetryManager", "Crash reporting not enabled")
@@ -1480,7 +1178,7 @@ class TelemetryManager private constructor(
      * @param action Description of user action (max 500 chars)
      */
     fun setLastUserAction(action: String) {
-        if (crashReportingEnabled && crashReporter != null) {
+        if (config.enableCrashReporting && crashReporter != null) {
             crashReporter!!.setLastUserAction(action)
         } else {
             Log.w("TelemetryManager", "Crash reporting not enabled")
@@ -1491,7 +1189,7 @@ class TelemetryManager private constructor(
      * Start new session (Flutter-compatible)
      */
     fun startNewSession() {
-        if (sessionTrackingEnabled && enhancedSessionManager != null) {
+        if (config.enableSessionTracking && enhancedSessionManager != null) {
             enhancedSessionManager!!.startNewSession()
         } else {
             // Fallback to legacy session management
@@ -1508,16 +1206,16 @@ class TelemetryManager private constructor(
      * End current session (Flutter-compatible)
      */
     fun endCurrentSession() {
-        if (sessionTrackingEnabled && enhancedSessionManager != null) {
+        if (config.enableSessionTracking && enhancedSessionManager != null) {
             enhancedSessionManager!!.endCurrentSession()
         }
     }
 
     /**
-     * Get device ID (Flutter-compatible format)
+     * Get device ID
      */
     fun getDeviceId(): String {
-        return flutterIdGenerator?.getDeviceId() ?: deviceId
+        return if (::deviceId.isInitialized) deviceId else idGenerator.getDeviceId()
     }
 
     /**
@@ -1525,7 +1223,7 @@ class TelemetryManager private constructor(
      * CRITICAL: Always returns a valid user ID, never null
      */
     fun getUserId(): String {
-        return if (userProfilesEnabled && userProfileManager != null) {
+        return if (config.enableUserProfiles && userProfileManager != null) {
             userProfileManager!!.getUserId()
         } else {
             // Fallback to internal userId, ensure it's not empty
@@ -1542,7 +1240,7 @@ class TelemetryManager private constructor(
      * Get session ID (Flutter-compatible)
      */
     fun getSessionId(): String {
-        return if (sessionTrackingEnabled && enhancedSessionManager != null) {
+        return if (config.enableSessionTracking && enhancedSessionManager != null) {
             enhancedSessionManager!!.getCurrentSessionId()
         } else {
             sessionId
@@ -1553,7 +1251,7 @@ class TelemetryManager private constructor(
      * Test crash reporting (Flutter-compatible)
      */
     fun testCrashReporting(customMessage: String? = null) {
-        if (crashReportingEnabled && crashReporter != null) {
+        if (config.enableCrashReporting && crashReporter != null) {
             crashReporter!!.testCrashReporting(customMessage)
         } else {
             Log.w("TelemetryManager", "Crash reporting not enabled. Cannot test.")
