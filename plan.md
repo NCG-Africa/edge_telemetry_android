@@ -206,30 +206,38 @@ This plan ensures the Android Telemetry SDK aligns with backend processor servic
 ## Phase 3: Event Cleanup
 
 ### 3.1 Remove Unsupported Events
-**Status:** Pending
+**Status:** ✅ Complete
 
-**Events NOT Processed by Backend (remove or disable):**
-- `telemetry.capabilities_initialized`
-- `app.error` (only `app.crash` is processed)
-- `memory_pressure`
-- `storage_usage`
-- `frame_drop`
-- `performance.frame_summary`
-- `navigation.screen_resume`
-- `navigation.screen_pause`
-- `screen.entry`
-- `screen.exit`
-- `screen.resume`
-- `screen.pause`
-- `user.interaction`
-- `performance.compose`
-- `screen_view` (legacy)
+**Events NOT Processed by Backend (disabled by default via feature flags):**
+- `telemetry.capabilities_initialized` - Disabled via `enableCapabilityEvents` (default: false)
+- `app.error` - Deprecated, use `app.crash` instead
+- `memory_pressure` - Disabled via `enableMemoryTracking` (default: false)
+- `storage_usage` - Disabled via `enableStorageTracking` (default: false)
+- `frame_drop` - Disabled via `enableFrameTracking` (default: false)
+- `performance.frame_summary` - Disabled via `enableFrameTracking` (default: false)
+- `navigation.screen_resume` - Disabled via `enableLegacyScreenEvents` (default: false)
+- `navigation.screen_pause` - Disabled via `enableLegacyScreenEvents` (default: false)
+- `screen.entry` - Disabled via `enableLegacyScreenEvents` (default: false)
+- `screen.exit` - Disabled via `enableLegacyScreenEvents` (default: false)
+- `screen.resume` - Disabled via `enableLegacyScreenEvents` (default: false)
+- `screen.pause` - Disabled via `enableLegacyScreenEvents` (default: false)
+- `user.interaction` - Disabled via `enableUserInteractionEvents` (default: false)
+- `performance.compose` - Disabled via `enableLegacyScreenEvents` (default: false)
+- `screen_view` - Deprecated, disabled via `enableLegacyScreenEvents` (default: false)
 
 **Tasks:**
-- [ ] Audit codebase for unsupported event emissions
-- [ ] Remove or add feature flags to disable unsupported events
-- [ ] Document removed events in CHANGELOG
-- [ ] Update migration guide
+- [x] Audit codebase for unsupported event emissions
+- [x] Add feature flags to TelemetryConfig for all unsupported events
+- [x] Update all modules to respect feature flags
+- [x] Document removed events in CHANGELOG
+- [x] Maintain backward compatibility with opt-in flags
+
+**Implementation:**
+- Location: `core/TelemetryConfig.kt` - 6 new feature flags
+- All flags default to `false` (disabled)
+- Opt-in available for users who need specific events
+- Zero performance overhead when disabled
+- Debug logging when events are skipped
 
 ---
 

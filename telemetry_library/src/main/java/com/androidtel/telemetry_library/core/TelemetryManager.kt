@@ -58,6 +58,7 @@ class TelemetryManager private constructor(
     private val apiKey: String,
     private val telemetryEndpoint: String,
     private val debugMode: Boolean,
+    private val config: TelemetryConfig,
 ) : DefaultLifecycleObserver {
     
     // Public getter for context
@@ -120,6 +121,13 @@ class TelemetryManager private constructor(
     // ID validation state
     @Volatile
     private var idsInitialized: Boolean = false
+    
+    // Helper methods to check feature flags
+    internal fun isMemoryTrackingEnabled(): Boolean = config.enableMemoryTracking
+    internal fun isStorageTrackingEnabled(): Boolean = config.enableStorageTracking
+    internal fun isFrameTrackingEnabled(): Boolean = config.enableFrameTracking
+    internal fun isLegacyScreenEventsEnabled(): Boolean = config.enableLegacyScreenEvents
+    internal fun isUserInteractionEventsEnabled(): Boolean = config.enableUserInteractionEvents
 
 
     // file name for persisted fatal crash batch
@@ -147,21 +155,43 @@ class TelemetryManager private constructor(
          * ```
          */
         fun initialize(config: TelemetryConfig): TelemetryManager {
-            return initialize(
-                application = config.application,
-                apiKey = config.apiKey,
-                batchSize = config.batchSize,
-                endpoint = config.endpoint,
-                debugMode = config.debugMode,
-                enableCrashReporting = config.enableCrashReporting,
-                enableUserProfiles = config.enableUserProfiles,
-                enableSessionTracking = config.enableSessionTracking,
-                globalAttributes = config.globalAttributes,
-                enableLocationTracking = config.enableLocationTracking,
-                locationApiEndpoint = config.locationApiEndpoint,
-                locationCacheDuration = config.locationCacheDuration,
-                locationFallbackToIp = config.locationFallbackToIp
-            )
+            // Validate API key before any initialization
+            require(config.apiKey.isNotBlank()) { "API key cannot be blank" }
+            require(config.apiKey.startsWith("edge_")) { "API key is invalid" }
+            
+            return instance ?: synchronized(this) {
+                instance ?: TelemetryManager(
+                    config.application,
+                    httpClient = TelemetryHttpClient(
+                        telemetryUrl = config.endpoint,
+                        apiKey = config.apiKey,
+                        debugMode = config.debugMode
+                    ),
+                    offlineStorage = OfflineBatchStorage(config.application.applicationContext),
+                    screenTimingTracker = ScreenTimingTracker(),
+                    batchSize = config.batchSize,
+                    apiKey = config.apiKey,
+                    telemetryEndpoint = config.endpoint,
+                    debugMode = config.debugMode,
+                    config = config,
+                ).also { manager ->
+                    instance = manager
+                    manager.initializeIdGenerator()
+                    manager.initializeCapabilities()
+                    manager.initializeUserId()
+                    manager.initializeFlutterComponents(
+                        config.enableCrashReporting,
+                        config.enableUserProfiles,
+                        config.enableSessionTracking,
+                        config.globalAttributes,
+                        config.enableLocationTracking,
+                        config.locationApiEndpoint,
+                        config.locationCacheDuration,
+                        config.locationFallbackToIp
+                    )
+                    manager.register()
+                }
+            }
         }
 
         /**
@@ -184,42 +214,24 @@ class TelemetryManager private constructor(
             locationCacheDuration: Long = 3600000,
             locationFallbackToIp: Boolean = true
         ): TelemetryManager {
-            // Validate API key before any initialization
-            require(apiKey.isNotBlank()) { "API key cannot be blank" }
-            require(apiKey.startsWith("edge_")) { "API key is invalid" }
+            // Create config object from parameters
+            val config = TelemetryConfig(
+                application = application,
+                apiKey = apiKey,
+                batchSize = batchSize,
+                endpoint = endpoint,
+                debugMode = debugMode,
+                enableCrashReporting = enableCrashReporting,
+                enableUserProfiles = enableUserProfiles,
+                enableSessionTracking = enableSessionTracking,
+                globalAttributes = globalAttributes,
+                enableLocationTracking = enableLocationTracking,
+                locationApiEndpoint = locationApiEndpoint,
+                locationCacheDuration = locationCacheDuration,
+                locationFallbackToIp = locationFallbackToIp
+            )
             
-            return instance ?: synchronized(this) {
-                instance ?: TelemetryManager(
-                    application,
-                    httpClient = TelemetryHttpClient(
-                        telemetryUrl = endpoint,
-                        apiKey = apiKey,
-                        debugMode = debugMode
-                    ),
-                    offlineStorage = OfflineBatchStorage(application.applicationContext),
-                    screenTimingTracker = ScreenTimingTracker(),
-                    batchSize = batchSize,
-                    apiKey = apiKey,
-                    telemetryEndpoint = endpoint,
-                    debugMode = debugMode,
-                ).also { manager ->
-                    instance = manager
-                    manager.initializeIdGenerator() // Initialize ID generator first
-                    manager.initializeCapabilities() // Initialize device capabilities
-                    manager.initializeUserId() // Initialize user ID
-                    manager.initializeFlutterComponents(
-                        enableCrashReporting,
-                        enableUserProfiles,
-                        enableSessionTracking,
-                        globalAttributes,
-                        enableLocationTracking,
-                        locationApiEndpoint,
-                        locationCacheDuration,
-                        locationFallbackToIp
-                    ) // Initialize Flutter-compatible components
-                    manager.register() // lifecycle + crash handling
-                }
-            }
+            return initialize(config)
         }
 
         /**
@@ -683,7 +695,16 @@ class TelemetryManager private constructor(
         scope.launch { sendBatch(forceSend = true, flushOffline = false) }
     }
 
+    @Deprecated(
+        message = "Use recordCrash() instead. Backend only processes app.crash events.",
+        replaceWith = ReplaceWith("recordCrash(throwable)"),
+        level = DeprecationLevel.WARNING
+    )
     fun recordError(throwable: Throwable, attributes: Map<String, Any> = emptyMap()) {
+        if (debugMode) {
+            Log.w("TelemetryManager", "recordError() is deprecated. Use recordCrash() instead. Recording as app.crash.")
+        }
+        
         val sw = StringWriter()
         throwable.printStackTrace(PrintWriter(sw))
         val stackTrace = sw.toString()
@@ -722,7 +743,19 @@ class TelemetryManager private constructor(
     }
 
     // --- Screen Navigation Tracking ---
+    @Deprecated(
+        message = "Legacy screen_view event is not supported by backend. Use navigation events instead.",
+        replaceWith = ReplaceWith("recordComposeScreenView(screenName)"),
+        level = DeprecationLevel.WARNING
+    )
     fun recordScreenView(screenName: String) {
+        if (!config.enableLegacyScreenEvents) {
+            if (debugMode) {
+                Log.d("TelemetryManager", "Legacy screen events disabled - skipping screen_view for $screenName")
+            }
+            return
+        }
+        
         visitedScreens.add(screenName)
         val attributes = mapOf(
             "screen_name" to screenName
@@ -1037,6 +1070,13 @@ class TelemetryManager private constructor(
      * Record device capabilities as telemetry event for analytics
      */
     private fun recordCapabilityTelemetry() {
+        if (!config.enableCapabilityEvents) {
+            if (debugMode) {
+                Log.d("TelemetryManager", "Capability events disabled - skipping telemetry.capabilities_initialized")
+            }
+            return
+        }
+        
         try {
             val capabilitySummary = deviceCapabilities.getCapabilitiesSummary()
             val networkSummary = networkCapabilityDetector.getNetworkCapabilitiesSummary()

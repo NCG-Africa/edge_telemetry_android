@@ -185,6 +185,10 @@ class LegacyPerformanceTracker(
     }
     
     private fun recordFrameEvent(frameDurationMs: Double, severity: String) {
+        if (!telemetryManager.isFrameTrackingEnabled()) {
+            return
+        }
+        
         try {
             val activityName = currentActivityRef?.get()?.javaClass?.simpleName ?: "Unknown"
             
@@ -212,6 +216,9 @@ class LegacyPerformanceTracker(
     
     private fun generatePerformanceSummary() {
         if (frameCount == 0) return
+        if (!telemetryManager.isFrameTrackingEnabled()) {
+            return
+        }
         
         try {
             val avgFrameTimeMs = (totalFrameTime / frameCount) / 1_000_000.0

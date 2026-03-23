@@ -89,11 +89,13 @@ class TelemetryMemoryUsage(private val telemetryManager: TelemetryManager = Tele
             memoryInfo["total_pss_kb"]?.let { memoryAttributes["memory.total_pss_kb"] = it }
             memoryInfo["process_total_pss_kb"]?.let { memoryAttributes["memory.process_pss_kb"] = it }
             
-            // Record memory pressure event
-            telemetryManager.recordEvent(
-                eventName = "memory_pressure",
-                attributes = memoryAttributes
-            )
+            // Record memory pressure event (only if enabled)
+            if (telemetryManager.isMemoryTrackingEnabled()) {
+                telemetryManager.recordEvent(
+                    eventName = "memory_pressure",
+                    attributes = memoryAttributes
+                )
+            }
             
             // Record primary memory usage metric
             val heapUsedMb = memorySummary["heap_used_mb"] as? Long ?: 0L
@@ -148,16 +150,17 @@ class TelemetryMemoryUsage(private val telemetryManager: TelemetryManager = Tele
             
             val timestamp = telemetryManager.dateFormat.format(Date())
             
-            // Record basic memory event
-            telemetryManager.recordEvent(
-                eventName = "memory_pressure",
-                attributes = mapOf(
-                    "memory.heap_used_mb" to usedMb,
-                    "memory.heap_max_mb" to maxMb,
-                    "memory.heap_free_mb" to freeMb,
-                    "memory.pressure_level" to pressureLevel,
-                    "memory.timestamp" to timestamp,
-                    "memory.api_level" to Build.VERSION.SDK_INT,
+            // Record basic memory event (only if enabled)
+            if (telemetryManager.isMemoryTrackingEnabled()) {
+                telemetryManager.recordEvent(
+                    eventName = "memory_pressure",
+                    attributes = mapOf(
+                        "memory.heap_used_mb" to usedMb,
+                        "memory.heap_max_mb" to maxMb,
+                        "memory.heap_free_mb" to freeMb,
+                        "memory.pressure_level" to pressureLevel,
+                        "memory.timestamp" to timestamp,
+                        "memory.api_level" to Build.VERSION.SDK_INT,
                     "memory.tracking_method" to "basic_runtime"
                 )
             )
@@ -243,10 +246,12 @@ class TelemetryMemoryUsage(private val telemetryManager: TelemetryManager = Tele
                     storageAttributes["storage.external_free_mb"] = (it as Long) / (1024 * 1024)
                 }
                 
-                telemetryManager.recordEvent(
-                    eventName = "storage_usage",
-                    attributes = storageAttributes
-                )
+                if (telemetryManager.isStorageTrackingEnabled()) {
+                    telemetryManager.recordEvent(
+                        eventName = "storage_usage",
+                        attributes = storageAttributes
+                    )
+                }
                 
                 Log.d(TAG, "Storage usage recorded")
                 

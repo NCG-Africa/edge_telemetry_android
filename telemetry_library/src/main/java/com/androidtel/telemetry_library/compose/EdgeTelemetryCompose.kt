@@ -81,18 +81,22 @@ fun TrackComposeScreen(
         val lifecycleObserver = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
-                    // Track screen resume
-                    EdgeTelemetry.getInstance().recordEvent("navigation.screen_resume", mapOf(
-                        "screen" to finalScreenName,
-                        "route" to route
-                    ))
+                    // Track screen resume (only if legacy screen events are enabled)
+                    if (EdgeTelemetry.getInstance().isLegacyScreenEventsEnabled()) {
+                        EdgeTelemetry.getInstance().recordEvent("navigation.screen_resume", mapOf(
+                            "screen" to finalScreenName,
+                            "route" to route
+                        ))
+                    }
                 }
                 Lifecycle.Event.ON_PAUSE -> {
-                    // Track screen pause
-                    EdgeTelemetry.getInstance().recordEvent("navigation.screen_pause", mapOf(
-                        "screen" to finalScreenName,
-                        "route" to route
-                    ))
+                    // Track screen pause (only if legacy screen events are enabled)
+                    if (EdgeTelemetry.getInstance().isLegacyScreenEventsEnabled()) {
+                        EdgeTelemetry.getInstance().recordEvent("navigation.screen_pause", mapOf(
+                            "screen" to finalScreenName,
+                            "route" to route
+                        ))
+                    }
                 }
                 else -> { /* No action needed */ }
             }
@@ -171,23 +175,29 @@ fun TrackScreen(
             data = entryData
         )
         
-        // Track screen entry event
-        EdgeTelemetry.getInstance().recordEvent("screen.entry", entryData)
+        // Track screen entry event (only if legacy screen events are enabled)
+        if (EdgeTelemetry.getInstance().isLegacyScreenEventsEnabled()) {
+            EdgeTelemetry.getInstance().recordEvent("screen.entry", entryData)
+        }
         
         // Set up lifecycle observer
         val lifecycleObserver = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
-                    EdgeTelemetry.getInstance().recordEvent("screen.resume", mapOf(
-                        "screen" to screenName,
-                        "category" to category
-                    ))
+                    if (EdgeTelemetry.getInstance().isLegacyScreenEventsEnabled()) {
+                        EdgeTelemetry.getInstance().recordEvent("screen.resume", mapOf(
+                            "screen" to screenName,
+                            "category" to category
+                        ))
+                    }
                 }
                 Lifecycle.Event.ON_PAUSE -> {
-                    EdgeTelemetry.getInstance().recordEvent("screen.pause", mapOf(
-                        "screen" to screenName,
-                        "category" to category
-                    ))
+                    if (EdgeTelemetry.getInstance().isLegacyScreenEventsEnabled()) {
+                        EdgeTelemetry.getInstance().recordEvent("screen.pause", mapOf(
+                            "screen" to screenName,
+                            "category" to category
+                        ))
+                    }
                 }
                 else -> { /* No action needed */ }
             }
@@ -215,8 +225,10 @@ fun TrackScreen(
                 data = exitData
             )
             
-            // Track screen exit and duration
-            EdgeTelemetry.getInstance().recordEvent("screen.exit", exitData)
+            // Track screen exit and duration (only if legacy screen events are enabled)
+            if (EdgeTelemetry.getInstance().isLegacyScreenEventsEnabled()) {
+                EdgeTelemetry.getInstance().recordEvent("screen.exit", exitData)
+            }
             
             lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
         }
@@ -250,8 +262,10 @@ fun trackUserInteraction(
         data = interactionData
     )
     
-    // Track user interaction event
-    EdgeTelemetry.getInstance().recordEvent("user.interaction", interactionData)
+    // Track user interaction event (only if user interaction events are enabled)
+    if (EdgeTelemetry.getInstance().isUserInteractionEventsEnabled()) {
+        EdgeTelemetry.getInstance().recordEvent("user.interaction", interactionData)
+    }
 }
 
 /**
@@ -276,6 +290,8 @@ fun trackComposePerformance(
     )
     attributes?.let { performanceData.putAll(it) }
     
-    // Track performance event
-    EdgeTelemetry.getInstance().recordEvent("performance.compose", performanceData)
+    // Track performance event (only if legacy screen events are enabled)
+    if (EdgeTelemetry.getInstance().isLegacyScreenEventsEnabled()) {
+        EdgeTelemetry.getInstance().recordEvent("performance.compose", performanceData)
+    }
 }

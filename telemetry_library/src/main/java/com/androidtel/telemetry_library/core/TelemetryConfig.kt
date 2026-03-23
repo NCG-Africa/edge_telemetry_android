@@ -21,6 +21,12 @@ import android.app.Application
  * @property locationApiEndpoint API endpoint for location service (default: ipinfo.io)
  * @property locationCacheDuration Duration to cache location in milliseconds (default: 1 hour)
  * @property locationFallbackToIp Send IP address if location API fails (default: true)
+ * @property enableMemoryTracking Enable memory pressure events (default: false, not supported by backend)
+ * @property enableStorageTracking Enable storage usage events (default: false, not supported by backend)
+ * @property enableFrameTracking Enable frame drop events (default: false, not supported by backend)
+ * @property enableLegacyScreenEvents Enable legacy screen events (default: false, not supported by backend)
+ * @property enableUserInteractionEvents Enable user interaction events (default: false, not supported by backend)
+ * @property enableCapabilityEvents Enable capability initialization events (default: false, not supported by backend)
  */
 data class TelemetryConfig(
     val application: Application,
@@ -35,7 +41,13 @@ data class TelemetryConfig(
     val enableLocationTracking: Boolean = true,
     val locationApiEndpoint: String = "https://ipinfo.io/json",
     val locationCacheDuration: Long = 3600000,
-    val locationFallbackToIp: Boolean = true
+    val locationFallbackToIp: Boolean = true,
+    val enableMemoryTracking: Boolean = false,
+    val enableStorageTracking: Boolean = false,
+    val enableFrameTracking: Boolean = false,
+    val enableLegacyScreenEvents: Boolean = false,
+    val enableUserInteractionEvents: Boolean = false,
+    val enableCapabilityEvents: Boolean = false
 ) {
     
     init {
@@ -63,6 +75,12 @@ data class TelemetryConfig(
         private var locationApiEndpoint: String = "https://ipinfo.io/json"
         private var locationCacheDuration: Long = 3600000
         private var locationFallbackToIp: Boolean = true
+        private var enableMemoryTracking: Boolean = false
+        private var enableStorageTracking: Boolean = false
+        private var enableFrameTracking: Boolean = false
+        private var enableLegacyScreenEvents: Boolean = false
+        private var enableUserInteractionEvents: Boolean = false
+        private var enableCapabilityEvents: Boolean = false
         
         fun batchSize(size: Int) = apply { this.batchSize = size }
         fun endpoint(url: String) = apply { this.endpoint = url }
@@ -75,6 +93,12 @@ data class TelemetryConfig(
         fun locationApiEndpoint(endpoint: String) = apply { this.locationApiEndpoint = endpoint }
         fun locationCacheDuration(duration: Long) = apply { this.locationCacheDuration = duration }
         fun locationFallbackToIp(enabled: Boolean) = apply { this.locationFallbackToIp = enabled }
+        fun enableMemoryTracking(enabled: Boolean) = apply { this.enableMemoryTracking = enabled }
+        fun enableStorageTracking(enabled: Boolean) = apply { this.enableStorageTracking = enabled }
+        fun enableFrameTracking(enabled: Boolean) = apply { this.enableFrameTracking = enabled }
+        fun enableLegacyScreenEvents(enabled: Boolean) = apply { this.enableLegacyScreenEvents = enabled }
+        fun enableUserInteractionEvents(enabled: Boolean) = apply { this.enableUserInteractionEvents = enabled }
+        fun enableCapabilityEvents(enabled: Boolean) = apply { this.enableCapabilityEvents = enabled }
         
         fun build() = TelemetryConfig(
             application = application,
@@ -89,7 +113,13 @@ data class TelemetryConfig(
             enableLocationTracking = enableLocationTracking,
             locationApiEndpoint = locationApiEndpoint,
             locationCacheDuration = locationCacheDuration,
-            locationFallbackToIp = locationFallbackToIp
+            locationFallbackToIp = locationFallbackToIp,
+            enableMemoryTracking = enableMemoryTracking,
+            enableStorageTracking = enableStorageTracking,
+            enableFrameTracking = enableFrameTracking,
+            enableLegacyScreenEvents = enableLegacyScreenEvents,
+            enableUserInteractionEvents = enableUserInteractionEvents,
+            enableCapabilityEvents = enableCapabilityEvents
         )
     }
     
