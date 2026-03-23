@@ -201,10 +201,11 @@ class TelemetryHttpClient(
             )
         }
         flat["user.id"] = attrs.user.userId
-        flat["user.name"] = attrs.user.name
-        flat["user.email"] = attrs.user.email
-        flat["user.phone"] = attrs.user.phone
-        flat["user.profile_version"] = attrs.user.profileVersion
+        
+        // Only include displayName, email, and phone if non-null (omit key entirely if null)
+        attrs.user.name?.let { flat["user.name"] = it }
+        attrs.user.email?.let { flat["user.email"] = it }
+        attrs.user.phone?.let { flat["user.phone"] = it }
 
         // Session (extended)
         flat["session.id"] = attrs.session.sessionId

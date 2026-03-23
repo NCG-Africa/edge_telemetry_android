@@ -106,11 +106,11 @@ class TelemetryManager private constructor(
     private var locationTrackingEnabled = false
     private var globalAttributes = mutableMapOf<String, String>()
 
-    // Legacy user profile fields (for backward compatibility)
-    private var userName: String? = null
-    private var userEmail: String? = null
-    private var userPhone: String? = null
-    private var userProfileVersion: Int? = null
+    // Pre-init user profile storage (for setUserProfile() called before init)
+    private var pendingDisplayName: String? = null
+    private var pendingEmail: String? = null
+    private var pendingPhone: String? = null
+    private var hasPendingProfile: Boolean = false
 
     // Session tracking state
     private var eventCount: Int = 0
@@ -353,6 +353,15 @@ class TelemetryManager private constructor(
             // Initialize user profile manager if enabled
             if (enableUserProfiles) {
                 userProfileManager = UserProfileManager(context, flutterIdGenerator!!)
+                
+                // Apply pending profile if setUserProfile() was called before init
+                if (hasPendingProfile) {
+                    userProfileManager!!.setUserProfile(pendingDisplayName, pendingEmail, pendingPhone)
+                    hasPendingProfile = false
+                    pendingDisplayName = null
+                    pendingEmail = null
+                    pendingPhone = null
+                }
             }
 
             // Initialize enhanced session manager if enabled
@@ -798,30 +807,16 @@ class TelemetryManager private constructor(
     }
 
 
-    // Sets the user ID for all subsequent events in the session.
-    // Made private - SDK manages user ID automatically
-    private fun setUserId(id: String) {
-        this.userId = id
-    }
-
-    // A new method to set additional user profile information.
-    // Made private - SDK manages user profile automatically
-    private fun setUserProfile(name: String, email: String, phone: String, profileVersion: Int) {
-        this.userName = name
-        this.userEmail = email
-        this.userPhone = phone
-        this.userProfileVersion = profileVersion
-    }
 
     // Builds the full set of attributes for an event by combining core attributes and event-specific ones.
     private fun buildAttributes(eventAttributes: Map<String, Any>): EventAttributes? {
         val sessionInfo = getSessionInfo()
         
-        // Get user data from UserProfileManager if available, otherwise use legacy fields
-        val userAttrs = if (userProfilesEnabled && userProfileManager != null) {
-            userProfileManager!!.getUserAttributes()
+        // Get user profile from UserProfileManager if available
+        val userProfile = if (userProfilesEnabled && userProfileManager != null) {
+            userProfileManager!!.getUserProfile()
         } else {
-            emptyMap()
+            null
         }
         
         return appInfo?.let {
@@ -829,11 +824,11 @@ class TelemetryManager private constructor(
                 app = it,
                 device = deviceInfo,
                 user = UserInfo(
-                    userId = userAttrs["user.id"] ?: userId,
-                    name = userAttrs["user.name"] ?: userName,
-                    email = userAttrs["user.email"] ?: userEmail,
-                    phone = userAttrs["user.phone"] ?: userPhone,
-                    profileVersion = userAttrs["user.profile_version"]?.toIntOrNull() ?: userProfileVersion
+                    userId = userId,
+                    name = userProfile?.displayName,
+                    email = userProfile?.email,
+                    phone = userProfile?.phone,
+                    profileVersion = null
                 ),
                 session = sessionInfo,
                 customAttributes = eventAttributes
@@ -1208,18 +1203,22 @@ class TelemetryManager private constructor(
     // ================================
 
     /**
-     * Set user profile information (Flutter-compatible)
+     * Set user profile information
+     * Can be called before or after SDK.init()
+     * Fully replaces previous values (no merge)
+     * Passing null for a field clears it
      */
-    fun setUserProfile(
-        name: String? = null,
-        email: String? = null,
-        phone: String? = null,
-        customAttributes: Map<String, String>? = null
-    ) {
-        if (userProfilesEnabled && userProfileManager != null) {
-            userProfileManager!!.setUserProfile(name, email, phone, customAttributes)
+    fun setUserProfile(displayName: String?, email: String?, phone: String? = null) {
+        if (userProfileManager != null) {
+            // SDK is initialized - apply immediately
+            userProfileManager!!.setUserProfile(displayName, email, phone)
         } else {
-            Log.w("TelemetryManager", "User profiles not enabled. Call initialize() with enableUserProfiles = true")
+            // SDK not initialized yet - store for later
+            pendingDisplayName = displayName
+            pendingEmail = email
+            pendingPhone = phone
+            hasPendingProfile = true
+            Log.i("TelemetryManager", "User profile stored for application after SDK init")
         }
     }
 
