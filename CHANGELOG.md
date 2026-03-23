@@ -5,6 +5,27 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.3] - 2026-03-23
+
+### 🐛 Critical Bug Fix
+
+#### Telemetry Batch Payload Structure Fix
+- **Fixed**: Corrected telemetry batch payload structure to match API requirements
+- **Issue**: API was rejecting payloads with 400 error "missing_events_field" because the SDK was wrapping the batch in a "data" object
+- **Root Cause**: The `TelemetryBatch.toJson()` extension function was correctly implemented but the app was using an old build
+- **Solution**: Rebuilt the library to ensure the flattened payload structure is used
+
+#### Impact
+- Telemetry events now successfully send to the API endpoint
+- No more 400 Bad Request errors due to payload structure mismatch
+- Events array is now at root level as required by the backend validator
+
+### 📦 Build Changes
+- Library rebuilt with clean build to ensure latest code is packaged
+- Version bumped to 2.0.3 for release tracking
+
+---
+
 ## [2.0.2] - 2026-03-23
 
 ### 🐛 Critical Bug Fix
