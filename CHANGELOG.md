@@ -5,6 +5,38 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.3] - 2026-03-23
+
+### 🔧 Code Quality Improvements
+
+#### Naming Convention Remediation
+Removed all temporal naming (Phase/Stage prefixes) from code and tests in favor of functional, descriptive names.
+
+**Test Files Renamed:**
+- `Phase4EventIntegrationTest.kt` → `EventIntegrationTest.kt`
+- `Phase2cEnhancedContextTest.kt` → `EnhancedCrashContextTest.kt`
+- `Phase4IntegrationTest.kt` → `StandardAttributesIntegrationTest.kt`
+- `TelemetryManagerStage2Test.kt` → `TelemetryManagerTest.kt`
+- `UserProfileManagerStage2Test.kt` → `UserProfileManagerTest.kt`
+- `IdGeneratorStage2Test.kt` → Removed (duplicate of existing `IdGeneratorTest.kt`)
+
+**Code Functions Renamed:**
+- `performStage9InitSequence()` → `performInitializationSequence()`
+- `validatePhase2Attributes()` → `validateStandardAttributes()`
+
+**Comments Updated:**
+- Removed all Phase/Stage references from 13 files
+- Updated documentation strings to be descriptive of functionality
+- Improved code readability and maintainability
+
+**Impact:**
+- Zero breaking changes to public API
+- Improved code maintainability and clarity
+- Better alignment with industry best practices
+- All git history preserved via `git mv`
+
+---
+
 ## [2.1.0] - 2026-03-23
 
 ### ✅ Phase 5: Documentation - COMPLETE
