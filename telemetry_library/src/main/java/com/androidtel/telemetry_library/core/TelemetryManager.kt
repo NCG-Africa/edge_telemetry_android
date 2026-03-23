@@ -21,6 +21,11 @@ import com.androidtel.telemetry_library.core.ids.IdGenerator
 import com.androidtel.telemetry_library.core.location.IpLocationProvider
 import com.androidtel.telemetry_library.core.location.LocationProvider
 import com.androidtel.telemetry_library.core.models.AppInfo
+import com.androidtel.telemetry_library.core.services.EventTrackingService
+import com.androidtel.telemetry_library.core.services.SessionService
+import com.androidtel.telemetry_library.core.services.UserProfileService
+import com.androidtel.telemetry_library.core.services.CrashReportingService
+import com.androidtel.telemetry_library.core.services.BatchProcessingService
 import com.androidtel.telemetry_library.core.models.DeviceInfo
 import com.androidtel.telemetry_library.core.models.EventAttributes
 import com.androidtel.telemetry_library.core.models.SessionInfo
@@ -69,23 +74,16 @@ class TelemetryManager private constructor(
     // Public getter for context
     val applicationContext: Context get() = context
 
-    private val gson = Gson()
-    private val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
     private val scope = CoroutineScope(Dispatchers.IO)
     val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
-    private var batchSendJob: Job? = null
 
     // Pre-init call queue
     private val isReady = AtomicBoolean(false)
     private val preInitQueue = ConcurrentLinkedQueue<() -> Unit>()
     private val PRE_INIT_QUEUE_MAX_SIZE = 50
 
-    // Flush timer
-    private var flushTimer: ScheduledExecutorService? = null
-
     // Registration guards
     private var activityObserverRegistered = false
-    private var crashHandlerInstalled = false
     private var processObserverRegistered = false
 
     // TelemetryInterceptor instance
@@ -98,45 +96,32 @@ class TelemetryManager private constructor(
     private lateinit var deviceId: String
     private val appInfo = collectAppInfo()
     private lateinit var deviceInfo: DeviceInfo
-    private lateinit var sessionId: String
-    private var sessionStartTime = System.currentTimeMillis()
-    private lateinit var userId: String
     
     // Device capabilities for runtime feature detection
     private lateinit var deviceCapabilities: DeviceCapabilities
     private lateinit var networkCapabilityDetector: NetworkCapabilityDetector
     private lateinit var memoryCapabilityTracker: MemoryCapabilityTracker
 
-    // Core components (initialized based on configuration)
-    private var breadcrumbManager: BreadcrumbManager? = null
-    private var userProfileManager: UserProfileManager? = null
-    private var enhancedSessionManager: SessionManager? = null
-    private var crashReporter: CrashReporter? = null
+    // Legacy components (for backward compatibility)
     private var deviceInfoCollector: DeviceInfoCollector? = null
     private var jsonEventTracker: JsonEventTracker? = null
 
     // Location tracking components
     private var locationProvider: LocationProvider? = null
     private var currentLocation: String? = null
-
-    // Global attributes for custom event data
-    private var globalAttributes = mutableMapOf<String, String>()
-
-    // Pre-init user profile storage (for setUserProfile() called before init)
-    private var pendingDisplayName: String? = null
-    private var pendingEmail: String? = null
-    private var pendingPhone: String? = null
-    private var hasPendingProfile: Boolean = false
-
-    // Session tracking state
-    private var eventCount: Int = 0
-    private var metricCount: Int = 0
-    private var totalSessions: Int = 0
-    private val visitedScreens: MutableSet<String> = mutableSetOf()
     
     // ID validation state
     @Volatile
     private var idsInitialized: Boolean = false
+    
+    // ========================================
+    // PHASE 2: Service-based Architecture
+    // ========================================
+    private lateinit var eventTrackingService: EventTrackingService
+    private lateinit var sessionService: SessionService
+    private lateinit var userProfileService: UserProfileService
+    private lateinit var crashReportingService: CrashReportingService
+    private lateinit var batchProcessingService: BatchProcessingService
     
     // Helper methods to check feature flags
     internal fun isMemoryTrackingEnabled(): Boolean = config.enableMemoryTracking
@@ -144,12 +129,6 @@ class TelemetryManager private constructor(
     internal fun isFrameTrackingEnabled(): Boolean = config.enableFrameTracking
     internal fun isLegacyScreenEventsEnabled(): Boolean = config.enableLegacyScreenEvents
     internal fun isUserInteractionEventsEnabled(): Boolean = config.enableUserInteractionEvents
-
-
-    // file name for persisted fatal crash batch
-    private val persistedCrashFileName = "telemetry_pending_crash.json"
-    private val persistedCrashFile: File
-        get() = File(context.cacheDir, persistedCrashFileName)
 
     companion object {
         @Volatile
@@ -275,70 +254,63 @@ class TelemetryManager private constructor(
             deviceId = idGenerator.getOrGenerateDeviceId()
             Log.d("TelemetryManager", "Step 2: Device ID initialized: $deviceId")
             
-            // Step 3: Restore or generate userId
-            userId = idGenerator.getUserId()
-            Log.d("TelemetryManager", "Step 3: User ID initialized: $userId")
-            
-            // Step 4: Collect and cache device info
+            // Step 3: Collect and cache device info
             deviceInfo = collectDeviceInfo()
-            sessionId = idGenerator.generateSessionId()
             initializeCapabilities()
-            Log.d("TelemetryManager", "Step 4: Device info collected")
+            Log.d("TelemetryManager", "Step 3: Device info collected")
             
-            // Step 5: Initialize UserProfileManager
+            // Step 4: Initialize Services (Phase 2 Architecture)
+            eventTrackingService = EventTrackingService(context, config)
+            eventTrackingService.initialize(appInfo, deviceInfo)
+            Log.d("TelemetryManager", "Step 4: EventTrackingService initialized")
+            
+            // Step 5: Initialize SessionService
+            sessionService = SessionService(context, config, idGenerator)
+            sessionService.initialize()
+            Log.d("TelemetryManager", "Step 5: SessionService initialized")
+            
+            // Step 6: Initialize UserProfileService
+            userProfileService = UserProfileService(context, config, idGenerator)
+            userProfileService.initialize()
+            Log.d("TelemetryManager", "Step 6: UserProfileService initialized")
+            
+            // Step 7: Initialize CrashReportingService
+            crashReportingService = CrashReportingService(
+                context, config, idGenerator, httpClient, offlineStorage, scope, apiKey, telemetryEndpoint
+            )
+            crashReportingService.initialize()
+            Log.d("TelemetryManager", "Step 7: CrashReportingService initialized")
+            
+            // Step 8: Initialize BatchProcessingService
+            batchProcessingService = BatchProcessingService(config, httpClient, offlineStorage, scope)
+            batchProcessingService.initialize()
+            Log.d("TelemetryManager", "Step 8: BatchProcessingService initialized")
+            
+            // Step 9: Initialize legacy components for backward compatibility
             deviceInfoCollector = DeviceInfoCollector(context, idGenerator)
-            userProfileManager = UserProfileManager(context, idGenerator)
-            breadcrumbManager = BreadcrumbManager()
-            Log.d("TelemetryManager", "Step 5: UserProfileManager initialized")
+            Log.d("TelemetryManager", "Step 9: Legacy components initialized")
             
-            // Step 6: Initialize SessionManager
-            enhancedSessionManager = SessionManager(idGenerator)
-            Log.d("TelemetryManager", "Step 6: SessionManager initialized")
-            
-            // Step 7: Event queue and offline buffer already initialized in constructor
-            Log.d("TelemetryManager", "Step 7: Event queue and offline storage ready")
-            
-            // Step 8: Start flush timer
-            startFlushTimer()
-            Log.d("TelemetryManager", "Step 8: Flush timer started (interval: ${config.flushIntervalMs}ms)")
-            
-            // Step 9: Mark as ready
+            // Step 10: Mark as ready
             idsInitialized = true
+            batchProcessingService.setIdsInitialized(true)
             isReady.set(true)
-            Log.d("TelemetryManager", "Step 9: SDK marked as ready")
+            Log.d("TelemetryManager", "Step 10: SDK marked as ready")
             
-            // Step 10: Drain pre-init queue
+            // Step 11: Drain pre-init queue
             drainPreInitQueue()
-            Log.d("TelemetryManager", "Step 10: Pre-init queue drained")
+            Log.d("TelemetryManager", "Step 11: Pre-init queue drained")
             
-            // Step 11: Register activity lifecycle callbacks if enabled
+            // Step 12: Register activity lifecycle callbacks if enabled
             if (config.enableScreenTracking && !activityObserverRegistered) {
                 val app = context as? Application
                 if (app != null) {
                     val observer = TelemetryActivityLifecycleObserver(this)
                     app.registerActivityLifecycleCallbacks(observer)
                     activityObserverRegistered = true
-                    Log.d("TelemetryManager", "Step 11: Activity lifecycle observer registered")
+                    Log.d("TelemetryManager", "Step 12: Activity lifecycle observer registered")
                 } else {
-                    Log.w("TelemetryManager", "Step 11: Context is not Application, cannot register activity observer")
+                    Log.w("TelemetryManager", "Step 12: Context is not Application, cannot register activity observer")
                 }
-            }
-            
-            // Step 12: Install crash reporter if enabled
-            if (config.enableCrashReporting && !crashHandlerInstalled) {
-                crashReporter = CrashReporter(
-                    context = context,
-                    telemetryManager = this,
-                    breadcrumbManager = breadcrumbManager!!,
-                    idGenerator = idGenerator,
-                    apiKey = apiKey,
-                    telemetryEndpoint = telemetryEndpoint,
-                    enabled = true,
-                    debugMode = false
-                )
-                crashReporter?.installGlobalExceptionHandler()
-                crashHandlerInstalled = true
-                Log.d("TelemetryManager", "Step 12: Crash handler installed")
             }
             
             // Step 13: Register ProcessLifecycleOwner observer if enabled
@@ -372,50 +344,28 @@ class TelemetryManager private constructor(
         
         // 1. Restore offline buffer back into in-memory event queue
         scope.launch {
-            try {
-                val batches = offlineStorage.getStoredBatches()
-                batches.forEach { batch ->
-                    batch.events.forEach { event ->
-                        eventQueue.offer(event)
-                    }
-                    offlineStorage.removeBatch(batch.id)
-                }
-                if (batches.isNotEmpty()) {
-                    Log.d("TelemetryManager", "Restored ${batches.size} batches from offline storage")
-                }
-            } catch (e: Exception) {
-                Log.e("TelemetryManager", "Error restoring offline buffer", e)
-            }
+            batchProcessingService.restoreOfflineBatches(eventTrackingService.getEventQueue())
         }
         
-        // 2. Read lastActiveTimestamp from SharedPreferences
-        val prefs = context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE)
-        val lastActive = prefs.getLong("last_active_timestamp", 0L)
-        val elapsed = System.currentTimeMillis() - lastActive
-        
-        // 3 & 4. Session timeout logic
-        if (lastActive > 0 && elapsed < config.sessionTimeoutMs) {
-            Log.i("TelemetryManager", "Resuming existing session (elapsed: ${elapsed}ms)")
-        } else {
+        // 2. Check session timeout and start new session if needed
+        if (sessionService.hasSessionTimedOut()) {
+            val lastActive = sessionService.getLastActiveTimestamp()
             if (lastActive > 0) {
-                // Emit session_end for stale session
-                val oldSessionId = sessionId
+                val oldSessionId = sessionService.getCurrentSessionId()
                 recordEvent("session_end", mapOf(
                     "session.id" to oldSessionId,
                     "session.reason" to "timeout"
                 ))
             }
-            // Generate new sessionId
-            sessionId = idGenerator.generateSessionId()
-            sessionStartTime = System.currentTimeMillis()
-            if (enhancedSessionManager != null) {
-                enhancedSessionManager!!.startNewSession()
-            }
-            Log.i("TelemetryManager", "Started new session: $sessionId")
+            sessionService.startNewSession()
+            Log.i("TelemetryManager", "Started new session: ${sessionService.getCurrentSessionId()}")
+        } else {
+            val elapsed = System.currentTimeMillis() - sessionService.getLastActiveTimestamp()
+            Log.i("TelemetryManager", "Resuming existing session (elapsed: ${elapsed}ms)")
         }
         
-        // 5. Resume the flush timer
-        resumeFlushTimer()
+        // 3. Resume the flush timer
+        batchProcessingService.resumeFlushTimer()
     }
 
     // This is called when the app goes into the background. We can track the session end here.
@@ -427,32 +377,14 @@ class TelemetryManager private constructor(
         
         // 1. Flush in-memory event queue to offline buffer
         scope.launch {
-            try {
-                val eventsToStore = mutableListOf<TelemetryEvent>()
-                while (eventQueue.isNotEmpty()) {
-                    eventQueue.poll()?.let { eventsToStore.add(it) }
-                }
-                
-                if (eventsToStore.isNotEmpty()) {
-                    val batch = TelemetryBatch(
-                        batchSize = eventsToStore.size,
-                        timestamp = dateFormat.format(Date()),
-                        events = eventsToStore
-                    )
-                    offlineStorage.storeBatch(batch)
-                    Log.d("TelemetryManager", "Flushed ${eventsToStore.size} events to offline storage")
-                }
-            } catch (e: Exception) {
-                Log.e("TelemetryManager", "Error flushing to offline storage", e)
-            }
+            batchProcessingService.flushToOfflineStorage(eventTrackingService.getEventQueue())
         }
         
-        // 2. Persist lastActiveTimestamp to SharedPreferences
-        val prefs = context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putLong("last_active_timestamp", System.currentTimeMillis()).apply()
+        // 2. Persist lastActiveTimestamp
+        sessionService.updateLastActiveTimestamp()
         
-        // 3. Pause (cancel) the flush timer
-        stopFlushTimer()
+        // 3. Pause the flush timer
+        batchProcessingService.stopFlushTimer()
     }
 
     // Records a new metric event with the specified details.
@@ -465,17 +397,15 @@ class TelemetryManager private constructor(
             offerToPreInitQueue { recordMetric(metricName, value, attributes) }
             return
         }
-        metricCount++
-        val event = buildAttributes(attributes)?.let {
-            TelemetryEvent(
-                type = "metric|event",
-                metricName = metricName,
-                value = value,
-                timestamp = dateFormat.format(Date()),
-                attributes = it
-            )
-        }
-        event?.let { eventQueue.add(it) }
+        
+        val userInfo = userProfileService.getUserInfo()
+        val sessionInfo = sessionService.getSessionInfo(
+            eventTrackingService.getEventCount(),
+            eventTrackingService.getMetricCount(),
+            getNetworkType(context)
+        )
+        
+        eventTrackingService.recordMetric(metricName, value, attributes, userInfo, sessionInfo)
         maybeSendBatch()
     }
 
@@ -488,16 +418,15 @@ class TelemetryManager private constructor(
             offerToPreInitQueue { recordEvent(eventName, attributes) }
             return
         }
-        eventCount++
-        val event = buildAttributes(attributes)?.let {
-            TelemetryEvent(
-                type = "event",
-                eventName = eventName,
-                timestamp = dateFormat.format(Date()),
-                attributes = it
-            )
-        }
-        event?.let { eventQueue.add(it) }
+        
+        val userInfo = userProfileService.getUserInfo()
+        val sessionInfo = sessionService.getSessionInfo(
+            eventTrackingService.getEventCount(),
+            eventTrackingService.getMetricCount(),
+            getNetworkType(context)
+        )
+        
+        eventTrackingService.recordEvent(eventName, attributes, userInfo, sessionInfo)
         maybeSendBatch()
     }
 
@@ -518,65 +447,27 @@ class TelemetryManager private constructor(
             offerToPreInitQueue { recordNetworkRequest(url, method, statusCode, durationMs, requestBodySize, responseBodySize, error, attributes) }
             return
         }
-        val networkAttributes = mapOf(
-            "http.url" to url,
-            "http.method" to method,
-            "http.status_code" to statusCode,
-            "http.duration_ms" to durationMs,
-            "http.timestamp" to dateFormat.format(Date()),
-            "http.success" to (statusCode < 400),
-            "http.request_body_size" to requestBodySize,
-            "http.response_body_size" to responseBodySize,
-            "http.error" to (error ?: "none")
+        
+        val userInfo = userProfileService.getUserInfo()
+        val sessionInfo = sessionService.getSessionInfo(
+            eventTrackingService.getEventCount(),
+            eventTrackingService.getMetricCount(),
+            getNetworkType(context)
         )
-        val combinedAttributes = attributes + networkAttributes
-        recordEvent(eventName = "http.request", attributes = combinedAttributes)
+        
+        eventTrackingService.recordNetworkRequest(
+            url, method, statusCode, durationMs, requestBodySize, responseBodySize, error, attributes, userInfo, sessionInfo
+        )
+        maybeSendBatch()
     }
 
     // --- Crash and Error Reporting ---
     fun recordCrash(throwable: Throwable) {
-        val sw = StringWriter()
-        throwable.printStackTrace(PrintWriter(sw))
-        val stackTrace = sw.toString()
-        
-        // Extract breadcrumbs if available
-        val breadcrumbs = breadcrumbManager?.getBreadcrumbsAsJson() ?: "[]"
-        val breadcrumbCount = breadcrumbManager?.getBreadcrumbCount() ?: 0
-        
-        val attributes = mapOf(
-            "error.message" to "${throwable.javaClass.name}: ${throwable.message ?: ""}".take(1000),
-            "error.stack_trace" to stackTrace.take(2000),
-            "error.exception_type" to throwable.javaClass.simpleName.take(255),
-            "error.context" to extractErrorContext(stackTrace).take(500),
-            "error.cause" to (throwable.cause?.message ?: "unknown").take(255),
-            "error.severity_level" to determineSeverityLevel(throwable),
-            "error.is_fatal" to true,
-            "error.breadcrumbs" to breadcrumbs.take(800),
-            "error.breadcrumb_count" to breadcrumbCount
+        crashReportingService.recordCrash(
+            throwable = throwable,
+            buildAttributesFn = { attrs -> buildAttributes(attrs) },
+            onEventCreated = { event -> eventTrackingService.getEventQueue().add(event) }
         )
-
-        // Build the TelemetryEvent and queue it (normal flow)
-        val event = buildAttributes(attributes)?.let {
-            TelemetryEvent(
-                type = "event",
-                eventName = "app.crash",
-                timestamp = dateFormat.format(Date()),
-                attributes = it
-            )
-        }
-        event?.let {
-            eventQueue.add(it)
-            // Persist crash immediately so we don't lose it if a subsequent fatal crash happens
-            val batch = TelemetryBatch(
-                batchSize = 1,
-                timestamp = dateFormat.format(Date()),
-                events = listOf(it)
-            )
-            persistBatchSync(batch)
-        }
-
-        // Try to send asynchronously (best-effort). If the process terminates quickly, the persisted file will ensure delivery on next launch.
-        scope.launch { sendBatch(forceSend = true, flushOffline = false) }
     }
 
     @Deprecated(
@@ -588,28 +479,7 @@ class TelemetryManager private constructor(
         if (debugMode) {
             Log.w("TelemetryManager", "recordError() is deprecated. Use recordCrash() instead. Recording as app.crash.")
         }
-        
-        val sw = StringWriter()
-        throwable.printStackTrace(PrintWriter(sw))
-        val stackTrace = sw.toString()
-        
-        // Extract breadcrumbs if available
-        val breadcrumbs = breadcrumbManager?.getBreadcrumbsAsJson() ?: "[]"
-        val breadcrumbCount = breadcrumbManager?.getBreadcrumbCount() ?: 0
-        
-        val errorAttributes = mapOf(
-            "error.message" to "${throwable.javaClass.name}: ${throwable.message ?: ""}".take(1000),
-            "error.stack_trace" to stackTrace.take(2000),
-            "error.exception_type" to throwable.javaClass.simpleName.take(255),
-            "error.context" to extractErrorContext(stackTrace).take(500),
-            "error.cause" to (throwable.cause?.message ?: "unknown").take(255),
-            "error.severity_level" to determineSeverityLevel(throwable),
-            "error.is_fatal" to false,
-            "error.breadcrumbs" to breadcrumbs.take(800),
-            "error.breadcrumb_count" to breadcrumbCount
-        )
-        val combinedAttributes = attributes + errorAttributes
-        recordEvent(eventName = "app.crash", attributes = combinedAttributes)
+        recordCrash(throwable)
     }
 
     @Composable
@@ -632,7 +502,7 @@ class TelemetryManager private constructor(
             return
         }
         
-        visitedScreens.add(screenName)
+        sessionService.addVisitedScreen(screenName)
         val attributes = mapOf(
             "screen_name" to screenName
         )
@@ -677,25 +547,18 @@ class TelemetryManager private constructor(
 
     // Builds the full set of attributes for an event by combining core attributes and event-specific ones.
     private fun buildAttributes(eventAttributes: Map<String, Any>): EventAttributes? {
-        val sessionInfo = getSessionInfo()
-        
-        // Get user profile from UserProfileManager if available
-        val userProfile = if (config.enableUserProfiles && userProfileManager != null) {
-            userProfileManager!!.getUserProfile()
-        } else {
-            null
-        }
+        val userInfo = userProfileService.getUserInfo()
+        val sessionInfo = sessionService.getSessionInfo(
+            eventTrackingService.getEventCount(),
+            eventTrackingService.getMetricCount(),
+            getNetworkType(context)
+        )
         
         return appInfo?.let {
             EventAttributes(
                 app = it,
                 device = deviceInfo,
-                user = UserInfo(
-                    userId = userId,
-                    name = userProfile?.displayName,
-                    email = userProfile?.email,
-                    phone = userProfile?.phone
-                ),
+                user = userInfo,
                 session = sessionInfo,
                 customAttributes = eventAttributes
             )
@@ -704,170 +567,42 @@ class TelemetryManager private constructor(
 
     // Checks the queue size and sends a batch if the threshold is met.
     private fun maybeSendBatch() {
-        if (eventQueue.size >= batchSize) {
-            batchSendJob = scope.launch { sendBatch() }
+        if (batchProcessingService.shouldSendBatch(eventTrackingService.getEventQueue().size)) {
+            val location = if (config.enableLocationTracking) {
+                locationProvider?.getCachedLocation() ?: currentLocation
+            } else {
+                null
+            }
+            batchProcessingService.triggerBatchSend(eventTrackingService.getEventQueue(), location)
         }
     }
 
     // This method sends the buffered events as a single JSON batch.
-    // It now uses the TelemetryHttpClient and OfflineBatchStorage.
+    // Delegated to BatchProcessingService
     private suspend fun sendBatch(forceSend: Boolean = false, flushOffline: Boolean = true) {
-        // CRITICAL: Validate that device ID and user ID are properly initialized before sending
-        if (!idsInitialized) {
-            Log.w(
-                "TelemetryManager",
-                "Skipping batch send - IDs not properly initialized. Events remain queued (${eventQueue.size} events)."
-            )
-            return
-        }
-        
-        if (!forceSend && eventQueue.size < batchSize) {
-            return
-        }
-
-        val eventsToSend = mutableListOf<TelemetryEvent>()
-        repeat(eventQueue.size) {
-            val ev = eventQueue.poll()
-            if (ev != null) eventsToSend.add(ev)
-        }
-
-        if (eventsToSend.isEmpty()) return
-
-        // Get current location (from cache if available)
         val location = if (config.enableLocationTracking) {
             locationProvider?.getCachedLocation() ?: currentLocation
         } else {
             null
         }
-
-        val batch = TelemetryBatch(
-            batchSize = eventsToSend.size,
-            timestamp = dateFormat.format(Date()),
-            events = eventsToSend,
-            location = location
+        
+        batchProcessingService.sendBatch(
+            eventTrackingService.getEventQueue(),
+            forceSend,
+            flushOffline,
+            location
         )
-
-        Log.i("TelemetryManager", "Attempting to send a batch of ${batch.batchSize} events with location: $location")
-        val result = httpClient.sendBatch(batch)
-
-        if (result.isSuccess) {
-            Log.i("TelemetryManager", "Successfully sent batch.")
-        } else {
-            Log.e("TelemetryManager", "Failed to send batch. Storing offline.")
-            if (flushOffline) {
-                offlineStorage.storeBatch(batch)
-            }
-        }
     }
 
     // Method to send any batches stored in the offline queue.
+    // Delegated to BatchProcessingService
     private suspend fun sendStoredBatches() {
-        Log.i("TelemetryManager", "Checking for stored batches to send.")
-        val storedBatches = offlineStorage.getStoredBatches()
-        if (storedBatches.isNotEmpty()) {
-            Log.i(
-                "TelemetryManager",
-                "Found ${storedBatches.size} stored batches. Attempting to send."
-            )
-            storedBatches.forEach { batch ->
-                val result = httpClient.sendBatch(batch)
-                if (result.isSuccess) {
-                    Log.i("TelemetryManager", "Successfully re-sent stored batch.")
-                    offlineStorage.removeBatch(batch.id)
-                } else {
-                    Log.e(
-                        "TelemetryManager",
-                        "Failed to re-send stored batch. Will try again later."
-                    )
-                }
-            }
-        }
+        batchProcessingService.sendStoredBatches()
     }
 
-    // Persist a TelemetryBatch to a small JSON file synchronously so it survives process death.
-    private fun persistBatchSync(batch: TelemetryBatch) {
-        try {
-            val json = gson.toJson(batch)
-            persistedCrashFile.parentFile?.mkdirs()
-            persistedCrashFile.writeText(json)
-            Log.i("TelemetryManager", "Persisted crash batch to ${persistedCrashFile.absolutePath}")
-        } catch (e: Exception) {
-            Log.e("TelemetryManager", "Failed to persist crash batch: ${e.localizedMessage}", e)
-        }
-    }
-
-    // Persist a raw minimal crash map (fallback)
-    private fun persistRawCrashSync(raw: Map<String, Any>) {
-        try {
-            val json = gson.toJson(raw)
-            persistedCrashFile.parentFile?.mkdirs()
-            persistedCrashFile.writeText(json)
-            Log.i("TelemetryManager", "Persisted raw crash to ${persistedCrashFile.absolutePath}")
-        } catch (e: Exception) {
-            Log.e("TelemetryManager", "Failed to persist raw crash: ${e.localizedMessage}", e)
-        }
-    }
-
-    // Read persisted crash batch (or null if invalid/missing)
-    private fun readPersistedBatch(): TelemetryBatch? {
-        return try {
-            if (!persistedCrashFile.exists()) return null
-            val text = persistedCrashFile.readText()
-            gson.fromJson(text, TelemetryBatch::class.java)
-        } catch (e: Exception) {
-            Log.e(
-                "TelemetryManager",
-                "Failed to read persisted crash batch: ${e.localizedMessage}",
-                e
-            )
-            null
-        }
-    }
-
-    private fun deletePersistedBatch() {
-        try {
-            if (persistedCrashFile.exists()) {
-                persistedCrashFile.delete()
-                Log.i("TelemetryManager", "Deleted persisted crash file.")
-            }
-        } catch (e: Exception) {
-            Log.e(
-                "TelemetryManager",
-                "Failed to delete persisted crash file: ${e.localizedMessage}",
-                e
-            )
-        }
-    }
-
-    // Try to send persisted crash if exists (called on init)
+    // Crash persistence methods delegated to CrashReportingService
     private suspend fun sendPersistedCrashIfAny() {
-        val batch = readPersistedBatch()
-        if (batch == null) {
-            return
-        }
-
-        Log.i("TelemetryManager", "Found persisted crash batch; attempting to send.")
-        try {
-            val result = httpClient.sendBatch(batch)
-            if (result.isSuccess) {
-                Log.i("TelemetryManager", "Successfully sent persisted crash batch.")
-                deletePersistedBatch()
-            } else {
-                Log.e(
-                    "TelemetryManager",
-                    "Failed to send persisted crash batch; moving to offline storage."
-                )
-                offlineStorage.storeBatch(batch)
-                deletePersistedBatch()
-            }
-        } catch (e: Exception) {
-            Log.e(
-                "TelemetryManager",
-                "Error sending persisted crash batch: ${e.localizedMessage}",
-                e
-            )
-            // leave file for next attempt
-        }
+        crashReportingService.sendPersistedCrashIfAny()
     }
 
 
@@ -1017,22 +752,12 @@ class TelemetryManager private constructor(
             )
         }*/
 
-    // Example: Collects session information
+    // Session information delegated to SessionService
     private fun getSessionInfo(): SessionInfo {
-        val now = System.currentTimeMillis()
-        val duration = now - sessionStartTime
-
-        return SessionInfo(
-            sessionId = sessionId,
-            startTime = dateFormat.format(Date(sessionStartTime)),
-            durationMs = duration,
-            eventCount = eventCount,
-            metricCount = metricCount,
-            screenCount = visitedScreens.size,
-            visitedScreens = visitedScreens.joinToString(","),
-            isFirstSession = totalSessions == 1,
-            totalSessions = totalSessions,
-            networkType = getNetworkType(context)
+        return sessionService.getSessionInfo(
+            eventTrackingService.getEventCount(),
+            eventTrackingService.getMetricCount(),
+            getNetworkType(context)
         )
     }
 
@@ -1075,32 +800,18 @@ class TelemetryManager private constructor(
      * Passing null for a field clears it
      */
     fun setUserProfile(displayName: String?, email: String?, phone: String? = null) {
-        if (userProfileManager != null) {
-            // SDK is initialized - apply immediately
-            userProfileManager!!.setUserProfile(displayName, email, phone)
-        } else {
-            // SDK not initialized yet - store for later
-            pendingDisplayName = displayName
-            pendingEmail = email
-            pendingPhone = phone
-            hasPendingProfile = true
-            Log.i("TelemetryManager", "User profile stored for application after SDK init")
-        }
+        userProfileService.setUserProfile(displayName, email, phone)
     }
 
     /**
-     * Clear user profile (Flutter-compatible)
+     * Clear user profile
      */
     fun clearUserProfile() {
-        if (config.enableUserProfiles && userProfileManager != null) {
-            userProfileManager!!.clearUserProfile()
-        } else {
-            Log.w("TelemetryManager", "User profiles not enabled")
-        }
+        userProfileService.clearUserProfile()
     }
 
     /**
-     * Add breadcrumb (Flutter-compatible)
+     * Add breadcrumb
      */
     fun addBreadcrumb(
         message: String,
@@ -1108,19 +819,14 @@ class TelemetryManager private constructor(
         level: String = "info",
         data: Map<String, String>? = null
     ) {
-        breadcrumbManager?.addBreadcrumb(message, category, level, data)
-            ?: Log.w("TelemetryManager", "Breadcrumb manager not initialized")
+        crashReportingService.addBreadcrumb(message, category, level, data)
     }
 
     /**
-     * Track error manually (Flutter-compatible)
+     * Track error manually
      */
     fun trackError(error: Throwable, attributes: Map<String, String>? = null) {
-        if (config.enableCrashReporting && crashReporter != null) {
-            crashReporter!!.trackError(error, attributes)
-        } else {
-            Log.w("TelemetryManager", "Crash reporting not enabled. Call initialize() with enableCrashReporting = true")
-        }
+        crashReportingService.trackError(error, attributes)
     }
     
     /**
@@ -1139,22 +845,14 @@ class TelemetryManager private constructor(
         userAction: String? = null,
         attributes: Map<String, String>? = null
     ) {
-        if (config.enableCrashReporting && crashReporter != null) {
-            crashReporter!!.trackError(error, errorCode, productId, userAction, attributes)
-        } else {
-            Log.w("TelemetryManager", "Crash reporting not enabled. Call initialize() with enableCrashReporting = true")
-        }
+        crashReportingService.trackError(error, errorCode, productId, userAction, attributes)
     }
 
     /**
-     * Track error with message (Flutter-compatible)
+     * Track error with message
      */
     fun trackError(message: String, stackTrace: String? = null, attributes: Map<String, String>? = null) {
-        if (config.enableCrashReporting && crashReporter != null) {
-            crashReporter!!.trackError(message, stackTrace, attributes)
-        } else {
-            Log.w("TelemetryManager", "Crash reporting not enabled")
-        }
+        crashReportingService.trackError(message, stackTrace, attributes)
     }
     
     /**
@@ -1164,11 +862,7 @@ class TelemetryManager private constructor(
      * @param productId Product/module identifier (max 255 chars)
      */
     fun setProductContext(productId: String) {
-        if (config.enableCrashReporting && crashReporter != null) {
-            crashReporter!!.setProductContext(productId)
-        } else {
-            Log.w("TelemetryManager", "Crash reporting not enabled")
-        }
+        crashReportingService.setProductContext(productId)
     }
     
     /**
@@ -1178,84 +872,52 @@ class TelemetryManager private constructor(
      * @param action Description of user action (max 500 chars)
      */
     fun setLastUserAction(action: String) {
-        if (config.enableCrashReporting && crashReporter != null) {
-            crashReporter!!.setLastUserAction(action)
-        } else {
-            Log.w("TelemetryManager", "Crash reporting not enabled")
-        }
+        crashReportingService.setLastUserAction(action)
     }
 
     /**
-     * Start new session (Flutter-compatible)
+     * Start new session
      */
     fun startNewSession() {
-        if (config.enableSessionTracking && enhancedSessionManager != null) {
-            enhancedSessionManager!!.startNewSession()
-        } else {
-            // Fallback to legacy session management
-            sessionId = idGenerator.generateSessionId()
-            sessionStartTime = System.currentTimeMillis()
-            eventCount = 0
-            metricCount = 0
-            visitedScreens.clear()
-            totalSessions++
-        }
+        sessionService.startNewSession()
+        eventTrackingService.resetEventCount()
+        eventTrackingService.resetMetricCount()
     }
 
     /**
-     * End current session (Flutter-compatible)
+     * End current session
      */
     fun endCurrentSession() {
-        if (config.enableSessionTracking && enhancedSessionManager != null) {
-            enhancedSessionManager!!.endCurrentSession()
-        }
+        sessionService.endCurrentSession()
     }
 
     /**
      * Get device ID
      */
     fun getDeviceId(): String {
-        return if (::deviceId.isInitialized) deviceId else idGenerator.getDeviceId()
+        return if (::deviceId.isInitialized) deviceId else ""
     }
 
     /**
-     * Get user ID (Flutter-compatible)
+     * Get user ID
      * CRITICAL: Always returns a valid user ID, never null
      */
     fun getUserId(): String {
-        return if (config.enableUserProfiles && userProfileManager != null) {
-            userProfileManager!!.getUserId()
-        } else {
-            // Fallback to internal userId, ensure it's not empty
-            if (userId.isBlank()) {
-                Log.w("TelemetryManager", "User ID is blank, generating fallback")
-                "user_fallback_${System.currentTimeMillis()}"
-            } else {
-                userId
-            }
-        }
+        return userProfileService.getUserId()
     }
 
     /**
-     * Get session ID (Flutter-compatible)
+     * Get session ID
      */
     fun getSessionId(): String {
-        return if (config.enableSessionTracking && enhancedSessionManager != null) {
-            enhancedSessionManager!!.getCurrentSessionId()
-        } else {
-            sessionId
-        }
+        return sessionService.getCurrentSessionId()
     }
 
     /**
-     * Test crash reporting (Flutter-compatible)
+     * Test crash reporting
      */
     fun testCrashReporting(customMessage: String? = null) {
-        if (config.enableCrashReporting && crashReporter != null) {
-            crashReporter!!.testCrashReporting(customMessage)
-        } else {
-            Log.w("TelemetryManager", "Crash reporting not enabled. Cannot test.")
-        }
+        crashReportingService.testCrashReporting(customMessage)
     }
 
     /**
@@ -1269,57 +931,18 @@ class TelemetryManager private constructor(
     /**
      * Get enhanced session manager (for internal use)
      */
-    internal fun getEnhancedSessionManager(): SessionManager? = enhancedSessionManager
+    internal fun getEnhancedSessionManager(): SessionManager? = sessionService.getEnhancedSessionManager()
 
     /**
      * Get breadcrumb manager (for internal use)
      */
-    internal fun getBreadcrumbManager(): BreadcrumbManager? = breadcrumbManager
+    internal fun getBreadcrumbManager(): BreadcrumbManager? = crashReportingService.getBreadcrumbManager()
 
     /**
      * Get crash reporter (for internal use)
      */
-    internal fun getCrashReporter(): CrashReporter? = crashReporter
+    internal fun getCrashReporter(): CrashReporter? = crashReportingService.getCrashReporter()
     
-    /**
-     * Extract error context from stack trace (ClassName.methodName from top frame)
-     */
-    private fun extractErrorContext(stackTrace: String): String {
-        return try {
-            val lines = stackTrace.lines()
-            val firstFrame = lines.firstOrNull { it.trim().startsWith("at ") } ?: return "unknown"
-            
-            // Extract "at com.example.ClassName.methodName(File.kt:123)"
-            val atIndex = firstFrame.indexOf("at ")
-            if (atIndex == -1) return "unknown"
-            
-            val methodPart = firstFrame.substring(atIndex + 3).trim()
-            val parenIndex = methodPart.indexOf("(")
-            val fullMethod = if (parenIndex > 0) methodPart.substring(0, parenIndex) else methodPart
-            
-            // Get last two parts (ClassName.methodName)
-            val parts = fullMethod.split(".")
-            if (parts.size >= 2) {
-                "${parts[parts.size - 2]}.${parts[parts.size - 1]}"
-            } else {
-                fullMethod
-            }
-        } catch (e: Exception) {
-            "unknown"
-        }
-    }
-    
-    /**
-     * Determine severity level based on exception type
-     */
-    private fun determineSeverityLevel(throwable: Throwable): String {
-        return when {
-            throwable is OutOfMemoryError || throwable is StackOverflowError -> "critical"
-            throwable is IllegalStateException || throwable is NullPointerException -> "error"
-            throwable is IllegalArgumentException -> "warning"
-            else -> "error"
-        }
-    }
 
     // ================================
     // Pre-Init Queue & Helper Methods
@@ -1354,40 +977,6 @@ class TelemetryManager private constructor(
         }
     }
 
-    /**
-     * Start flush timer using config.flushIntervalMs
-     */
-    private fun startFlushTimer() {
-        flushTimer = Executors.newSingleThreadScheduledExecutor()
-        flushTimer?.scheduleWithFixedDelay({
-            try {
-                if (eventQueue.size > 0) {
-                    scope.launch { sendBatch(forceSend = false) }
-                }
-            } catch (e: Exception) {
-                Log.e("TelemetryManager", "Error in flush timer", e)
-            }
-        }, config.flushIntervalMs, config.flushIntervalMs, TimeUnit.MILLISECONDS)
-        Log.d("TelemetryManager", "Flush timer started with interval: ${config.flushIntervalMs}ms")
-    }
-
-    /**
-     * Stop flush timer
-     */
-    private fun stopFlushTimer() {
-        flushTimer?.shutdown()
-        flushTimer = null
-        Log.d("TelemetryManager", "Flush timer stopped")
-    }
-
-    /**
-     * Resume flush timer
-     */
-    private fun resumeFlushTimer() {
-        if (flushTimer == null || flushTimer?.isShutdown == true) {
-            startFlushTimer()
-        }
-    }
 
     /**
      * Get network interceptor accessor

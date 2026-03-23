@@ -22,7 +22,7 @@ import java.time.Instant
  */
 class CrashReporter(
     private val context: Context,
-    private val telemetryManager: TelemetryManager,
+    private val telemetryManager: TelemetryManager?,
     private val breadcrumbManager: BreadcrumbManager,
     private val idGenerator: IdGenerator,
     private val apiKey: String,
