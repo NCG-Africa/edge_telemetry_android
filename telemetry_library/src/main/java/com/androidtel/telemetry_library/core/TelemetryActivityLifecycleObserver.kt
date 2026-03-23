@@ -65,18 +65,16 @@ class TelemetryActivityLifecycleObserver(
         // Stop performance tracking to prevent memory leaks
         performanceTracker.stop()
 
-        // End timing
+        // End timing and emit screen_view event
         val durationMs = screenTimingTracker.endScreen(screenName)
         if (durationMs != null) {
-            telemetryManager.recordMetric(
-                metricName = "performance.screen_duration",
-                value = durationMs.toDouble(),
+            telemetryManager.recordEvent(
+                eventName = "screen_view",
                 attributes = mapOf(
-                    "screen.name" to screenName,
-                    "screen.duration_ms" to durationMs,
-                    "screen.exit_method" to "paused",
-                    "screen.timestamp" to java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).format(java.util.Date()),
-                    "metric.unit" to "milliseconds"
+                    "screen_name" to screenName,
+                    "duration_ms" to durationMs,
+                    "session_id" to telemetryManager.getSessionId(),
+                    "timestamp" to System.currentTimeMillis()
                 )
             )
         }

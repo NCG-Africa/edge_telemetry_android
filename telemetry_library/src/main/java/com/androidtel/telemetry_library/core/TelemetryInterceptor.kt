@@ -36,14 +36,16 @@ class TelemetryInterceptor(
             val responseBodySize = response?.body?.contentLength() ?: 0
             val statusCode = response?.code ?: 0
 
-            telemetryManager.recordNetworkRequest(
-                url = requestUrl,
-                method = request.method,
-                statusCode = statusCode,
-                durationMs = durationMs,
-                requestBodySize = requestBodySize,
-                responseBodySize = responseBodySize,
-                error = error?.message
+            telemetryManager.recordEvent(
+                eventName = "http_request",
+                attributes = mapOf(
+                    "url" to requestUrl.substringBefore('?'),
+                    "method" to request.method,
+                    "response_code" to statusCode,
+                    "latency_ms" to durationMs,
+                    "request_size_bytes" to requestBodySize,
+                    "response_size_bytes" to responseBodySize
+                )
             )
         }
     }

@@ -47,6 +47,10 @@ import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 // The custom TelemetryManager class handles all telemetry logic according to the specification.
 class TelemetryManager private constructor(
@@ -69,6 +73,22 @@ class TelemetryManager private constructor(
     private val scope = CoroutineScope(Dispatchers.IO)
     val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
     private var batchSendJob: Job? = null
+
+    // Stage 9: Pre-init call queue
+    private val isReady = AtomicBoolean(false)
+    private val preInitQueue = ConcurrentLinkedQueue<() -> Unit>()
+    private val PRE_INIT_QUEUE_MAX_SIZE = 50
+
+    // Stage 9: Flush timer
+    private var flushTimer: ScheduledExecutorService? = null
+
+    // Stage 9: Registration guards
+    private var activityObserverRegistered = false
+    private var crashHandlerInstalled = false
+    private var processObserverRegistered = false
+
+    // Stage 9: TelemetryInterceptor instance
+    private var telemetryInterceptor: TelemetryInterceptor? = null
 
     // ID Generator - single source of truth for all IDs
     private lateinit var idGenerator: IdGenerator
@@ -140,98 +160,62 @@ class TelemetryManager private constructor(
         private var instance: TelemetryManager? = null
 
         /**
-         * Initialize SDK with TelemetryConfig object
-         * 
-         * Recommended approach for cleaner configuration management.
+         * Initialize SDK with TelemetryConfig object (Stage 9)
          * 
          * Example:
          * ```
-         * val config = TelemetryConfig.builder(application, "edge_your_api_key")
-         *     .debugMode(true)
-         *     .batchSize(50)
-         *     .build()
-         * 
-         * TelemetryManager.initialize(config)
+         * val config = TelemetryConfig(
+         *     apiKey = "edge_your_api_key",
+         *     endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry"
+         * )
+         * TelemetryManager.initialize(application, config)
          * ```
          */
-        fun initialize(config: TelemetryConfig): TelemetryManager {
-            // Validate API key before any initialization
-            require(config.apiKey.isNotBlank()) { "API key cannot be blank" }
-            require(config.apiKey.startsWith("edge_")) { "API key is invalid" }
+        fun initialize(application: Application, config: TelemetryConfig): TelemetryManager {
+            // Step 1: Validate config (already done in TelemetryConfig.init)
+            Log.i("TelemetryManager", "Starting SDK initialization with Stage 9 config")
             
             return instance ?: synchronized(this) {
                 instance ?: TelemetryManager(
-                    config.application,
+                    application.applicationContext,
                     httpClient = TelemetryHttpClient(
                         telemetryUrl = config.endpoint,
                         apiKey = config.apiKey,
-                        debugMode = config.debugMode
+                        debugMode = false
                     ),
-                    offlineStorage = OfflineBatchStorage(config.application.applicationContext),
+                    offlineStorage = OfflineBatchStorage(application.applicationContext),
                     screenTimingTracker = ScreenTimingTracker(),
                     batchSize = config.batchSize,
                     apiKey = config.apiKey,
                     telemetryEndpoint = config.endpoint,
-                    debugMode = config.debugMode,
+                    debugMode = false,
                     config = config,
                 ).also { manager ->
                     instance = manager
-                    manager.initializeIdGenerator()
-                    manager.initializeCapabilities()
-                    manager.initializeUserId()
-                    manager.initializeFlutterComponents(
-                        config.enableCrashReporting,
-                        config.enableUserProfiles,
-                        config.enableSessionTracking,
-                        config.globalAttributes,
-                        config.enableLocationTracking,
-                        config.locationApiEndpoint,
-                        config.locationCacheDuration,
-                        config.locationFallbackToIp
-                    )
-                    manager.register()
+                    manager.performStage9InitSequence()
                 }
             }
         }
 
         /**
-         * Initialize SDK with individual parameters (legacy approach)
-         * 
-         * Call this once in Application.onCreate()
+         * Initialize SDK with individual parameters (deprecated - use TelemetryConfig)
          */
+        @Deprecated(
+            message = "Use initialize(application, TelemetryConfig) instead",
+            replaceWith = ReplaceWith("initialize(application, TelemetryConfig(apiKey, endpoint))")
+        )
         fun initialize(
             application: Application,
             apiKey: String,
-            batchSize: Int = 30,
-            endpoint: String = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
-            debugMode: Boolean = false,
-            enableCrashReporting: Boolean = true,
-            enableUserProfiles: Boolean = true,
-            enableSessionTracking: Boolean = true,
-            globalAttributes: Map<String, String> = emptyMap(),
-            enableLocationTracking: Boolean = true,
-            locationApiEndpoint: String = "https://ipinfo.io/json",
-            locationCacheDuration: Long = 3600000,
-            locationFallbackToIp: Boolean = true
+            batchSize: Int = 50,
+            endpoint: String = "https://edgetelemetry.ncgafrica.com/collector/telemetry"
         ): TelemetryManager {
-            // Create config object from parameters
             val config = TelemetryConfig(
-                application = application,
                 apiKey = apiKey,
-                batchSize = batchSize,
                 endpoint = endpoint,
-                debugMode = debugMode,
-                enableCrashReporting = enableCrashReporting,
-                enableUserProfiles = enableUserProfiles,
-                enableSessionTracking = enableSessionTracking,
-                globalAttributes = globalAttributes,
-                enableLocationTracking = enableLocationTracking,
-                locationApiEndpoint = locationApiEndpoint,
-                locationCacheDuration = locationCacheDuration,
-                locationFallbackToIp = locationFallbackToIp
+                batchSize = batchSize
             )
-            
-            return initialize(config)
+            return initialize(application, config)
         }
 
         /**
@@ -266,6 +250,124 @@ class TelemetryManager private constructor(
         @JvmStatic
         internal fun resetForTesting() {
             instance = null
+        }
+    }
+
+    /**
+     * Stage 9: Enforced initialization sequence
+     * 
+     * ENFORCED INIT SEQUENCE:
+     * 1. Validate config — fail fast
+     * 2. Restore or generate deviceId (SharedPreferences)
+     * 3. Restore or generate userId (SharedPreferences)
+     * 4. Collect and cache device info (once)
+     * 5. Initialise UserProfileManager (empty profile)
+     * 6. Initialise SessionManager
+     * 7. Initialise in-memory event queue + offline buffer
+     * 8. Start flush timer (config.flushIntervalMs)
+     * 9. isReady.set(true)
+     * 10. Drain preInitQueue (FIFO)
+     * 11. if (enableScreenTracking)   → register ActivityLifecycleCallbacks
+     * 12. if (enableCrashReporting)   → install CrashReporter
+     * 13. if (enableLifecycleTracking)→ register ProcessLifecycleOwner observer
+     * 14. if (enableNetworkTracking)  → instantiate TelemetryInterceptor
+     */
+    private fun performStage9InitSequence() {
+        try {
+            // Step 1: Config already validated in TelemetryConfig.init
+            Log.d("TelemetryManager", "Step 1: Config validated")
+            
+            // Step 2: Restore or generate deviceId
+            idGenerator = IdGenerator()
+            idGenerator.initialize(context)
+            deviceId = idGenerator.getOrGenerateDeviceId()
+            Log.d("TelemetryManager", "Step 2: Device ID initialized: $deviceId")
+            
+            // Step 3: Restore or generate userId
+            userId = idGenerator.getUserId()
+            Log.d("TelemetryManager", "Step 3: User ID initialized: $userId")
+            
+            // Step 4: Collect and cache device info
+            deviceInfo = collectDeviceInfo()
+            sessionId = idGenerator.generateSessionId()
+            initializeCapabilities()
+            Log.d("TelemetryManager", "Step 4: Device info collected")
+            
+            // Step 5: Initialize UserProfileManager
+            flutterIdGenerator = IdGenerator().apply { initialize(context) }
+            deviceInfoCollector = DeviceInfoCollector(context, flutterIdGenerator!!)
+            userProfileManager = UserProfileManager(context, flutterIdGenerator!!)
+            breadcrumbManager = BreadcrumbManager()
+            Log.d("TelemetryManager", "Step 5: UserProfileManager initialized")
+            
+            // Step 6: Initialize SessionManager
+            enhancedSessionManager = SessionManager(flutterIdGenerator!!)
+            Log.d("TelemetryManager", "Step 6: SessionManager initialized")
+            
+            // Step 7: Event queue and offline buffer already initialized in constructor
+            Log.d("TelemetryManager", "Step 7: Event queue and offline storage ready")
+            
+            // Step 8: Start flush timer
+            startFlushTimer()
+            Log.d("TelemetryManager", "Step 8: Flush timer started (interval: ${config.flushIntervalMs}ms)")
+            
+            // Step 9: Mark as ready
+            idsInitialized = true
+            isReady.set(true)
+            Log.d("TelemetryManager", "Step 9: SDK marked as ready")
+            
+            // Step 10: Drain pre-init queue
+            drainPreInitQueue()
+            Log.d("TelemetryManager", "Step 10: Pre-init queue drained")
+            
+            // Step 11: Register activity lifecycle callbacks if enabled
+            if (config.enableScreenTracking && !activityObserverRegistered) {
+                val app = context as? Application
+                if (app != null) {
+                    val observer = TelemetryActivityLifecycleObserver(this)
+                    app.registerActivityLifecycleCallbacks(observer)
+                    activityObserverRegistered = true
+                    Log.d("TelemetryManager", "Step 11: Activity lifecycle observer registered")
+                } else {
+                    Log.w("TelemetryManager", "Step 11: Context is not Application, cannot register activity observer")
+                }
+            }
+            
+            // Step 12: Install crash reporter if enabled
+            if (config.enableCrashReporting && !crashHandlerInstalled) {
+                crashReporter = CrashReporter(
+                    context = context,
+                    telemetryManager = this,
+                    breadcrumbManager = breadcrumbManager!!,
+                    idGenerator = flutterIdGenerator!!,
+                    apiKey = apiKey,
+                    telemetryEndpoint = telemetryEndpoint,
+                    enabled = true,
+                    debugMode = false
+                )
+                crashReporter?.installGlobalExceptionHandler()
+                crashHandlerInstalled = true
+                Log.d("TelemetryManager", "Step 12: Crash handler installed")
+            }
+            
+            // Step 13: Register ProcessLifecycleOwner observer if enabled
+            if (config.enableLifecycleTracking && !processObserverRegistered) {
+                ProcessLifecycleOwner.get().lifecycle.addObserver(this)
+                processObserverRegistered = true
+                Log.d("TelemetryManager", "Step 13: Process lifecycle observer registered")
+            }
+            
+            // Step 14: Instantiate TelemetryInterceptor if enabled
+            if (config.enableNetworkTracking) {
+                telemetryInterceptor = TelemetryInterceptor(this, telemetryEndpoint)
+                Log.d("TelemetryManager", "Step 14: Network interceptor instantiated")
+            }
+            
+            Log.i("TelemetryManager", "Stage 9 initialization complete - All modules active")
+            
+        } catch (e: Exception) {
+            Log.e("TelemetryManager", "Failed to complete Stage 9 init sequence", e)
+            throw e
         }
     }
 
@@ -556,40 +658,93 @@ class TelemetryManager private constructor(
     // This is called when the app comes to the foreground. The session is already active.
     override fun onStart(owner: LifecycleOwner) {
         super.onStart(owner)
-        Log.i("TelemetryManager", "App moved to foreground. Continuing session ID: $sessionId")
-        // When the app comes back to the foreground, try to send any stored batches.
-        scope.launch { sendStoredBatches() }
+        if (!config.enableLifecycleTracking) return
+        
+        Log.i("TelemetryManager", "App moved to foreground")
+        
+        // 1. Restore offline buffer back into in-memory event queue
+        scope.launch {
+            try {
+                val batches = offlineStorage.getStoredBatches()
+                batches.forEach { batch ->
+                    batch.events.forEach { event ->
+                        eventQueue.offer(event)
+                    }
+                    offlineStorage.removeBatch(batch.id)
+                }
+                if (batches.isNotEmpty()) {
+                    Log.d("TelemetryManager", "Restored ${batches.size} batches from offline storage")
+                }
+            } catch (e: Exception) {
+                Log.e("TelemetryManager", "Error restoring offline buffer", e)
+            }
+        }
+        
+        // 2. Read lastActiveTimestamp from SharedPreferences
+        val prefs = context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE)
+        val lastActive = prefs.getLong("last_active_timestamp", 0L)
+        val elapsed = System.currentTimeMillis() - lastActive
+        
+        // 3 & 4. Session timeout logic
+        if (lastActive > 0 && elapsed < config.sessionTimeoutMs) {
+            Log.i("TelemetryManager", "Resuming existing session (elapsed: ${elapsed}ms)")
+        } else {
+            if (lastActive > 0) {
+                // Emit session_end for stale session
+                val oldSessionId = sessionId
+                recordEvent("session_end", mapOf(
+                    "session.id" to oldSessionId,
+                    "session.reason" to "timeout"
+                ))
+            }
+            // Generate new sessionId
+            sessionId = idGenerator.generateSessionId()
+            sessionStartTime = System.currentTimeMillis()
+            if (enhancedSessionManager != null) {
+                enhancedSessionManager!!.startNewSession()
+            }
+            Log.i("TelemetryManager", "Started new session: $sessionId")
+        }
+        
+        // 5. Resume the flush timer
+        resumeFlushTimer()
     }
 
     // This is called when the app goes into the background. We can track the session end here.
     override fun onStop(owner: LifecycleOwner) {
         super.onStop(owner)
-        val durationMs = System.currentTimeMillis() - sessionStartTime
-        val attributes = mapOf(
-            "session.id" to sessionId,
-            "session.start_time" to dateFormat.format(Date(sessionStartTime)),
-            "session.duration_ms" to durationMs,
-            "session.event_count" to eventCount,
-            "session.metric_count" to metricCount,
-            "session.screen_count" to visitedScreens.size,
-            "session.visited_screens" to visitedScreens.joinToString(","),
-            "session.is_first_session" to (totalSessions == 1),
-            "session.total_sessions" to totalSessions,
-            "network.type" to getNetworkType(context)
-        )
-        recordEvent(eventName = "session.finalized", attributes = attributes)
-        Log.i(
-            "TelemetryManager",
-            "App moved to background. Session ID: $sessionId ended after $durationMs ms."
-        )
-
-        // Flush any remaining events to the offline storage when the app goes to the background.
+        if (!config.enableLifecycleTracking) return
+        
+        Log.i("TelemetryManager", "App moved to background")
+        
+        // 1. Flush in-memory event queue to offline buffer
         scope.launch {
-            if (batchSendJob?.isActive == true) {
-                batchSendJob?.cancelAndJoin()
+            try {
+                val eventsToStore = mutableListOf<TelemetryEvent>()
+                while (eventQueue.isNotEmpty()) {
+                    eventQueue.poll()?.let { eventsToStore.add(it) }
+                }
+                
+                if (eventsToStore.isNotEmpty()) {
+                    val batch = TelemetryBatch(
+                        batchSize = eventsToStore.size,
+                        timestamp = dateFormat.format(Date()),
+                        events = eventsToStore
+                    )
+                    offlineStorage.storeBatch(batch)
+                    Log.d("TelemetryManager", "Flushed ${eventsToStore.size} events to offline storage")
+                }
+            } catch (e: Exception) {
+                Log.e("TelemetryManager", "Error flushing to offline storage", e)
             }
-            sendBatch(true)
         }
+        
+        // 2. Persist lastActiveTimestamp to SharedPreferences
+        val prefs = context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putLong("last_active_timestamp", System.currentTimeMillis()).apply()
+        
+        // 3. Pause (cancel) the flush timer
+        stopFlushTimer()
     }
 
     // Records a new metric event with the specified details.
@@ -598,6 +753,10 @@ class TelemetryManager private constructor(
         value: Double,
         attributes: Map<String, Any> = emptyMap()
     ) {
+        if (!isReady.get()) {
+            offerToPreInitQueue { recordMetric(metricName, value, attributes) }
+            return
+        }
         metricCount++
         val event = buildAttributes(attributes)?.let {
             TelemetryEvent(
@@ -617,6 +776,10 @@ class TelemetryManager private constructor(
         eventName: String,
         attributes: Map<String, Any> = emptyMap()
     ) {
+        if (!isReady.get()) {
+            offerToPreInitQueue { recordEvent(eventName, attributes) }
+            return
+        }
         eventCount++
         val event = buildAttributes(attributes)?.let {
             TelemetryEvent(
@@ -643,6 +806,10 @@ class TelemetryManager private constructor(
         error: String? = null,
         attributes: Map<String, Any> = emptyMap()
     ) {
+        if (!isReady.get()) {
+            offerToPreInitQueue { recordNetworkRequest(url, method, statusCode, durationMs, requestBodySize, responseBodySize, error, attributes) }
+            return
+        }
         val networkAttributes = mapOf(
             "http.url" to url,
             "http.method" to method,
@@ -1453,5 +1620,83 @@ class TelemetryManager private constructor(
             throwable is IllegalArgumentException -> "warning"
             else -> "error"
         }
+    }
+
+    // ================================
+    // Stage 9: Pre-Init Queue & Helpers
+    // ================================
+
+    /**
+     * Offer action to pre-init queue with FIFO eviction if full
+     */
+    private fun offerToPreInitQueue(action: () -> Unit) {
+        if (preInitQueue.size >= PRE_INIT_QUEUE_MAX_SIZE) {
+            preInitQueue.poll()
+        }
+        preInitQueue.offer(action)
+    }
+
+    /**
+     * Drain pre-init queue in FIFO order
+     */
+    private fun drainPreInitQueue() {
+        var drained = 0
+        while (preInitQueue.isNotEmpty()) {
+            val action = preInitQueue.poll()
+            try {
+                action?.invoke()
+                drained++
+            } catch (e: Exception) {
+                Log.e("TelemetryManager", "Error executing pre-init queued action", e)
+            }
+        }
+        if (drained > 0) {
+            Log.i("TelemetryManager", "Drained $drained pre-init queued calls")
+        }
+    }
+
+    /**
+     * Start flush timer using config.flushIntervalMs
+     */
+    private fun startFlushTimer() {
+        flushTimer = Executors.newSingleThreadScheduledExecutor()
+        flushTimer?.scheduleWithFixedDelay({
+            try {
+                if (eventQueue.size > 0) {
+                    scope.launch { sendBatch(forceSend = false) }
+                }
+            } catch (e: Exception) {
+                Log.e("TelemetryManager", "Error in flush timer", e)
+            }
+        }, config.flushIntervalMs, config.flushIntervalMs, TimeUnit.MILLISECONDS)
+        Log.d("TelemetryManager", "Flush timer started with interval: ${config.flushIntervalMs}ms")
+    }
+
+    /**
+     * Stop flush timer
+     */
+    private fun stopFlushTimer() {
+        flushTimer?.shutdown()
+        flushTimer = null
+        Log.d("TelemetryManager", "Flush timer stopped")
+    }
+
+    /**
+     * Resume flush timer
+     */
+    private fun resumeFlushTimer() {
+        if (flushTimer == null || flushTimer?.isShutdown == true) {
+            startFlushTimer()
+        }
+    }
+
+    /**
+     * Get network interceptor accessor (Stage 9)
+     */
+    fun getInterceptor(): Interceptor {
+        if (!config.enableNetworkTracking) {
+            throw IllegalStateException("Network tracking is disabled in TelemetryConfig")
+        }
+        return telemetryInterceptor ?: throw IllegalStateException("Network interceptor not initialized")
     }
 }

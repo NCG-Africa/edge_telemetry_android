@@ -55,7 +55,7 @@ class CrashReporter(
     /**
      * Install global exception handler for automatic crash detection
      */
-    private fun installGlobalExceptionHandler() {
+    fun installGlobalExceptionHandler() {
         originalHandler = Thread.getDefaultUncaughtExceptionHandler()
         
         Thread.setDefaultUncaughtExceptionHandler { thread, exception ->
