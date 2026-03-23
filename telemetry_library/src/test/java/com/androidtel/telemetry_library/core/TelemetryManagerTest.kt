@@ -13,13 +13,13 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Stage 2 Remediation Tests for TelemetryManager
+ * Tests for TelemetryManager
  * Verifies:
  * - setUserProfile() can be called before init()
  * - Pending profile is applied after init completes
  * - Event attributes include userId, displayName, email correctly
  */
-class TelemetryManagerStage2Test {
+class TelemetryManagerTest {
 
     private lateinit var application: Application
     private lateinit var context: Context

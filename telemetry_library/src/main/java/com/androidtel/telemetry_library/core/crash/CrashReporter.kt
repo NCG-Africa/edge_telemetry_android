@@ -41,7 +41,7 @@ class CrashReporter(
     private val deviceInfoCollector = DeviceInfoCollector(context, idGenerator)
     private var originalHandler: Thread.UncaughtExceptionHandler? = null
     
-    // Product context and user action tracking (Phase 2C)
+    // Product context and user action tracking
     private var currentProductId: String? = null
     private var lastUserAction: String? = null
     private var currentLocation: String? = null
@@ -260,7 +260,7 @@ class CrashReporter(
     }
     
     /**
-     * Set product context for crash reporting (Phase 2C)
+     * Set product context for crash reporting
      */
     fun setProductContext(productId: String) {
         this.currentProductId = productId.take(255)
@@ -268,7 +268,7 @@ class CrashReporter(
     }
     
     /**
-     * Set last user action for crash context (Phase 2C)
+     * Set last user action for crash context
      */
     fun setLastUserAction(action: String) {
         this.lastUserAction = action.take(500)

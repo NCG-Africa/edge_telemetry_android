@@ -7,7 +7,7 @@ import org.junit.Test
 import java.io.IOException
 
 /**
- * Phase 3 Test Suite: Integration Tests for Crash Scenarios
+ * Integration Tests for Crash Scenarios
  * Tests real-world crash scenarios and edge cases
  */
 class CrashScenarioIntegrationTest {

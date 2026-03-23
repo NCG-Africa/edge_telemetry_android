@@ -13,13 +13,13 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Tests for Phase 2C: Enhanced Context Collection
+ * Tests for Enhanced Crash Context Collection
  * - user_action tracking (last user interaction)
  * - error_code support (app-specific error codes)
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
-class Phase2cEnhancedContextTest {
+class EnhancedCrashContextTest {
 
     private lateinit var context: Context
     private lateinit var crashReporter: CrashReporter

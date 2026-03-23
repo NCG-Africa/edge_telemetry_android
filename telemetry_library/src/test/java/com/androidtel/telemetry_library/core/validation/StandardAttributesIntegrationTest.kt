@@ -6,10 +6,10 @@ import org.junit.Test
 import java.time.Instant
 
 /**
- * Phase 4: Integration Tests
+ * Integration Tests for Standard Attributes
  * End-to-end validation of event payloads with standard attributes
  */
-class Phase4IntegrationTest {
+class StandardAttributesIntegrationTest {
     
     private lateinit var standardAttributes: Map<String, Any?>
     private val validTimestamp = Instant.now().toString()

@@ -23,7 +23,7 @@ class DeviceInfoCollector(
     
     /**
      * Collect all device information for telemetry events
-     * Aligned with Phase 2 backend processor requirements
+     * Aligned with backend processor requirements
      */
     fun collectDeviceInfo(): Map<String, String> {
         return mapOf(

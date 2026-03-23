@@ -11,13 +11,13 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Stage 2 Remediation Tests for UserProfileManager
+ * Tests for UserProfileManager
  * Verifies:
  * - Profile starts empty at init
  * - setUserProfile() contract works correctly
  * - displayName and email are optional enrichment
  */
-class UserProfileManagerStage2Test {
+class UserProfileManagerTest {
 
     private lateinit var context: Context
     private lateinit var sharedPreferences: SharedPreferences

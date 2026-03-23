@@ -16,11 +16,11 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 /**
- * Phase 4: End-to-End Integration Tests
+ * End-to-End Integration Tests
  * Tests actual event tracking through TelemetryManager with validation
  */
 @RunWith(AndroidJUnit4::class)
-class Phase4EventIntegrationTest {
+class EventIntegrationTest {
     
     private lateinit var context: Context
     private lateinit var telemetryManager: TelemetryManager

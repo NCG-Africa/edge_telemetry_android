@@ -74,20 +74,20 @@ class TelemetryManager private constructor(
     val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
     private var batchSendJob: Job? = null
 
-    // Stage 9: Pre-init call queue
+    // Pre-init call queue
     private val isReady = AtomicBoolean(false)
     private val preInitQueue = ConcurrentLinkedQueue<() -> Unit>()
     private val PRE_INIT_QUEUE_MAX_SIZE = 50
 
-    // Stage 9: Flush timer
+    // Flush timer
     private var flushTimer: ScheduledExecutorService? = null
 
-    // Stage 9: Registration guards
+    // Registration guards
     private var activityObserverRegistered = false
     private var crashHandlerInstalled = false
     private var processObserverRegistered = false
 
-    // Stage 9: TelemetryInterceptor instance
+    // TelemetryInterceptor instance
     private var telemetryInterceptor: TelemetryInterceptor? = null
 
     // ID Generator - single source of truth for all IDs
@@ -160,7 +160,7 @@ class TelemetryManager private constructor(
         private var instance: TelemetryManager? = null
 
         /**
-         * Initialize SDK with TelemetryConfig object (Stage 9)
+         * Initialize SDK with TelemetryConfig object
          * 
          * Example:
          * ```
@@ -173,7 +173,7 @@ class TelemetryManager private constructor(
          */
         fun initialize(application: Application, config: TelemetryConfig): TelemetryManager {
             // Step 1: Validate config (already done in TelemetryConfig.init)
-            Log.i("TelemetryManager", "Starting SDK initialization with Stage 9 config")
+            Log.i("TelemetryManager", "Starting SDK initialization")
             
             return instance ?: synchronized(this) {
                 instance ?: TelemetryManager(
@@ -192,7 +192,7 @@ class TelemetryManager private constructor(
                     config = config,
                 ).also { manager ->
                     instance = manager
-                    manager.performStage9InitSequence()
+                    manager.performInitializationSequence()
                 }
             }
         }
@@ -254,7 +254,7 @@ class TelemetryManager private constructor(
     }
 
     /**
-     * Stage 9: Enforced initialization sequence
+     * Enforced initialization sequence for SDK components
      * 
      * ENFORCED INIT SEQUENCE:
      * 1. Validate config — fail fast
@@ -272,7 +272,7 @@ class TelemetryManager private constructor(
      * 13. if (enableLifecycleTracking)→ register ProcessLifecycleOwner observer
      * 14. if (enableNetworkTracking)  → instantiate TelemetryInterceptor
      */
-    private fun performStage9InitSequence() {
+    private fun performInitializationSequence() {
         try {
             // Step 1: Config already validated in TelemetryConfig.init
             Log.d("TelemetryManager", "Step 1: Config validated")
@@ -363,10 +363,10 @@ class TelemetryManager private constructor(
                 Log.d("TelemetryManager", "Step 14: Network interceptor instantiated")
             }
             
-            Log.i("TelemetryManager", "Stage 9 initialization complete - All modules active")
+            Log.i("TelemetryManager", "SDK initialization complete - All modules active")
             
         } catch (e: Exception) {
-            Log.e("TelemetryManager", "Failed to complete Stage 9 init sequence", e)
+            Log.e("TelemetryManager", "Failed to complete initialization sequence", e)
             throw e
         }
     }
@@ -1623,7 +1623,7 @@ class TelemetryManager private constructor(
     }
 
     // ================================
-    // Stage 9: Pre-Init Queue & Helpers
+    // Pre-Init Queue & Helper Methods
     // ================================
 
     /**
@@ -1691,7 +1691,7 @@ class TelemetryManager private constructor(
     }
 
     /**
-     * Get network interceptor accessor (Stage 9)
+     * Get network interceptor accessor
      */
     fun getInterceptor(): Interceptor {
         if (!config.enableNetworkTracking) {

@@ -6,7 +6,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 
 /**
- * Phase 4: Event Payload Validator
+ * Event Payload Validator
  * Validates event payloads match backend processor requirements
  * Ensures all required attributes are present with correct data types and formats
  */
@@ -297,7 +297,7 @@ object EventPayloadValidator {
      * Validate standard attributes (app, device, user, session)
      */
     fun validateStandardAttributes(attributes: Map<String, Any?>): EventValidationResult {
-        return AttributeValidator.validatePhase2Attributes(attributes).let { result ->
+        return AttributeValidator.validateStandardAttributes(attributes).let { result ->
             when (result) {
                 is ValidationResult.Success -> EventValidationResult.Valid
                 is ValidationResult.Failure -> EventValidationResult.Invalid(

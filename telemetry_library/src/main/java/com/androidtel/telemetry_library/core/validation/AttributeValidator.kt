@@ -3,7 +3,7 @@ package com.androidtel.telemetry_library.core.validation
 import android.util.Log
 
 /**
- * Validator for Phase 2 Standard Attributes
+ * Validator for Standard Attributes
  * Ensures all events have required app, device, user, and session attributes
  */
 object AttributeValidator {
@@ -11,7 +11,7 @@ object AttributeValidator {
     private const val TAG = "AttributeValidator"
     
     /**
-     * Phase 2 Required App Attributes (must be present on ALL events)
+     * Required App Attributes (must be present on ALL events)
      */
     private val REQUIRED_APP_ATTRIBUTES = setOf(
         "app.name",
@@ -21,7 +21,7 @@ object AttributeValidator {
     )
     
     /**
-     * Phase 2 Required Device Attributes (must be present on ALL events)
+     * Required Device Attributes (must be present on ALL events)
      */
     private val REQUIRED_DEVICE_ATTRIBUTES = setOf(
         "device.id",
@@ -38,7 +38,7 @@ object AttributeValidator {
     )
     
     /**
-     * Phase 2 Required User & Session Attributes (must be present on ALL events)
+     * Required User & Session Attributes (must be present on ALL events)
      */
     private val REQUIRED_USER_SESSION_ATTRIBUTES = setOf(
         "user.id",
@@ -47,20 +47,20 @@ object AttributeValidator {
     )
     
     /**
-     * All required Phase 2 attributes combined
+     * All required standard attributes combined
      */
     private val ALL_REQUIRED_ATTRIBUTES = REQUIRED_APP_ATTRIBUTES + 
         REQUIRED_DEVICE_ATTRIBUTES + 
         REQUIRED_USER_SESSION_ATTRIBUTES
     
     /**
-     * Validate that all Phase 2 required attributes are present
+     * Validate that all required standard attributes are present
      * 
      * @param attributes The flattened attributes map from an event
      * @param eventName The name of the event being validated (for logging)
      * @return ValidationResult indicating success or failure with missing attributes
      */
-    fun validatePhase2Attributes(
+    fun validateStandardAttributes(
         attributes: Map<String, Any?>,
         eventName: String? = null
     ): ValidationResult {
@@ -83,7 +83,7 @@ object AttributeValidator {
             ValidationResult.Success
         } else {
             val eventInfo = eventName?.let { " for event '$it'" } ?: ""
-            Log.w(TAG, "Phase 2 validation failed$eventInfo. Missing: $missingAttributes, Empty: $emptyAttributes")
+            Log.w(TAG, "Standard attributes validation failed$eventInfo. Missing: $missingAttributes, Empty: $emptyAttributes")
             ValidationResult.Failure(missingAttributes, emptyAttributes)
         }
     }
@@ -144,10 +144,10 @@ object AttributeValidator {
      */
     fun getValidationReport(result: ValidationResult): String {
         return when (result) {
-            is ValidationResult.Success -> "✓ All Phase 2 required attributes present"
+            is ValidationResult.Success -> "✓ All required standard attributes present"
             is ValidationResult.Failure -> {
                 buildString {
-                    appendLine("✗ Phase 2 validation failed:")
+                    appendLine("✗ Standard attributes validation failed:")
                     if (result.missingAttributes.isNotEmpty()) {
                         appendLine("  Missing attributes: ${result.missingAttributes.joinToString(", ")}")
                     }

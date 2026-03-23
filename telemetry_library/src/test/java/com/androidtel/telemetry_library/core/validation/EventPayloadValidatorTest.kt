@@ -5,7 +5,7 @@ import org.junit.Test
 import java.time.Instant
 
 /**
- * Phase 4: Event Payload Validation Tests
+ * Event Payload Validation Tests
  * Comprehensive test suite for validating event payloads match backend requirements
  */
 class EventPayloadValidatorTest {
