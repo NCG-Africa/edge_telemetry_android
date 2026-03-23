@@ -9,7 +9,13 @@ data class TelemetryConfig(
     val enableScreenTracking: Boolean = true,
     val enableCrashReporting: Boolean = true,
     val enableNetworkTracking: Boolean = true,
-    val enableLifecycleTracking: Boolean = true
+    val enableLifecycleTracking: Boolean = true,
+    val enableMemoryTracking: Boolean = true,
+    val enableStorageTracking: Boolean = true,
+    val enableFrameTracking: Boolean = true,
+    val enableLegacyScreenEvents: Boolean = false,
+    val enableUserInteractionEvents: Boolean = true,
+    val enableCapabilityEvents: Boolean = true
 ) {
     init {
         require(apiKey.isNotBlank()) { "apiKey must not be blank" }

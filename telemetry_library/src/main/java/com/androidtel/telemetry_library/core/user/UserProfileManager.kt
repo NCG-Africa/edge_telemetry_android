@@ -90,6 +90,19 @@ class UserProfileManager(
         }
     }
     
+    /**
+     * Get user attributes as a map for event enrichment
+     */
+    fun getUserAttributes(): Map<String, String> {
+        return lock.read {
+            buildMap {
+                currentProfile.displayName?.let { put("user_display_name", it) }
+                currentProfile.email?.let { put("user_email", it) }
+                currentProfile.phone?.let { put("user_phone", it) }
+            }
+        }
+    }
+    
     
     /**
      * Load user profile from SharedPreferences

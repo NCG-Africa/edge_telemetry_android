@@ -31,6 +31,7 @@ import com.androidtel.telemetry_library.core.session.SessionManager
 import com.androidtel.telemetry_library.core.user.UserProfileManager
 import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
+import okhttp3.Interceptor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
