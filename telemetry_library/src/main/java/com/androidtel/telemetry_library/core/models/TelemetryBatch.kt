@@ -14,10 +14,10 @@ data class TelemetryPayload(
 
 data class TelemetryDataOut(
     val type: String = "batch",
-    val device_id: String,
     val events: List<TelemetryEventOut>,
     val batch_size: Int,
     val timestamp: String,
+    val device_id: String,
     val location: String? = null
 )
 

@@ -142,9 +142,6 @@ class TelemetryHttpClient(
         
         val out = TelemetryDataOut(
             type = "batch",
-            device_id = safeDeviceId,
-            batch_size = this.batchSize,
-            timestamp = this.timestamp,
             events = this.events.map { event ->
                 TelemetryEventOut(
                     type = event.type,
@@ -155,6 +152,9 @@ class TelemetryHttpClient(
                     attributes = flattenAttributes(event.attributes)
                 )
             },
+            batch_size = this.batchSize,
+            timestamp = this.timestamp,
+            device_id = safeDeviceId,
             location = this.location
         )
         

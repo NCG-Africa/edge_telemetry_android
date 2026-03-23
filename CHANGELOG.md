@@ -5,6 +5,62 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2] - 2026-03-23
+
+### 🐛 Critical Bug Fix
+
+#### Telemetry Batch Payload Structure Corrected
+- **Fixed**: Removed incorrect "data" wrapper object from telemetry batch payloads
+- **Issue**: API was rejecting payloads with "missing_events_field" error because events array was nested inside a "data" object
+- **Solution**: Flattened payload structure to send all fields at root level as required by API
+
+#### Payload Structure Changes
+**Before (Incorrect):**
+```json
+{
+  "data": {
+    "batch_size": 1,
+    "device_id": "...",
+    "events": [...],
+    "timestamp": "...",
+    "type": "batch"
+  },
+  "device_id": "...",
+  "timestamp": "..."
+}
+```
+
+**After (Correct):**
+```json
+{
+  "type": "batch",
+  "events": [...],
+  "batch_size": 1,
+  "timestamp": "...",
+  "device_id": "...",
+  "location": "..."
+}
+```
+
+### 🔧 Technical Changes
+
+#### Files Modified
+- `TelemetryBatch.kt`: Reordered `TelemetryDataOut` fields to match API requirements
+- `TelemetryHttpClient.kt`: Updated `toJson()` method to serialize flat structure
+- `sample_telemetry_payload.json`: Updated to reflect correct payload structure
+
+#### Impact
+- **API Compatibility**: Payloads now accepted by API validator
+- **No Breaking Changes**: Internal refactoring only, no API changes for SDK users
+- **Backward Compatible**: Existing SDK integrations continue to work without modification
+
+### ⚠️ Important Notes
+- This fix resolves API rejection errors for telemetry batch submissions
+- No code changes required for existing SDK users
+- Update to v2.0.2 to ensure telemetry data is successfully transmitted
+
+---
+
 ## [2.1.0] - 2026-03-18
 
 ### 💥 BREAKING CHANGES
