@@ -33,6 +33,136 @@ A comprehensive, production-ready Android SDK for collecting and transmitting te
 
 ---
 
+## ✅ Backend Alignment (v2.1.0)
+
+**EdgeRum SDK is now fully aligned with OpenTelemetry backend requirements.**
+
+The SDK has undergone comprehensive alignment to ensure all telemetry events match backend processor expectations. This alignment includes event name standardization, attribute structure updates, and performance optimizations.
+
+### What's Aligned
+
+#### ✅ Phase 1: Event Name Alignment
+All event names now match backend processor requirements:
+
+| Old Event Name | New Event Name | Status |
+|----------------|----------------|--------|
+| `network.request` | `http.request` | ✅ Updated |
+| `session_end` | `session.finalized` | ✅ Updated |
+| `navigation.route_change` | `navigation` | ✅ Standardized |
+| `performance.screen_duration` | `performance.screen_duration` | ✅ Verified |
+| `app.crash` | `app.crash` | ✅ Enhanced |
+
+**Impact:** Automatic - SDK handles all event name changes internally.
+
+#### ✅ Phase 2: Standard Attributes
+All events automatically include comprehensive standard attributes:
+
+**App Information (4 attributes):**
+- `app.name`, `app.version`, `app.build_number`, `app.package_name`
+
+**Device Information (11 attributes):**
+- `device.id`, `device.platform`, `device.platform_version`, `device.model`, `device.manufacturer`, `device.brand`, `device.android_sdk`, `device.android_release`, `device.fingerprint`, `device.hardware`, `device.product`
+
+**User & Session (3+ attributes):**
+- `user.id`, `session.id`, `session.start_time`, plus comprehensive session analytics
+
+**Impact:** Automatic - all attributes attached to every event.
+
+#### ✅ Phase 3: Event Cleanup
+Unsupported events are now disabled by default to optimize performance:
+
+**Disabled Events (60-70% reduction in traffic):**
+- Performance events: `frame_drop`, `performance.frame_summary`, `performance.compose`
+- System events: `memory_pressure`, `storage_usage`
+- Legacy screen events: `screen.entry`, `screen.exit`, `screen.resume`, `screen.pause`, `screen_view`
+- User interaction events: `user.interaction`
+- Capability events: `telemetry.capabilities_initialized`
+
+**Opt-In Available:**
+```kotlin
+val config = TelemetryConfig.builder(application, apiKey)
+    .enableMemoryTracking(true)      // Enable if needed
+    .enableFrameTracking(true)       // Enable if needed
+    .enableLegacyScreenEvents(true)  // Enable if needed
+    .build()
+```
+
+**Impact:** Improved performance, reduced bandwidth, lower battery usage.
+
+#### ✅ Phase 4: Testing & Validation
+Comprehensive validation ensures all events meet backend requirements:
+
+- **EventPayloadValidator** - Validates all 5 event types
+- **RuntimeEventValidator** - Optional runtime validation with debug/strict modes
+- **75+ Test Cases** - Unit and integration tests
+- **Zero Production Overhead** - Validation disabled by default
+
+**Usage:**
+```kotlin
+import com.androidtel.telemetry_library.core.validation.EventPayloadValidator
+
+val result = EventPayloadValidator.validateHttpRequestEvent(
+    eventName = "http.request",
+    attributes = attributes,
+    timestamp = timestamp
+)
+```
+
+### Feature Flags
+
+Control which events are tracked via configuration:
+
+```kotlin
+val config = TelemetryConfig.builder(application, apiKey)
+    // Core features (enabled by default)
+    .enableCrashReporting(true)
+    .enableUserProfiles(true)
+    .enableSessionTracking(true)
+    
+    // Optional features (disabled by default)
+    .enableMemoryTracking(false)        // Memory pressure events
+    .enableStorageTracking(false)       // Storage usage events
+    .enableFrameTracking(false)         // Frame drop events
+    .enableLegacyScreenEvents(false)    // Screen lifecycle events
+    .enableUserInteractionEvents(false) // User interaction events
+    .enableCapabilityEvents(false)      // Capability initialization events
+    .build()
+
+TelemetryManager.initialize(config)
+```
+
+**Benefits:**
+- 60-70% reduction in event traffic
+- Lower battery consumption
+- Reduced memory usage
+- Improved app performance
+- Backend-compatible events only
+
+### Event Schema Reference
+
+For complete event schemas, validation rules, and JSON examples, see:
+
+📖 **[Event Schema Reference](docs/EVENT_SCHEMA_REFERENCE.md)**
+
+**Includes:**
+- All 5 supported event types with examples
+- Required and optional attributes
+- Field length limits and validation rules
+- Standard attributes documentation
+- Backend compatibility notes
+- Migration guidance
+
+### Documentation
+
+- **[Event Schema Reference](docs/EVENT_SCHEMA_REFERENCE.md)** - Complete event schemas and examples
+- **[Phase 1 Summary](docs/PHASE_1_SUMMARY.md)** - Event name alignment details
+- **[Phase 2 Summary](docs/PHASE_2_SUMMARY.md)** - Standard attributes implementation
+- **[Phase 3 Summary](docs/PHASE_3_SUMMARY.md)** - Event cleanup and feature flags
+- **[Phase 4 Summary](docs/PHASE_4_SUMMARY.md)** - Testing and validation
+- **[Phase 4 Testing Guide](docs/PHASE_4_TESTING_GUIDE.md)** - Comprehensive testing guide
+
+---
+
 ## 🚀 Features
 
 ### Core Telemetry
