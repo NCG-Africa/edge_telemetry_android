@@ -73,7 +73,9 @@ class TelemetryActivityLifecycleObserver(
                 value = durationMs.toDouble(),
                 attributes = mapOf(
                     "screen.name" to screenName,
-                    "navigation.exit_method" to "paused",
+                    "screen.duration_ms" to durationMs,
+                    "screen.exit_method" to "paused",
+                    "screen.timestamp" to java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).format(java.util.Date()),
                     "metric.unit" to "milliseconds"
                 )
             )
@@ -92,7 +94,9 @@ class TelemetryActivityLifecycleObserver(
                 value = durationMs.toDouble(),
                 attributes = mapOf(
                     "screen.name" to screenName,
-                    "navigation.exit_method" to "closed",
+                    "screen.duration_ms" to durationMs,
+                    "screen.exit_method" to "closed",
+                    "screen.timestamp" to java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).format(java.util.Date()),
                     "metric.unit" to "milliseconds"
                 )
             )
@@ -112,7 +116,9 @@ class TelemetryActivityLifecycleObserver(
                 value = durationMs.toDouble(),
                 attributes = mapOf(
                     "screen.name" to screenName,
-                    "navigation.exit_method" to "saved state",
+                    "screen.duration_ms" to durationMs,
+                    "screen.exit_method" to "saved_state",
+                    "screen.timestamp" to java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).format(java.util.Date()),
                     "metric.unit" to "milliseconds"
                 )
             )
@@ -134,7 +140,9 @@ class TelemetryActivityLifecycleObserver(
                 value = durationMs.toDouble(),
                 attributes = mapOf(
                     "screen.name" to screenName,
-                    "navigation.exit_method" to "destroyed",
+                    "screen.duration_ms" to durationMs,
+                    "screen.exit_method" to "destroyed",
+                    "screen.timestamp" to java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).format(java.util.Date()),
                     "metric.unit" to "milliseconds"
                 )
             )

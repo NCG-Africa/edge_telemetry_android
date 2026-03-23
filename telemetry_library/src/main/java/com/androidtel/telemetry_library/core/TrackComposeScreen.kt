@@ -40,26 +40,22 @@ fun TrackComposeScreen(
             data = entryData
         )
         
-        // Track navigation event
-        telemetryManager.recordEvent("navigation.route_change", entryData)
+        // Track navigation event with standardized structure
+        telemetryManager.recordEvent(
+            "navigation",
+            mapOf(
+                "navigation.from_screen" to "",
+                "navigation.to_screen" to finalScreenName,
+                "navigation.method" to "push",
+                "navigation.route_type" to "compose_route",
+                "navigation.has_arguments" to (additionalData != null),
+                "navigation.timestamp" to java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).format(java.util.Date())
+            )
+        )
         
-        // Set up lifecycle observer for screen duration tracking
-        val lifecycleObserver = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> {
-                    telemetryManager.recordEvent("navigation.screen_resume", mapOf(
-                        "screen" to finalScreenName,
-                        "route" to route
-                    ))
-                }
-                Lifecycle.Event.ON_PAUSE -> {
-                    telemetryManager.recordEvent("navigation.screen_pause", mapOf(
-                        "screen" to finalScreenName,
-                        "route" to route
-                    ))
-                }
-                else -> { /* No action needed */ }
-            }
+        // Lifecycle observer removed - unsupported events (navigation.screen_resume, navigation.screen_pause)
+        val lifecycleObserver = LifecycleEventObserver { _, _ ->
+            // No lifecycle events tracked - these are not supported by backend
         }
         
         lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
@@ -83,8 +79,17 @@ fun TrackComposeScreen(
                 data = exitData
             )
             
-            // Track screen duration metric
-            telemetryManager.recordEvent("performance.screen_duration", exitData)
+            // Track screen duration metric with proper structure
+            telemetryManager.recordMetric(
+                metricName = "performance.screen_duration",
+                value = duration.toDouble(),
+                attributes = mapOf(
+                    "screen.name" to finalScreenName,
+                    "screen.duration_ms" to duration,
+                    "screen.exit_method" to "navigation",
+                    "screen.timestamp" to java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).format(java.util.Date())
+                )
+            )
             
             lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
         }

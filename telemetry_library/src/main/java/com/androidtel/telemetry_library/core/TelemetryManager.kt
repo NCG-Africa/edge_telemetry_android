@@ -461,11 +461,24 @@ class TelemetryManager private constructor(
             // Build the crash attributes (stringified stacktrace etc.)
             val sw = StringWriter()
             throwable.printStackTrace(PrintWriter(sw))
+            val stackTrace = sw.toString()
+            
+            // Extract breadcrumbs if available
+            val breadcrumbs = breadcrumbManager?.getBreadcrumbsAsJson() ?: "[]"
+            val breadcrumbCount = breadcrumbManager?.getBreadcrumbCount() ?: 0
+            
             val attributes = mapOf(
-                "stacktrace" to sw.toString(),
-                "message" to (throwable.message ?: "No message"),
-                "cause" to (throwable.cause?.javaClass?.simpleName ?: "unknown"),
-                "exception_type" to throwable.javaClass.simpleName
+                "error.message" to "${throwable.javaClass.name}: ${throwable.message ?: ""}".take(1000),
+                "error.stack_trace" to stackTrace.take(2000),
+                "error.exception_type" to throwable.javaClass.simpleName.take(255),
+                "error.context" to extractErrorContext(stackTrace).take(500),
+                "error.cause" to (throwable.cause?.message ?: "unknown").take(255),
+                "error.severity_level" to "critical",
+                "error.is_fatal" to true,
+                "error.breadcrumbs" to breadcrumbs.take(800),
+                "error.breadcrumb_count" to breadcrumbCount,
+                "crash.thread" to thread.name.take(255),
+                "crash.is_main_thread" to (thread == Thread.currentThread())
             )
 
             // Try to create a TelemetryEvent with full EventAttributes (includes app/device/session/user)
@@ -532,9 +545,18 @@ class TelemetryManager private constructor(
         super.onStop(owner)
         val durationMs = System.currentTimeMillis() - sessionStartTime
         val attributes = mapOf(
-            "session_duration_ms" to durationMs
+            "session.id" to sessionId,
+            "session.start_time" to dateFormat.format(Date(sessionStartTime)),
+            "session.duration_ms" to durationMs,
+            "session.event_count" to eventCount,
+            "session.metric_count" to metricCount,
+            "session.screen_count" to visitedScreens.size,
+            "session.visited_screens" to visitedScreens.joinToString(","),
+            "session.is_first_session" to (totalSessions == 1),
+            "session.total_sessions" to totalSessions,
+            "network.type" to getNetworkType(context)
         )
-        recordEvent(eventName = "session_end", attributes = attributes)
+        recordEvent(eventName = "session.finalized", attributes = attributes)
         Log.i(
             "TelemetryManager",
             "App moved to background. Session ID: $sessionId ended after $durationMs ms."
@@ -601,27 +623,40 @@ class TelemetryManager private constructor(
         attributes: Map<String, Any> = emptyMap()
     ) {
         val networkAttributes = mapOf(
-            "url" to url,
-            "method" to method,
-            "status_code" to statusCode,
-            "duration_ms" to durationMs,
-            "request_body_size" to requestBodySize,
-            "response_body_size" to responseBodySize,
-            "error" to (error ?: "none")
+            "http.url" to url,
+            "http.method" to method,
+            "http.status_code" to statusCode,
+            "http.duration_ms" to durationMs,
+            "http.timestamp" to dateFormat.format(Date()),
+            "http.success" to (statusCode < 400),
+            "http.request_body_size" to requestBodySize,
+            "http.response_body_size" to responseBodySize,
+            "http.error" to (error ?: "none")
         )
         val combinedAttributes = attributes + networkAttributes
-        recordEvent(eventName = "network.request", attributes = combinedAttributes)
+        recordEvent(eventName = "http.request", attributes = combinedAttributes)
     }
 
     // --- Crash and Error Reporting ---
     fun recordCrash(throwable: Throwable) {
         val sw = StringWriter()
         throwable.printStackTrace(PrintWriter(sw))
+        val stackTrace = sw.toString()
+        
+        // Extract breadcrumbs if available
+        val breadcrumbs = breadcrumbManager?.getBreadcrumbsAsJson() ?: "[]"
+        val breadcrumbCount = breadcrumbManager?.getBreadcrumbCount() ?: 0
+        
         val attributes = mapOf(
-            "stacktrace" to sw.toString(),
-            "message" to (throwable.message ?: "No message"),
-            "cause" to (throwable.cause?.javaClass?.simpleName ?: "unknown"),
-            "exception_type" to throwable.javaClass.simpleName
+            "error.message" to "${throwable.javaClass.name}: ${throwable.message ?: ""}".take(1000),
+            "error.stack_trace" to stackTrace.take(2000),
+            "error.exception_type" to throwable.javaClass.simpleName.take(255),
+            "error.context" to extractErrorContext(stackTrace).take(500),
+            "error.cause" to (throwable.cause?.message ?: "unknown").take(255),
+            "error.severity_level" to determineSeverityLevel(throwable),
+            "error.is_fatal" to true,
+            "error.breadcrumbs" to breadcrumbs.take(800),
+            "error.breadcrumb_count" to breadcrumbCount
         )
 
         // Build the TelemetryEvent and queue it (normal flow)
@@ -651,14 +686,25 @@ class TelemetryManager private constructor(
     fun recordError(throwable: Throwable, attributes: Map<String, Any> = emptyMap()) {
         val sw = StringWriter()
         throwable.printStackTrace(PrintWriter(sw))
+        val stackTrace = sw.toString()
+        
+        // Extract breadcrumbs if available
+        val breadcrumbs = breadcrumbManager?.getBreadcrumbsAsJson() ?: "[]"
+        val breadcrumbCount = breadcrumbManager?.getBreadcrumbCount() ?: 0
+        
         val errorAttributes = mapOf(
-            "stacktrace" to sw.toString(),
-            "message" to (throwable.message ?: "No message"),
-            "cause" to (throwable.cause?.javaClass?.simpleName ?: "unknown"),
-            "exception_type" to throwable.javaClass.simpleName
+            "error.message" to "${throwable.javaClass.name}: ${throwable.message ?: ""}".take(1000),
+            "error.stack_trace" to stackTrace.take(2000),
+            "error.exception_type" to throwable.javaClass.simpleName.take(255),
+            "error.context" to extractErrorContext(stackTrace).take(500),
+            "error.cause" to (throwable.cause?.message ?: "unknown").take(255),
+            "error.severity_level" to determineSeverityLevel(throwable),
+            "error.is_fatal" to false,
+            "error.breadcrumbs" to breadcrumbs.take(800),
+            "error.breadcrumb_count" to breadcrumbCount
         )
         val combinedAttributes = attributes + errorAttributes
-        recordEvent(eventName = "app.error", attributes = combinedAttributes)
+        recordEvent(eventName = "app.crash", attributes = combinedAttributes)
     }
 
     @Composable
@@ -689,13 +735,14 @@ class TelemetryManager private constructor(
     fun recordComposeScreenView(screenRoute: String) {
         screenTimingTracker.startScreen(screenRoute)
         recordEvent(
-            eventName = "navigation.route_change",
+            eventName = "navigation",
             attributes = mapOf(
-                "navigation.to" to screenRoute,
-                "navigation.method" to "entered",
-                "navigation.type" to "compose_route",
-                "screen.type" to "compose",
-                "navigation.timestamp" to System.currentTimeMillis().toString()
+                "navigation.from_screen" to "",
+                "navigation.to_screen" to screenRoute,
+                "navigation.method" to "push",
+                "navigation.route_type" to "compose_route",
+                "navigation.has_arguments" to false,
+                "navigation.timestamp" to dateFormat.format(Date())
             )
         )
     }
@@ -708,7 +755,9 @@ class TelemetryManager private constructor(
                 value = durationMs.toDouble(),
                 attributes = mapOf(
                     "screen.name" to screenRoute,
-                    "navigation.exit_method" to "disposed",
+                    "screen.duration_ms" to durationMs,
+                    "screen.exit_method" to "disposed",
+                    "screen.timestamp" to dateFormat.format(Date()),
                     "metric.unit" to "milliseconds"
                 )
             )
@@ -734,16 +783,24 @@ class TelemetryManager private constructor(
     // Builds the full set of attributes for an event by combining core attributes and event-specific ones.
     private fun buildAttributes(eventAttributes: Map<String, Any>): EventAttributes? {
         val sessionInfo = getSessionInfo()
+        
+        // Get user data from UserProfileManager if available, otherwise use legacy fields
+        val userAttrs = if (userProfilesEnabled && userProfileManager != null) {
+            userProfileManager!!.getUserAttributes()
+        } else {
+            emptyMap()
+        }
+        
         return appInfo?.let {
             EventAttributes(
                 app = it,
                 device = deviceInfo,
                 user = UserInfo(
-                    userId = userId, // Now guaranteed to be non-null after initialization
-                    name = userName,
-                    email = userEmail,
-                    phone = userPhone,
-                    profileVersion = userProfileVersion
+                    userId = userAttrs["user.id"] ?: userId,
+                    name = userAttrs["user.name"] ?: userName,
+                    email = userAttrs["user.email"] ?: userEmail,
+                    phone = userAttrs["user.phone"] ?: userPhone,
+                    profileVersion = userAttrs["user.profile_version"]?.toIntOrNull() ?: userProfileVersion
                 ),
                 session = sessionInfo,
                 customAttributes = eventAttributes
@@ -1318,4 +1375,44 @@ class TelemetryManager private constructor(
      * Get crash reporter (for internal use)
      */
     internal fun getCrashReporter(): CrashReporter? = crashReporter
+    
+    /**
+     * Extract error context from stack trace (ClassName.methodName from top frame)
+     */
+    private fun extractErrorContext(stackTrace: String): String {
+        return try {
+            val lines = stackTrace.lines()
+            val firstFrame = lines.firstOrNull { it.trim().startsWith("at ") } ?: return "unknown"
+            
+            // Extract "at com.example.ClassName.methodName(File.kt:123)"
+            val atIndex = firstFrame.indexOf("at ")
+            if (atIndex == -1) return "unknown"
+            
+            val methodPart = firstFrame.substring(atIndex + 3).trim()
+            val parenIndex = methodPart.indexOf("(")
+            val fullMethod = if (parenIndex > 0) methodPart.substring(0, parenIndex) else methodPart
+            
+            // Get last two parts (ClassName.methodName)
+            val parts = fullMethod.split(".")
+            if (parts.size >= 2) {
+                "${parts[parts.size - 2]}.${parts[parts.size - 1]}"
+            } else {
+                fullMethod
+            }
+        } catch (e: Exception) {
+            "unknown"
+        }
+    }
+    
+    /**
+     * Determine severity level based on exception type
+     */
+    private fun determineSeverityLevel(throwable: Throwable): String {
+        return when {
+            throwable is OutOfMemoryError || throwable is StackOverflowError -> "critical"
+            throwable is IllegalStateException || throwable is NullPointerException -> "error"
+            throwable is IllegalArgumentException -> "warning"
+            else -> "error"
+        }
+    }
 }

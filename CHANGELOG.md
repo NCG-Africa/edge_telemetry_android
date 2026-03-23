@@ -5,6 +5,234 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-03-23
+
+### 💥 BREAKING CHANGES - Phase 1: Event Name Alignment
+
+#### Backend Alignment Initiative
+- **🔴 CRITICAL**: All event names and attributes updated to match backend processor requirements
+- **Event Structure Changes**: Event names, attribute names, and data structures aligned with backend expectations
+- **Backend Compatibility**: Changes required for proper event processing and analytics
+- **Migration Impact**: Automatic for SDK users - no code changes required
+
+### ✨ Event Name Changes
+
+#### 1. HTTP Request Events
+**Event Name:** `network.request` → `http.request`
+
+**New Required Attributes:**
+- `http.url` - Full request URL
+- `http.method` - HTTP method (GET, POST, PUT, DELETE, etc.)
+- `http.status_code` - Response status code
+- `http.duration_ms` - Request duration in milliseconds
+- `http.timestamp` - Request timestamp (ISO 8601 format)
+- `http.success` - Boolean (status < 400)
+- `http.request_body_size` - Request body size in bytes
+- `http.response_body_size` - Response body size in bytes
+- `http.error` - Error message if request failed
+
+**Impact:** None - `TelemetryInterceptor` handles automatically
+
+#### 2. Session End Events
+**Event Name:** `session_end` → `session.finalized`
+
+**New Required Attributes:**
+- `session.id` - Unique session identifier
+- `session.start_time` - Session start timestamp (ISO 8601)
+- `session.duration_ms` - Total session duration
+- `session.event_count` - Total events in session
+- `session.metric_count` - Total metrics in session
+- `session.screen_count` - Number of unique screens visited
+- `session.visited_screens` - Comma-separated list of screen names
+- `session.is_first_session` - Boolean for first-time user
+- `session.total_sessions` - Total sessions for this user
+- `network.type` - Network type (wifi, cellular, etc.)
+
+**Impact:** None - SDK handles automatically on app background
+
+#### 3. Navigation Events
+**Event Name Standardized:** `navigation.route_change` → `navigation`
+
+**Updated Required Attributes:**
+- `navigation.from_screen` - Source screen name (empty for app launch)
+- `navigation.to_screen` - Destination screen name
+- `navigation.method` - Navigation method (push, pop, replace)
+- `navigation.route_type` - Route type (compose_route, main_flow, deeplink, fragment_flow)
+- `navigation.has_arguments` - Boolean indicating if route has arguments
+- `navigation.timestamp` - Navigation timestamp (ISO 8601)
+
+**Impact:** Automatic via lifecycle observers and Compose tracking
+
+#### 4. Screen Duration Events
+**Event Name:** `performance.screen_duration` (unchanged)
+
+**Enhanced Required Attributes:**
+- `screen.name` - Screen/route name
+- `screen.duration_ms` - Time spent on screen
+- `screen.exit_method` - How user left screen (navigation, paused, closed, destroyed, saved_state)
+- `screen.timestamp` - Screen exit timestamp (ISO 8601)
+- `metric.unit` - Unit of measurement (milliseconds)
+
+**Impact:** None - SDK handles automatically
+
+#### 5. Crash Events
+**Event Name:** `app.crash` (unchanged)
+
+**Enhanced Attributes with Field Limits:**
+- `error.message` - Error message (max 1000 chars)
+- `error.stack_trace` - Full stack trace (max 2000 chars)
+- `error.exception_type` - Exception class name (max 255 chars)
+- `error.context` - Error context/description (max 500 chars)
+- `error.cause` - Root cause description (max 255 chars)
+- `error.severity_level` - Severity (critical, error, warning, info)
+- `error.is_fatal` - Boolean indicating if crash is fatal
+- `error.breadcrumbs` - JSON array of breadcrumbs (max 800 chars)
+- `error.breadcrumb_count` - Number of breadcrumbs
+
+**Optional Enhanced Attributes:**
+- `error.code` - Error code if available (max 100 chars)
+- `error.product_id` - Product/module identifier (max 255 chars)
+- `error.user_action` - What user was doing (max 500 chars)
+
+**Impact:** None - SDK handles automatically with enhanced context
+
+### 🗑️ Removed Events (Not Processed by Backend)
+
+The following events are **no longer tracked** as they are not supported by the backend processor:
+
+**Lifecycle Events:**
+- ❌ `navigation.screen_resume`
+- ❌ `navigation.screen_pause`
+- ❌ `screen.entry`
+- ❌ `screen.exit`
+- ❌ `screen.resume`
+- ❌ `screen.pause`
+
+**Performance Events:**
+- ❌ `frame_drop`
+- ❌ `performance.frame_summary`
+- ❌ `performance.compose`
+
+**System Events:**
+- ❌ `memory_pressure`
+- ❌ `storage_usage`
+- ❌ `telemetry.capabilities_initialized`
+
+**Legacy Events:**
+- ❌ `screen_view` (use `navigation` instead)
+- ❌ `app.error` (use `app.crash` instead)
+- ❌ `user.interaction`
+
+### 🔧 Technical Improvements
+
+#### Automatic Field Length Enforcement
+- All crash attributes automatically truncated to backend limits
+- Prevents field truncation errors in backend processor
+- No data loss - most important info preserved within limits
+
+#### Enhanced Error Context Extraction
+- Automatic extraction of error context from stack traces
+- Severity level determination based on exception type
+- Breadcrumb integration for richer debugging context
+
+#### ISO 8601 Timestamp Standardization
+- All timestamps now use ISO 8601 format
+- Consistent timestamp format across all events
+- Backend-compatible datetime parsing
+
+### 📝 Migration Guide
+
+#### For SDK Users (App Developers)
+
+**Good News:** No code changes required! Just update the SDK version.
+
+```kotlin
+dependencies {
+    // Update to v2.1.0
+    implementation 'com.github.NCG-Africa:edge_telemetry_android:2.1.0'
+}
+```
+
+**Automatic Migration:**
+- ✅ HTTP tracking via `TelemetryInterceptor` - automatic
+- ✅ Session tracking - automatic
+- ✅ Navigation tracking - automatic
+- ✅ Screen duration tracking - automatic
+- ✅ Crash reporting - automatic
+
+**Manual Event Tracking (if used):**
+```kotlin
+// OLD - Don't use
+telemetryManager.recordEvent("navigation.route_change", attributes)
+telemetryManager.recordEvent("session_end", attributes)
+telemetryManager.recordEvent("network.request", attributes)
+telemetryManager.recordEvent("app.error", attributes)
+
+// NEW - Use instead
+telemetryManager.recordEvent("navigation", attributes)
+telemetryManager.recordEvent("session.finalized", attributes)
+telemetryManager.recordEvent("http.request", attributes)
+telemetryManager.recordCrash(throwable)
+```
+
+#### For Backend Teams
+
+**Required Updates:**
+1. Update Kafka processor to handle new event names
+2. Update database schema for new attribute structures
+3. Verify field mappings match new attribute names
+4. Test event processing in staging environment
+
+**Event Name Mapping:**
+- `network.request` → `http.request`
+- `session_end` → `session.finalized`
+- `navigation.route_change` → `navigation`
+- `app.error` → `app.crash`
+
+### ⚠️ Important Notes
+
+#### Backend Compatibility
+- Backend processor must support new event names and attribute structures
+- Old event names will not be processed correctly
+- Coordinate deployment with backend team
+
+#### Performance Impact
+- **No additional overhead** - maintains or improves performance
+- Event batching unchanged
+- Offline storage unchanged
+- Network efficiency improved with better attribute structure
+- Field length limits prevent excessive payload sizes
+- Removed unsupported events reduce unnecessary processing
+
+#### Testing Recommendations
+1. Enable debug mode to verify new event structures
+2. Test HTTP request tracking
+3. Test session finalization on app background
+4. Test navigation between screens
+5. Test crash reporting functionality
+
+### 📊 Files Modified
+
+#### Core Implementation
+- `TelemetryManager.kt` - Updated event names and attribute structures
+- `TelemetryInterceptor.kt` - HTTP request attribute alignment
+- `TelemetryActivityLifecycleObserver.kt` - Screen duration attributes
+- `TelemetryFragmentLifecycleObserver.kt` - Fragment screen duration
+- `TrackComposeScreen.kt` - Compose navigation standardization
+- `CrashReporter.kt` - Enhanced crash attributes (via existing v2.0.0 structure)
+
+#### Documentation
+- `docs/PHASE_1_MIGRATION.md` - Comprehensive migration guide
+- `CHANGELOG.md` - This changelog entry
+
+### 🔗 Related Documentation
+
+- [Phase 1 Migration Guide](docs/PHASE_1_MIGRATION.md) - Detailed migration instructions
+- [Integration Summary](docs/INTEGRATION_SUMMARY.md) - Integration details
+- [API Key Guide](docs/API_KEY_GUIDE.md) - Setup instructions
+
+---
+
 ## [2.0.3] - 2026-03-23
 
 ### 🐛 Critical Bug Fix
