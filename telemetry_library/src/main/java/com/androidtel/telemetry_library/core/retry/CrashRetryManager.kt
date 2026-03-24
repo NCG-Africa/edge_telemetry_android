@@ -178,7 +178,7 @@ class CrashRetryManager(
             storageFailureCount.set(0) // reset on success
         } catch (e: Exception) {
             storageFailureCount.incrementAndGet()
-            Log.e(TAG, "❌ Failed to store crash offline (failures: ${storageFailureCount.get()})", e)
+            Log.e(TAG, "❌ Failed to store crash offline (failures: ${storageFailureCount.get()}): ${e.message}")
         } finally {
             isStoringCrash.set(false)
         }

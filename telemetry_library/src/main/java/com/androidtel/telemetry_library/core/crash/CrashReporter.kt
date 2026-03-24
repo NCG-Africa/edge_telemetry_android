@@ -40,6 +40,7 @@ class CrashReporter(
     private val retryManager = CrashRetryManager(context, apiKey, telemetryEndpoint, debugMode)
     private val deviceInfoCollector = DeviceInfoCollector(context, idGenerator)
     private var originalHandler: Thread.UncaughtExceptionHandler? = null
+    private val handlerInstalled = java.util.concurrent.atomic.AtomicBoolean(false)
     
     // Product context and user action tracking
     private var currentProductId: String? = null
@@ -56,6 +57,10 @@ class CrashReporter(
      * Install global exception handler for automatic crash detection
      */
     fun installGlobalExceptionHandler() {
+        if (handlerInstalled.getAndSet(true)) {
+            Log.d(TAG, "Global exception handler already installed — skipping")
+            return
+        }
         originalHandler = Thread.getDefaultUncaughtExceptionHandler()
         
         Thread.setDefaultUncaughtExceptionHandler { thread, exception ->

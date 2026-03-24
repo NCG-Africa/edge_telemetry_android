@@ -67,7 +67,7 @@ internal class CrashReportingService(
                 enabled = true,
                 debugMode = false
             )
-            crashReporter?.installGlobalExceptionHandler()
+            // Note: installGlobalExceptionHandler() is already called in CrashReporter.init when enabled=true
             crashHandlerInstalled = true
             Log.d(TAG, "Crash handler installed")
         }
