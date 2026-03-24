@@ -22,8 +22,12 @@ internal class UserProfileService(
     private val config: TelemetryConfig,
     private val idGenerator: IdGenerator
 ) {
+    companion object {
+        private const val TAG = "UserProfileService"
+    }
+    
     private lateinit var userId: String
-    private var userProfileManager: UserProfileManager? = null
+    private lateinit var userProfileManager: UserProfileManager
     
     private var pendingDisplayName: String? = null
     private var pendingEmail: String? = null
@@ -33,14 +37,12 @@ internal class UserProfileService(
     fun initialize() {
         userId = idGenerator.getUserId()
         
-        if (config.enableUserProfiles) {
-            userProfileManager = UserProfileManager(context, idGenerator)
-            
-            if (hasPendingProfile) {
-                userProfileManager!!.setUserProfile(pendingDisplayName, pendingEmail, pendingPhone)
-                clearPendingProfile()
-                Log.d(TAG, "Applied pending user profile")
-            }
+        userProfileManager = UserProfileManager(context, idGenerator)
+        
+        if (hasPendingProfile) {
+            userProfileManager.setUserProfile(pendingDisplayName, pendingEmail, pendingPhone)
+            clearPendingProfile()
+            Log.d(TAG, "Applied pending user profile")
         }
         
         Log.d(TAG, "UserProfileService initialized - User ID: $userId")
@@ -50,14 +52,16 @@ internal class UserProfileService(
      * Set user profile information
      */
     fun setUserProfile(displayName: String?, email: String?, phone: String? = null) {
-        if (userProfileManager != null) {
-            userProfileManager!!.setUserProfile(displayName, email, phone)
+        Log.d(TAG, "setUserProfile() called - displayName: $displayName, email: $email, phone: $phone")
+        if (::userProfileManager.isInitialized) {
+            userProfileManager.setUserProfile(displayName, email, phone)
+            Log.d(TAG, "User profile set successfully via userProfileManager")
         } else {
             pendingDisplayName = displayName
             pendingEmail = email
             pendingPhone = phone
             hasPendingProfile = true
-            Log.i(TAG, "User profile stored for application after initialization")
+            Log.i(TAG, "User profile stored as pending (will be applied after initialization)")
         }
     }
     
@@ -65,10 +69,11 @@ internal class UserProfileService(
      * Clear user profile
      */
     fun clearUserProfile() {
-        if (config.enableUserProfiles && userProfileManager != null) {
-            userProfileManager!!.clearUserProfile()
+        if (::userProfileManager.isInitialized) {
+            userProfileManager.clearUserProfile()
+            Log.d(TAG, "User profile cleared")
         } else {
-            Log.w(TAG, "User profiles not enabled")
+            Log.w(TAG, "UserProfileManager not initialized yet")
         }
     }
     
@@ -76,14 +81,14 @@ internal class UserProfileService(
      * Get user ID
      */
     fun getUserId(): String {
-        return if (config.enableUserProfiles && userProfileManager != null) {
-            userProfileManager!!.getUserId()
+        return if (::userProfileManager.isInitialized) {
+            userProfileManager.getUserId()
         } else {
-            if (userId.isBlank()) {
-                Log.w(TAG, "User ID is blank, generating fallback")
-                "user_fallback_${System.currentTimeMillis()}"
-            } else {
+            if (::userId.isInitialized && userId.isNotBlank()) {
                 userId
+            } else {
+                Log.w(TAG, "User ID not initialized, generating fallback")
+                "user_fallback_${System.currentTimeMillis()}"
             }
         }
     }
@@ -92,29 +97,28 @@ internal class UserProfileService(
      * Get user info for event attributes
      */
     fun getUserInfo(): UserInfo {
-        val userProfile = if (config.enableUserProfiles && userProfileManager != null) {
-            userProfileManager!!.getUserProfile()
+        val userProfile = if (::userProfileManager.isInitialized) {
+            userProfileManager.getUserProfile()
         } else {
             null
         }
         
-        return UserInfo(
+        val userInfo = UserInfo(
             userId = getUserId(),
             name = userProfile?.displayName,
             email = userProfile?.email,
             phone = userProfile?.phone
         )
+        
+        Log.d(TAG, "getUserInfo() - userId: ${userInfo.userId}, name: ${userInfo.name}, email: ${userInfo.email}, phone: ${userInfo.phone}")
+        
+        return userInfo
     }
-    
-    /**
-     * Check if user profiles are enabled
-     */
-    fun isUserProfilesEnabled(): Boolean = config.enableUserProfiles
     
     /**
      * Get user profile manager (for internal use)
      */
-    fun getUserProfileManager(): UserProfileManager? = userProfileManager
+    fun getUserProfileManager(): UserProfileManager? = if (::userProfileManager.isInitialized) userProfileManager else null
     
     /**
      * Clear pending profile data
@@ -124,9 +128,5 @@ internal class UserProfileService(
         pendingEmail = null
         pendingPhone = null
         hasPendingProfile = false
-    }
-    
-    companion object {
-        private const val TAG = "UserProfileService"
     }
 }

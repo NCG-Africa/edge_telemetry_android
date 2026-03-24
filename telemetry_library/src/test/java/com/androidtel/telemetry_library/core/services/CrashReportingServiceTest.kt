@@ -38,7 +38,7 @@ class CrashReportingServiceTest {
     private lateinit var offlineStorage: OfflineBatchStorage
     private lateinit var testScope: TestScope
     private lateinit var service: CrashReportingService
-    private val testApiKey = "test-api-key"
+    private val testApiKey = "edge_test-api-key"
     private val testEndpoint = "https://test.example.com"
 
     @Before
@@ -46,9 +46,8 @@ class CrashReportingServiceTest {
         context = RuntimeEnvironment.getApplication()
         config = TelemetryConfig(
             apiKey = testApiKey,
-            telemetryEndpoint = testEndpoint,
+            endpoint = testEndpoint,
             enableCrashReporting = true,
-            enableUserProfiles = true,
             enableSessionTracking = true,
             enableLocationTracking = false,
             batchSize = 50,

@@ -29,10 +29,9 @@ class UserProfileServiceTest {
     fun setup() {
         context = RuntimeEnvironment.getApplication()
         config = TelemetryConfig(
-            apiKey = "test-api-key",
-            telemetryEndpoint = "https://test.example.com",
+            apiKey = "edge_test-api-key",
+            endpoint = "https://test.example.com",
             enableCrashReporting = true,
-            enableUserProfiles = true,
             enableSessionTracking = true,
             enableLocationTracking = false,
             batchSize = 50,
@@ -62,12 +61,10 @@ class UserProfileServiceTest {
     }
 
     @Test
-    fun `test initialization with user profiles disabled does not create manager`() {
-        val disabledConfig = config.copy(enableUserProfiles = false)
-        val disabledService = UserProfileService(context, disabledConfig, idGenerator)
-        disabledService.initialize()
+    fun `test initialization always creates manager`() {
+        service.initialize()
         
-        assertNull(disabledService.getUserProfileManager())
+        assertNotNull(service.getUserProfileManager())
     }
 
     @Test
@@ -148,13 +145,9 @@ class UserProfileServiceTest {
     }
 
     @Test
-    fun `test clearUserProfile when profiles disabled logs warning`() {
-        val disabledConfig = config.copy(enableUserProfiles = false)
-        val disabledService = UserProfileService(context, disabledConfig, idGenerator)
-        disabledService.initialize()
-        
+    fun `test clearUserProfile before initialization logs warning`() {
         // Should not throw exception
-        disabledService.clearUserProfile()
+        service.clearUserProfile()
     }
 
     @Test
@@ -177,12 +170,10 @@ class UserProfileServiceTest {
     }
 
     @Test
-    fun `test getUserId with user profiles disabled`() {
-        val disabledConfig = config.copy(enableUserProfiles = false)
-        val disabledService = UserProfileService(context, disabledConfig, idGenerator)
-        disabledService.initialize()
+    fun `test getUserId always returns valid ID`() {
+        service.initialize()
         
-        val userId = disabledService.getUserId()
+        val userId = service.getUserId()
         
         assertEquals("test-user-id-123", userId)
     }
@@ -213,12 +204,10 @@ class UserProfileServiceTest {
     }
 
     @Test
-    fun `test getUserInfo when profiles disabled`() {
-        val disabledConfig = config.copy(enableUserProfiles = false)
-        val disabledService = UserProfileService(context, disabledConfig, idGenerator)
-        disabledService.initialize()
+    fun `test getUserInfo with no profile returns only user ID`() {
+        service.initialize()
         
-        val userInfo = disabledService.getUserInfo()
+        val userInfo = service.getUserInfo()
         
         assertEquals("test-user-id-123", userInfo.userId)
         assertNull(userInfo.name)
@@ -226,16 +215,6 @@ class UserProfileServiceTest {
         assertNull(userInfo.phone)
     }
 
-    @Test
-    fun `test isUserProfilesEnabled returns correct value`() {
-        service.initialize()
-        assertTrue(service.isUserProfilesEnabled())
-        
-        val disabledConfig = config.copy(enableUserProfiles = false)
-        val disabledService = UserProfileService(context, disabledConfig, idGenerator)
-        disabledService.initialize()
-        assertFalse(disabledService.isUserProfilesEnabled())
-    }
 
     @Test
     fun `test getUserProfileManager returns manager when enabled`() {
@@ -245,12 +224,8 @@ class UserProfileServiceTest {
     }
 
     @Test
-    fun `test getUserProfileManager returns null when disabled`() {
-        val disabledConfig = config.copy(enableUserProfiles = false)
-        val disabledService = UserProfileService(context, disabledConfig, idGenerator)
-        disabledService.initialize()
-        
-        assertNull(disabledService.getUserProfileManager())
+    fun `test getUserProfileManager returns null before initialization`() {
+        assertNull(service.getUserProfileManager())
     }
 
     @Test

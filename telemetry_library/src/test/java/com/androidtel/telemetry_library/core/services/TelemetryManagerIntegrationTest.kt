@@ -35,10 +35,9 @@ class TelemetryManagerIntegrationTest {
         context = application.applicationContext
         
         config = TelemetryConfig(
-            apiKey = "test-api-key-integration",
-            telemetryEndpoint = "https://test-integration.example.com",
+            apiKey = "edge_test-api-key-integration",
+            endpoint = "https://test-integration.example.com",
             enableCrashReporting = true,
-            enableUserProfiles = true,
             enableSessionTracking = true,
             enableLocationTracking = false,
             batchSize = 10,
@@ -564,10 +563,9 @@ class TelemetryManagerIntegrationTest {
     @Test
     fun `test configuration with all features disabled`() {
         val disabledConfig = TelemetryConfig(
-            apiKey = "test-api-key",
-            telemetryEndpoint = "https://test.example.com",
+            apiKey = "edge_test-api-key",
+            endpoint = "https://test.example.com",
             enableCrashReporting = false,
-            enableUserProfiles = false,
             enableSessionTracking = false,
             enableLocationTracking = false,
             batchSize = 50,

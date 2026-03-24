@@ -16,7 +16,6 @@ data class TelemetryConfig(
     val enableLegacyScreenEvents: Boolean = false,
     val enableUserInteractionEvents: Boolean = true,
     val enableCapabilityEvents: Boolean = true,
-    val enableUserProfiles: Boolean = true,
     val enableSessionTracking: Boolean = true,
     val enableLocationTracking: Boolean = false
 ) {

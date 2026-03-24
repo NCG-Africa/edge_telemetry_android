@@ -31,10 +31,9 @@ class SessionServiceTest {
     fun setup() {
         context = RuntimeEnvironment.getApplication()
         config = TelemetryConfig(
-            apiKey = "test-api-key",
-            telemetryEndpoint = "https://test.example.com",
+            apiKey = "edge_test-api-key",
+            endpoint = "https://test.example.com",
             enableCrashReporting = true,
-            enableUserProfiles = true,
             enableSessionTracking = true,
             enableLocationTracking = false,
             batchSize = 50,
