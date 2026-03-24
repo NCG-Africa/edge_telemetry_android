@@ -57,6 +57,7 @@ class CrashRetryManager(
     
     private val baseRetryDelay = Duration.ofMinutes(1)
     private val offlineStorageFile = File(context.cacheDir, OFFLINE_STORAGE_FILE)
+    private val fileLock = Any()
     
     /**
      * Send crash data with retry mechanism
@@ -144,16 +145,18 @@ class CrashRetryManager(
      * Store crash data offline for later retry
      */
     private fun storeCrashOffline(crashData: Map<String, Any>) {
-        try {
-            val existingCrashes = loadOfflineCrashes().toMutableList()
-            existingCrashes.add(crashData)
-            
-            val json = gson.toJson(existingCrashes)
-            offlineStorageFile.writeText(json)
-            
-            Log.d(TAG, "💾 Crash stored offline (total: ${existingCrashes.size})")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to store crash offline", e)
+        synchronized(fileLock) {
+            try {
+                val existingCrashes = loadOfflineCrashes().toMutableList()
+                existingCrashes.add(crashData)
+                
+                val json = gson.toJson(existingCrashes)
+                offlineStorageFile.writeText(json)
+                
+                Log.d(TAG, "💾 Crash stored offline (total: ${existingCrashes.size})")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to store crash offline", e)
+            }
         }
     }
     
@@ -161,17 +164,31 @@ class CrashRetryManager(
      * Load offline crashes
      */
     private fun loadOfflineCrashes(): List<Map<String, Any>> {
-        return try {
-            if (offlineStorageFile.exists()) {
+        synchronized(fileLock) {
+            return try {
+                if (!offlineStorageFile.exists() || offlineStorageFile.length() == 0L) {
+                    return emptyList()
+                }
+                
                 val json = offlineStorageFile.readText()
+                if (json.isBlank()) {
+                    return emptyList()
+                }
+                
                 val type = object : com.google.gson.reflect.TypeToken<Array<Map<String, Any>>>() {}.type
-                gson.fromJson<Array<Map<String, Any>>>(json, type).toList()
-            } else {
+                val result = gson.fromJson<Array<Map<String, Any>>>(json, type)
+                result?.toList() ?: emptyList()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load offline crashes", e)
+                // Delete corrupted file
+                try {
+                    offlineStorageFile.delete()
+                    Log.w(TAG, "Deleted corrupted offline storage file")
+                } catch (deleteError: Exception) {
+                    Log.e(TAG, "Failed to delete corrupted file", deleteError)
+                }
                 emptyList()
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to load offline crashes", e)
-            emptyList()
         }
     }
     
@@ -271,15 +288,17 @@ class CrashRetryManager(
         
         // Remove successful crashes from offline storage
         if (successfulCrashes.isNotEmpty()) {
-            val remainingCrashes = offlineCrashes - successfulCrashes.toSet()
-            
-            if (remainingCrashes.isEmpty()) {
-                offlineStorageFile.delete()
-                Log.i(TAG, "🧹 All offline crashes sent successfully")
-            } else {
-                val json = gson.toJson(remainingCrashes)
-                offlineStorageFile.writeText(json)
-                Log.i(TAG, "📊 ${successfulCrashes.size} crashes sent, ${remainingCrashes.size} remaining")
+            synchronized(fileLock) {
+                val remainingCrashes = offlineCrashes - successfulCrashes.toSet()
+                
+                if (remainingCrashes.isEmpty()) {
+                    offlineStorageFile.delete()
+                    Log.i(TAG, "🧹 All offline crashes sent successfully")
+                } else {
+                    val json = gson.toJson(remainingCrashes)
+                    offlineStorageFile.writeText(json)
+                    Log.i(TAG, "📊 ${successfulCrashes.size} crashes sent, ${remainingCrashes.size} remaining")
+                }
             }
         }
     }
