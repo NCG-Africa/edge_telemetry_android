@@ -15,7 +15,7 @@ import org.junit.Test
  * Verifies:
  * - Profile starts empty at init
  * - setUserProfile() contract works correctly
- * - displayName and email are optional enrichment
+ * - name and email are optional enrichment
  */
 class UserProfileManagerTest {
 
@@ -53,7 +53,7 @@ class UserProfileManagerTest {
 
         // Then: Profile should be empty
         val profile = userProfileManager.getUserProfile()
-        assertNull("displayName should be null", profile.displayName)
+        assertNull("name should be null", profile.name)
         assertNull("email should be null", profile.email)
         assertNull("phone should be null", profile.phone)
     }
@@ -70,7 +70,7 @@ class UserProfileManagerTest {
 
         // Then: Profile should contain persisted data
         val profile = userProfileManager.getUserProfile()
-        assertEquals("Alice", profile.displayName)
+        assertEquals("Alice", profile.name)
         assertEquals("alice@test.com", profile.email)
         assertEquals("+1234567890", profile.phone)
     }
@@ -86,7 +86,7 @@ class UserProfileManagerTest {
 
         // Then: Profile should be updated
         val profile = userProfileManager.getUserProfile()
-        assertEquals("Bob", profile.displayName)
+        assertEquals("Bob", profile.name)
         assertEquals("bob@test.com", profile.email)
         assertEquals("+9876543210", profile.phone)
 
@@ -109,7 +109,7 @@ class UserProfileManagerTest {
 
         // Then: Profile should be cleared
         val profile = userProfileManager.getUserProfile()
-        assertNull(profile.displayName)
+        assertNull(profile.name)
         assertNull(profile.email)
         assertNull(profile.phone)
 
@@ -131,7 +131,7 @@ class UserProfileManagerTest {
 
         // Then: Only new values should be present (no merge)
         val profile = userProfileManager.getUserProfile()
-        assertEquals("Eve", profile.displayName)
+        assertEquals("Eve", profile.name)
         assertNull("email should be null, not merged from previous", profile.email)
         assertNull("phone should be null, not merged from previous", profile.phone)
     }
@@ -148,7 +148,7 @@ class UserProfileManagerTest {
 
         // Then: All fields should be null
         val profile = userProfileManager.getUserProfile()
-        assertNull(profile.displayName)
+        assertNull(profile.name)
         assertNull(profile.email)
         assertNull(profile.phone)
     }
@@ -178,7 +178,7 @@ class UserProfileManagerTest {
 
         // Then: Only phone should be set
         val profile = userProfileManager.getUserProfile()
-        assertNull(profile.displayName)
+        assertNull(profile.name)
         assertNull(profile.email)
         assertEquals("+5555555555", profile.phone)
 
@@ -198,7 +198,7 @@ class UserProfileManagerTest {
 
         // Then: Only phone should be loaded
         val profile = userProfileManager.getUserProfile()
-        assertNull(profile.displayName)
+        assertNull(profile.name)
         assertNull(profile.email)
         assertEquals("+9999999999", profile.phone)
     }

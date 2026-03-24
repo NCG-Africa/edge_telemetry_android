@@ -270,7 +270,7 @@ TelemetryManager.getInstance().recordEvent(
 **Before (v2.0.x):**
 ```kotlin
 TelemetryManager.getInstance().setUserProfile(
-    displayName = "John Doe",
+    name = "John Doe",
     email = "john@example.com",
     phone = "+1234567890"
 )
@@ -280,7 +280,7 @@ TelemetryManager.getInstance().setUserProfile(
 ```kotlin
 // Exact same code works!
 TelemetryManager.getInstance().setUserProfile(
-    displayName = "John Doe",
+    name = "John Doe",
     email = "john@example.com",
     phone = "+1234567890"
 )

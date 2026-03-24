@@ -68,7 +68,7 @@ class MyApplication : Application() {
         
         // Set initial user profile (if user is logged in)
         TelemetryManager.getInstance().setUserProfile(
-            displayName = "Demo User",
+            name = "Demo User",
             email = "demo@example.com",
             phone = "+1234567890"
         )
@@ -257,7 +257,7 @@ fun ProfileScreen(navController: NavController) {
                 )
                 
                 TelemetryManager.getInstance().setUserProfile(
-                    displayName = userName.takeIf { it.isNotEmpty() },
+                    name = userName.takeIf { it.isNotEmpty() },
                     email = userEmail.takeIf { it.isNotEmpty() },
                     phone = null
                 )

@@ -32,7 +32,7 @@ Successfully implemented Stage 2 remediation for the EdgeRUM SDK, focusing on us
 **File:** `telemetry_library/src/main/java/com/androidtel/telemetry_library/core/user/UserProfileManager.kt`
 
 **Changes:**
-- Added `UserProfile` data class with `displayName` and `email` fields (both nullable)
+- Added `UserProfile` data class with `name` and `email` fields (both nullable)
 - Removed all legacy profile fields (`name`, `email`, `phone`, `customAttributes`, `profileVersion`)
 - Updated SharedPreferences keys to `"display_name"` and `"email"`
 - Profile initializes empty (`UserProfile()`) - all fields null
@@ -43,11 +43,11 @@ Successfully implemented Stage 2 remediation for the EdgeRUM SDK, focusing on us
 **New API:**
 ```kotlin
 data class UserProfile(
-    val displayName: String? = null,
+    val name: String? = null,
     val email: String? = null
 )
 
-fun setUserProfile(displayName: String?, email: String?)
+fun setUserProfile(name: String?, email: String?)
 fun getUserProfile(): UserProfile
 fun getUserId(): String
 fun clearUserProfile()
@@ -72,14 +72,14 @@ fun clearUserProfile()
   - `pendingEmail: String?`
   - `hasPendingProfile: Boolean`
 - Updated `initializeFlutterComponents()` to apply pending profile after UserProfileManager init
-- Updated `setUserProfile()` signature to match new contract: `setUserProfile(displayName: String?, email: String?)`
+- Updated `setUserProfile()` signature to match new contract: `setUserProfile(name: String?, email: String?)`
 - `setUserProfile()` now stores pending profile if called before init, applies immediately if after init
 - Updated `buildAttributes()` to use `getUserProfile()` instead of `getUserAttributes()`
 - Removed deprecated `setUserId()` and legacy `setUserProfile()` methods
 
 **New Public API:**
 ```kotlin
-fun setUserProfile(displayName: String?, email: String?)
+fun setUserProfile(name: String?, email: String?)
 fun clearUserProfile()
 fun getUserId(): String
 ```
@@ -104,7 +104,7 @@ fun getUserId(): String
 
 **Behavior:**
 - ✅ Every event includes `user.id` (always)
-- ✅ `user.name` only present if `displayName` is non-null
+- ✅ `user.name` only present if `name` is non-null
 - ✅ `user.email` only present if `email` is non-null
 - ✅ Keys completely omitted when values are null (not sent as null)
 
@@ -163,21 +163,21 @@ val userId = manager.getUserId()
 // Record event without setting profile
 manager.recordEvent("test.event")
 // ✅ Event contains userId
-// ✅ No displayName or email keys present
+// ✅ No name or email keys present
 ```
 
 ### 4. setUserProfile() Called
 ```kotlin
 manager.setUserProfile("Alice", "alice@test.com")
 manager.recordEvent("test.event")
-// ✅ All subsequent events contain userId, displayName, email
+// ✅ All subsequent events contain userId, name, email
 ```
 
 ### 5. Clear Profile
 ```kotlin
 manager.setUserProfile(null, null)
 manager.recordEvent("test.event")
-// ✅ Both displayName and email absent from subsequent events
+// ✅ Both name and email absent from subsequent events
 // ✅ userId still present
 ```
 
@@ -260,10 +260,10 @@ manager.setUserProfile("Alice", "alice@test.com")
 - UserProfileManager initializes with all fields null
 - No profile fields populated until setUserProfile() called
 - userId always present and attached to every event
-- displayName and email are optional enrichment only
+- name and email are optional enrichment only
 
 ✅ **CHANGE 3** - setUserProfile() contract
-- Signature: `fun setUserProfile(displayName: String?, email: String?)`
+- Signature: `fun setUserProfile(name: String?, email: String?)`
 - Can be called before or after SDK.init()
 - Pending profile applied during init sequence
 - Fully replaces previous values (no merge)
@@ -273,7 +273,7 @@ manager.setUserProfile("Alice", "alice@test.com")
 
 ✅ **CHANGE 4** - Event attribute envelope
 - userId always present in every event
-- displayName only if non-null (key omitted if null)
+- name only if non-null (key omitted if null)
 - email only if non-null (key omitted if null)
 
 ## Status

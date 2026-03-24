@@ -12,7 +12,7 @@ Added `phone` field to the user profile system, ensuring it is persisted locally
 Added `phone` field to the `UserProfile` data class:
 ```kotlin
 data class UserProfile(
-    val displayName: String? = null,
+    val name: String? = null,
     val email: String? = null,
     val phone: String? = null  // NEW
 )
@@ -25,14 +25,14 @@ data class UserProfile(
 - Updated `loadUserProfile()` to load phone from SharedPreferences
 - Updated `saveUserProfile()` to persist phone:
   - Saves phone if non-null
-  - Removes key if null (same behavior as displayName and email)
+  - Removes key if null (same behavior as name and email)
 
 ### 3. setUserProfile() Signature
 **File:** `UserProfileManager.kt` & `TelemetryManager.kt`
 
 Updated method signature to include phone parameter:
 ```kotlin
-fun setUserProfile(displayName: String?, email: String?, phone: String? = null)
+fun setUserProfile(name: String?, email: String?, phone: String? = null)
 ```
 
 **Note:** Phone parameter has default value `null`, making it optional for backward compatibility.
@@ -75,7 +75,7 @@ Added/updated tests:
 ### Set All Fields
 ```kotlin
 TelemetryManager.getInstance().setUserProfile(
-    displayName = "John Doe",
+    name = "John Doe",
     email = "john@example.com",
     phone = "+1234567890"
 )
@@ -84,7 +84,7 @@ TelemetryManager.getInstance().setUserProfile(
 ### Set Without Phone (Backward Compatible)
 ```kotlin
 TelemetryManager.getInstance().setUserProfile(
-    displayName = "Jane Doe",
+    name = "Jane Doe",
     email = "jane@example.com"
 )
 // phone defaults to null
@@ -93,7 +93,7 @@ TelemetryManager.getInstance().setUserProfile(
 ### Set Only Phone
 ```kotlin
 TelemetryManager.getInstance().setUserProfile(
-    displayName = null,
+    name = null,
     email = null,
     phone = "+9876543210"
 )
@@ -102,7 +102,7 @@ TelemetryManager.getInstance().setUserProfile(
 ### Clear Phone
 ```kotlin
 TelemetryManager.getInstance().setUserProfile(
-    displayName = "User",
+    name = "User",
     email = "user@example.com",
     phone = null  // Clears phone
 )
@@ -149,7 +149,7 @@ When sending telemetry events, user fields are included as follows:
 - `user.id` - SDK-generated userId (never null)
 
 **Conditionally Included (only if non-null):**
-- `user.name` - displayName if set
+- `user.name` - name if set
 - `user.email` - email if set
 - `user.phone` - phone if set
 
@@ -190,7 +190,7 @@ When sending telemetry events, user fields are included as follows:
 
 ## Backward Compatibility
 
-✅ **Fully backward compatible** - The `phone` parameter has a default value of `null`, so existing code that calls `setUserProfile(displayName, email)` will continue to work without modification.
+✅ **Fully backward compatible** - The `phone` parameter has a default value of `null`, so existing code that calls `setUserProfile(name, email)` will continue to work without modification.
 
 ## Testing
 

@@ -200,7 +200,7 @@ class TelemetryHttpClient(
         }
         flat["user.id"] = attrs.user.userId
         
-        // Only include displayName, email, and phone if non-null (omit key entirely if null)
+        // Only include name, email, and phone if non-null (omit key entirely if null)
         attrs.user.name?.let { flat["user.name"] = it }
         attrs.user.email?.let { flat["user.email"] = it }
         attrs.user.phone?.let { flat["user.phone"] = it }

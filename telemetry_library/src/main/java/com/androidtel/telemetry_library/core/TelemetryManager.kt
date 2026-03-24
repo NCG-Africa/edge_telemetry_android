@@ -799,8 +799,8 @@ class TelemetryManager private constructor(
      * Fully replaces previous values (no merge)
      * Passing null for a field clears it
      */
-    fun setUserProfile(displayName: String?, email: String?, phone: String? = null) {
-        userProfileService.setUserProfile(displayName, email, phone)
+    fun setUserProfile(name: String?, email: String?, phone: String? = null) {
+        userProfileService.setUserProfile(name, email, phone)
     }
 
     /**

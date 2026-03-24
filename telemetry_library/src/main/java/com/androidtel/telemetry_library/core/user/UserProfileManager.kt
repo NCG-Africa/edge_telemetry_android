@@ -12,7 +12,7 @@ import kotlin.concurrent.write
  * User Profile data class
  */
 data class UserProfile(
-    val displayName: String? = null,
+    val name: String? = null,
     val email: String? = null,
     val phone: String? = null
 )
@@ -28,7 +28,7 @@ class UserProfileManager(
     companion object {
         private const val TAG = "UserProfileManager"
         private const val PREFS_NAME = "edge_telemetry_user"
-        private const val KEY_DISPLAY_NAME = "display_name"
+        private const val KEY_NAME = "display_name"
         private const val KEY_EMAIL = "email"
         private const val KEY_PHONE = "phone"
     }
@@ -50,11 +50,11 @@ class UserProfileManager(
      * Fully replaces previous values (no merge)
      * Passing null for a field clears it
      */
-    fun setUserProfile(displayName: String?, email: String?, phone: String? = null) {
+    fun setUserProfile(name: String?, email: String?, phone: String? = null) {
         lock.write {
             // Update profile - full replacement
             currentProfile = UserProfile(
-                displayName = displayName,
+                name = name,
                 email = email,
                 phone = phone
             )
@@ -62,7 +62,7 @@ class UserProfileManager(
             // Persist to SharedPreferences
             saveUserProfile()
             
-            Log.i(TAG, "👤 User profile updated: displayName=$displayName, email=$email, phone=$phone")
+            Log.i(TAG, "User profile updated: name=$name, email=$email, phone=$phone")
         }
     }
     
@@ -82,7 +82,7 @@ class UserProfileManager(
     
     /**
      * Get user profile for telemetry events
-     * Returns current profile with displayName and email (may be null)
+     * Returns current profile with name and email (may be null)
      */
     fun getUserProfile(): UserProfile {
         return lock.read {
@@ -96,7 +96,7 @@ class UserProfileManager(
     fun getUserAttributes(): Map<String, String> {
         return lock.read {
             buildMap {
-                currentProfile.displayName?.let { put("user_display_name", it) }
+                currentProfile.name?.let { put("user_display_name", it) }
                 currentProfile.email?.let { put("user_email", it) }
                 currentProfile.phone?.let { put("user_phone", it) }
             }
@@ -109,12 +109,12 @@ class UserProfileManager(
      */
     private fun loadUserProfile() {
         lock.write {
-            val displayName = prefs.getString(KEY_DISPLAY_NAME, null)
+            val name = prefs.getString(KEY_NAME, null)
             val email = prefs.getString(KEY_EMAIL, null)
             val phone = prefs.getString(KEY_PHONE, null)
             
             currentProfile = UserProfile(
-                displayName = displayName,
+                name = name,
                 email = email,
                 phone = phone
             )
@@ -127,11 +127,11 @@ class UserProfileManager(
     private fun saveUserProfile() {
         val editor = prefs.edit()
         
-        // Save or remove displayName
-        if (currentProfile.displayName != null) {
-            editor.putString(KEY_DISPLAY_NAME, currentProfile.displayName)
+        // Save or remove name
+        if (currentProfile.name != null) {
+            editor.putString(KEY_NAME, currentProfile.name)
         } else {
-            editor.remove(KEY_DISPLAY_NAME)
+            editor.remove(KEY_NAME)
         }
         
         // Save or remove email

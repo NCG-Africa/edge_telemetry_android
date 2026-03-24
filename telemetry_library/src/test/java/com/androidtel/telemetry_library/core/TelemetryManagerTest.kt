@@ -17,7 +17,7 @@ import org.junit.Test
  * Verifies:
  * - setUserProfile() can be called before init()
  * - Pending profile is applied after init completes
- * - Event attributes include userId, displayName, email correctly
+ * - Event attributes include userId, name, email correctly
  */
 class TelemetryManagerTest {
 

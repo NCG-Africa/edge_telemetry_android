@@ -29,7 +29,7 @@ internal class UserProfileService(
     private lateinit var userId: String
     private lateinit var userProfileManager: UserProfileManager
     
-    private var pendingDisplayName: String? = null
+    private var pendingName: String? = null
     private var pendingEmail: String? = null
     private var pendingPhone: String? = null
     private var hasPendingProfile: Boolean = false
@@ -40,7 +40,7 @@ internal class UserProfileService(
         userProfileManager = UserProfileManager(context, idGenerator)
         
         if (hasPendingProfile) {
-            userProfileManager.setUserProfile(pendingDisplayName, pendingEmail, pendingPhone)
+            userProfileManager.setUserProfile(pendingName, pendingEmail, pendingPhone)
             clearPendingProfile()
             Log.d(TAG, "Applied pending user profile")
         }
@@ -51,13 +51,13 @@ internal class UserProfileService(
     /**
      * Set user profile information
      */
-    fun setUserProfile(displayName: String?, email: String?, phone: String? = null) {
-        Log.d(TAG, "setUserProfile() called - displayName: $displayName, email: $email, phone: $phone")
+    fun setUserProfile(name: String?, email: String?, phone: String? = null) {
+        Log.d(TAG, "setUserProfile() called - name: $name, email: $email, phone: $phone")
         if (::userProfileManager.isInitialized) {
-            userProfileManager.setUserProfile(displayName, email, phone)
+            userProfileManager.setUserProfile(name, email, phone)
             Log.d(TAG, "User profile set successfully via userProfileManager")
         } else {
-            pendingDisplayName = displayName
+            pendingName = name
             pendingEmail = email
             pendingPhone = phone
             hasPendingProfile = true
@@ -105,7 +105,7 @@ internal class UserProfileService(
         
         val userInfo = UserInfo(
             userId = getUserId(),
-            name = userProfile?.displayName,
+            name = userProfile?.name,
             email = userProfile?.email,
             phone = userProfile?.phone
         )
@@ -124,7 +124,7 @@ internal class UserProfileService(
      * Clear pending profile data
      */
     private fun clearPendingProfile() {
-        pendingDisplayName = null
+        pendingName = null
         pendingEmail = null
         pendingPhone = null
         hasPendingProfile = false

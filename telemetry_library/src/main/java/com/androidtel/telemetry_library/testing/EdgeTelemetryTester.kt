@@ -68,7 +68,7 @@ object EdgeTelemetryTester {
             
             // Set user profile
             edgeTelemetry.setUserProfile(
-                displayName = "Test User",
+                name = "Test User",
                 email = "test@example.com",
                 phone = "+1234567890"
             )

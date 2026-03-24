@@ -140,7 +140,7 @@ All public methods remain unchanged:
 - `recordEvent(eventName, attributes)`
 - `recordMetric(metricName, value, attributes)`
 - `recordNetworkRequest(...)`
-- `setUserProfile(displayName, email, phone)`
+- `setUserProfile(name, email, phone)`
 - `clearUserProfile()`
 - `addBreadcrumb(...)`
 - `trackError(...)`
