@@ -125,7 +125,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.NCG-Africa"
                 artifactId = "edge_telemetry_android"
-                version = "2.1.8"
+                version = "2.1.10"
             }
         }
     }
