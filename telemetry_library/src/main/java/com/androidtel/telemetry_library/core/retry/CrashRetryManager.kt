@@ -7,6 +7,8 @@ import android.util.Log
 import androidx.work.*
 import com.androidtel.telemetry_library.core.interceptors.ApiKeyRedactionInterceptor
 import com.google.gson.Gson
+import com.google.gson.GsonBuilder
+import com.google.gson.JsonSyntaxException
 import kotlinx.coroutines.delay
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -14,9 +16,12 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
 import java.io.File
 import java.io.IOException
+import java.io.RandomAccessFile
+import java.nio.channels.FileLock
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -37,6 +42,7 @@ class CrashRetryManager(
         private const val WORK_TAG = "crash_retry_work"
         private const val HTTP_TOO_MANY_REQUESTS = 429
         private const val RATE_LIMIT_COOLDOWN_MS = 60_000L // 1 minute
+        private const val MAX_STORAGE_FAILURES = 3
         
         // Shared circuit breaker state across all instances
         private val isRateLimited = AtomicBoolean(false)
@@ -58,6 +64,10 @@ class CrashRetryManager(
     private val baseRetryDelay = Duration.ofMinutes(1)
     private val offlineStorageFile = File(context.cacheDir, OFFLINE_STORAGE_FILE)
     private val fileLock = Any()
+    private val isStoringCrash = AtomicBoolean(false)
+    private val storageFailureCount = AtomicInteger(0)
+    private val gsonLenient = GsonBuilder().setLenient().create()
+    private val lockFile = File(context.cacheDir, "crash_storage.lock")
     
     /**
      * Send crash data with retry mechanism
@@ -145,18 +155,32 @@ class CrashRetryManager(
      * Store crash data offline for later retry
      */
     private fun storeCrashOffline(crashData: Map<String, Any>) {
-        synchronized(fileLock) {
-            try {
-                val existingCrashes = loadOfflineCrashes().toMutableList()
-                existingCrashes.add(crashData)
-                
-                val json = gson.toJson(existingCrashes)
-                offlineStorageFile.writeText(json)
-                
-                Log.d(TAG, "💾 Crash stored offline (total: ${existingCrashes.size})")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to store crash offline", e)
+        // Storage circuit breaker
+        if (storageFailureCount.get() >= MAX_STORAGE_FAILURES) {
+            Log.e(TAG, "🚫 Storage circuit breaker open — dropping crash to prevent loop")
+            return
+        }
+        // Recursion guard
+        if (isStoringCrash.getAndSet(true)) {
+            Log.w(TAG, "⚠️ Already storing crash — skipping to prevent recursion")
+            return
+        }
+        try {
+            RandomAccessFile(lockFile, "rw").use { raf ->
+                raf.channel.lock().use {
+                    val existingCrashes = loadOfflineCrashesInternal(raf).toMutableList()
+                    existingCrashes.add(crashData)
+                    val json = gson.toJson(existingCrashes)
+                    offlineStorageFile.writeText(json)
+                    Log.d(TAG, "💾 Crash stored offline (total: ${existingCrashes.size})")
+                }
             }
+            storageFailureCount.set(0) // reset on success
+        } catch (e: Exception) {
+            storageFailureCount.incrementAndGet()
+            Log.e(TAG, "❌ Failed to store crash offline (failures: ${storageFailureCount.get()})", e)
+        } finally {
+            isStoringCrash.set(false)
         }
     }
     
@@ -164,31 +188,46 @@ class CrashRetryManager(
      * Load offline crashes
      */
     private fun loadOfflineCrashes(): List<Map<String, Any>> {
-        synchronized(fileLock) {
-            return try {
-                if (!offlineStorageFile.exists() || offlineStorageFile.length() == 0L) {
-                    return emptyList()
+        return try {
+            RandomAccessFile(lockFile, "rw").use { raf ->
+                raf.channel.lock().use {
+                    loadOfflineCrashesInternal(raf)
                 }
-                
-                val json = offlineStorageFile.readText()
-                if (json.isBlank()) {
-                    return emptyList()
-                }
-                
-                val type = object : com.google.gson.reflect.TypeToken<Array<Map<String, Any>>>() {}.type
-                val result = gson.fromJson<Array<Map<String, Any>>>(json, type)
-                result?.toList() ?: emptyList()
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to load offline crashes", e)
-                // Delete corrupted file
-                try {
-                    offlineStorageFile.delete()
-                    Log.w(TAG, "Deleted corrupted offline storage file")
-                } catch (deleteError: Exception) {
-                    Log.e(TAG, "Failed to delete corrupted file", deleteError)
-                }
-                emptyList()
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to acquire lock for reading offline crashes", e)
+            emptyList()
+        }
+    }
+    
+    private fun loadOfflineCrashesInternal(raf: RandomAccessFile? = null): List<Map<String, Any>> {
+        return try {
+            if (!offlineStorageFile.exists() || offlineStorageFile.length() == 0L) return emptyList()
+            val json = offlineStorageFile.readText()
+            if (json.isBlank()) return emptyList()
+
+            val type = object : com.google.gson.reflect.TypeToken<Array<Map<String, Any>>>() {}.type
+            val result: Array<Map<String, Any>>? = gsonLenient.fromJson(json, type)
+            result?.toList() ?: emptyList()
+        } catch (e: JsonSyntaxException) {
+            Log.e(TAG, "🧩 JSON corrupted — deleting storage file", e)
+            safeDeleteCorruptedFile()
+            emptyList()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load offline crashes", e)
+            safeDeleteCorruptedFile()
+            emptyList()
+        }
+    }
+    
+    private fun safeDeleteCorruptedFile() {
+        try {
+            if (offlineStorageFile.exists()) {
+                offlineStorageFile.delete()
+                Log.w(TAG, "🗑️ Deleted corrupted offline storage file")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to delete corrupted storage file", e)
         }
     }
     
@@ -288,17 +327,21 @@ class CrashRetryManager(
         
         // Remove successful crashes from offline storage
         if (successfulCrashes.isNotEmpty()) {
-            synchronized(fileLock) {
-                val remainingCrashes = offlineCrashes - successfulCrashes.toSet()
-                
-                if (remainingCrashes.isEmpty()) {
-                    offlineStorageFile.delete()
-                    Log.i(TAG, "🧹 All offline crashes sent successfully")
-                } else {
-                    val json = gson.toJson(remainingCrashes)
-                    offlineStorageFile.writeText(json)
-                    Log.i(TAG, "📊 ${successfulCrashes.size} crashes sent, ${remainingCrashes.size} remaining")
+            try {
+                RandomAccessFile(lockFile, "rw").use { raf ->
+                    raf.channel.lock().use {
+                        val remainingCrashes = offlineCrashes - successfulCrashes.toSet()
+                        if (remainingCrashes.isEmpty()) {
+                            offlineStorageFile.delete()
+                            Log.i(TAG, "🧹 All offline crashes sent successfully")
+                        } else {
+                            offlineStorageFile.writeText(gson.toJson(remainingCrashes))
+                            Log.i(TAG, "📊 ${successfulCrashes.size} sent, ${remainingCrashes.size} remaining")
+                        }
+                    }
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to update offline crash storage after retry", e)
             }
         }
     }
