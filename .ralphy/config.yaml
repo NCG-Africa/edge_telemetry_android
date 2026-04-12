@@ -94,8 +94,3 @@ boundaries:
 capabilities:
   browser: "false"   # pure backend/library refactor — no UI to automate
 
-notifications:
-# Fill in if you want Discord/Slack pings when Ralphy finishes a phase.
-# Leave commented out to disable.
-# discord_webhook: "https://discord.com/api/webhooks/..."
-# slack_webhook: "https://hooks.slack.com/services/..."
