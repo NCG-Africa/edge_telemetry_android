@@ -338,7 +338,7 @@ See refactor-plan.md for architectural context. Phases are strictly ordered.
 
 ## Phase R0 — Audit & Baseline
 - [x] Generate dependency graph and commit as docs/deps.txt
-- [ ] Run detekt with default rules, commit baseline as detekt-baseline.xml
+- [x] Run detekt with default rules, commit baseline as detekt-baseline.xml
 - [ ] Add Metalava plugin, generate and commit api/current.api baseline
 - [ ] Add Kover, generate initial coverage report, commit to docs/coverage-baseline.md
 - [ ] Write docs/code-audit.md listing files >400 lines, classes with >10 public methods, all `object` declarations, all `!!` usages, all empty catch blocks
