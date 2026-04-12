@@ -11,6 +11,7 @@ import com.androidtel.telemetry_library.core.ids.IdGenerator
 import com.androidtel.telemetry_library.core.models.EventAttributes
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.androidtel.telemetry_library.core.models.TelemetryEvent
+import com.androidtel.telemetry_library.core.models.UserInfo
 import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -264,16 +265,17 @@ internal class CrashReportingService(
     
     /**
      * Send persisted crash if any
+     * currentUserInfo: latest user profile for lazy enrichment at serialization time
      */
-    suspend fun sendPersistedCrashIfAny() {
+    suspend fun sendPersistedCrashIfAny(currentUserInfo: UserInfo? = null) {
         val batch = readPersistedBatch()
         if (batch == null) {
             return
         }
-        
+
         Log.i(TAG, "Found persisted crash batch; attempting to send.")
         try {
-            val result = httpClient.sendBatch(batch)
+            val result = httpClient.sendBatch(batch, currentUserInfo)
             if (result.isSuccess) {
                 Log.i(TAG, "Successfully sent persisted crash batch.")
                 deletePersistedBatch()
@@ -286,13 +288,13 @@ internal class CrashReportingService(
             Log.e(TAG, "Error sending persisted crash batch: ${e.localizedMessage}", e)
         }
     }
-    
+
     /**
      * Send batch asynchronously
      */
-    private suspend fun sendBatchAsync() {
+    private suspend fun sendBatchAsync(currentUserInfo: UserInfo? = null) {
         val batch = readPersistedBatch() ?: return
-        val result = httpClient.sendBatch(batch)
+        val result = httpClient.sendBatch(batch, currentUserInfo)
         if (result.isSuccess) {
             deletePersistedBatch()
         }

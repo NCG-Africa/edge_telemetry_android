@@ -5,6 +5,40 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.12] - 2026-03-24
+
+### 🐛 Bug Fixes
+- **User Profile API Consistency**: Standardized parameter naming from `displayName` to `name` throughout the SDK
+- **User Profile Data in Events**: Fixed issue where `user.name`, `user.email`, and `user.phone` were not appearing in telemetry events
+
+### 🔧 API Changes
+- `setUserProfile()` parameter renamed from `displayName` to `name` for consistency
+- Updated all documentation and examples to use the new parameter name
+- Maintained full backward compatibility with existing data storage
+
+### 📝 Documentation Updates
+- Updated all API documentation to reflect parameter name change
+- Updated usage examples and migration guides
+- Fixed inconsistent naming across all documentation files
+
+### ⚠️ Migration Required
+**Client Code Update Required:**
+```kotlin
+// Before
+TelemetryManager.getInstance().setUserProfile(
+    displayName = "John Doe",
+    email = "john@example.com"
+)
+
+// After  
+TelemetryManager.getInstance().setUserProfile(
+    name = "John Doe",
+    email = "john@example.com"
+)
+```
+
+---
+
 ## [2.1.3] - 2026-03-23
 
 ### 🔧 Code Quality Improvements

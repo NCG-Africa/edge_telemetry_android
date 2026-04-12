@@ -50,16 +50,17 @@ class TelemetryHttpClient(
     fun getOkHttpClient(): OkHttpClient = okHttpClient
 
     // Public method to send a batch with built-in retry logic.
-    suspend fun sendBatch(batch: TelemetryBatch): Result<Unit> {
-        return sendWithRetry(batch , maxRetries = 3)
+    // currentUserInfo: if provided, overrides name/email/phone in all events at serialization time (lazy enrichment)
+    suspend fun sendBatch(batch: TelemetryBatch, currentUserInfo: com.androidtel.telemetry_library.core.models.UserInfo? = null): Result<Unit> {
+        return sendWithRetry(batch, maxRetries = 3, currentUserInfo = currentUserInfo)
     }
 
 
     // Implementation of the retry strategy with exponential backoff.
-    private suspend fun sendWithRetry(batch: TelemetryBatch, maxRetries: Int): Result<Unit> {
+    private suspend fun sendWithRetry(batch: TelemetryBatch, maxRetries: Int, currentUserInfo: com.androidtel.telemetry_library.core.models.UserInfo? = null): Result<Unit> {
         repeat(maxRetries) { attempt ->
             try {
-                val jsonPayload = batch.toJson()
+                val jsonPayload = batch.toJson(currentUserInfo)
                 makeHttpRequest(jsonPayload, telemetryUrl).use { response ->
                     when (response.code) {
                         in 200..299 -> return Result.success(Unit)
@@ -123,7 +124,8 @@ class TelemetryHttpClient(
 
 
     // --- Extension: Convert Batch -> Outgoing JSON ---
-    fun TelemetryBatch.toJson(): String {
+    // currentUserInfo: if provided, overrides user.name/email/phone in all events (lazy enrichment)
+    fun TelemetryBatch.toJson(currentUserInfo: com.androidtel.telemetry_library.core.models.UserInfo? = null): String {
         // Extract device_id from the first event's attributes
         val deviceId = this.events.firstOrNull()?.attributes?.device?.deviceId
         
@@ -147,7 +149,7 @@ class TelemetryHttpClient(
                     metricName = event.metricName,
                     value = event.value,
                     timestamp = event.timestamp,
-                    attributes = flattenAttributes(event.attributes)
+                    attributes = flattenAttributes(event.attributes, currentUserInfo)
                 )
             },
             batch_size = this.batchSize,
@@ -161,7 +163,8 @@ class TelemetryHttpClient(
     }
 
     // ---- Helper: Flatten attributes into map ----
-    private fun flattenAttributes(attrs: EventAttributes): Map<String, Any?> {
+    // currentUserInfo: if provided, overrides user.name/email/phone with latest values (lazy enrichment)
+    private fun flattenAttributes(attrs: EventAttributes, currentUserInfo: com.androidtel.telemetry_library.core.models.UserInfo? = null): Map<String, Any?> {
         val flat = mutableMapOf<String, Any?>()
 
         // App
@@ -199,11 +202,15 @@ class TelemetryHttpClient(
             )
         }
         flat["user.id"] = attrs.user.userId
-        
-        // Only include name, email, and phone if non-null (omit key entirely if null)
-        attrs.user.name?.let { flat["user.name"] = it }
-        attrs.user.email?.let { flat["user.email"] = it }
-        attrs.user.phone?.let { flat["user.phone"] = it }
+
+        // Lazy enrichment: use currentUserInfo (latest profile) if available,
+        // otherwise fall back to the profile baked into the event at creation time.
+        // This ensures user.name/email/phone reflect the latest setUserProfile() call,
+        // even for events recorded before the profile was set.
+        val resolvedUser = currentUserInfo ?: attrs.user
+        resolvedUser.name?.let { flat["user.name"] = it }
+        resolvedUser.email?.let { flat["user.email"] = it }
+        resolvedUser.phone?.let { flat["user.phone"] = it }
 
         // Session (extended)
         flat["session.id"] = attrs.session.sessionId

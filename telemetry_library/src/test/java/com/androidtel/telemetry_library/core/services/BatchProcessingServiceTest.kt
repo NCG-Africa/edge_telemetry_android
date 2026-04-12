@@ -7,6 +7,7 @@ import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.androidtel.telemetry_library.core.models.TelemetryEvent
 import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest

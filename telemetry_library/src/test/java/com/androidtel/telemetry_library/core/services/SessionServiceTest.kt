@@ -164,7 +164,7 @@ class SessionServiceTest {
         
         assertEquals("test-session-id-123", sessionInfo.sessionId)
         assertNotNull(sessionInfo.startTime)
-        assertTrue(sessionInfo.durationMs >= 100)
+        assertTrue(sessionInfo.durationMs!! >= 100)
         assertEquals(10, sessionInfo.eventCount)
         assertEquals(5, sessionInfo.metricCount)
         assertEquals(0, sessionInfo.screenCount)
@@ -182,9 +182,9 @@ class SessionServiceTest {
         val sessionInfo = service.getSessionInfo(0, 0, "4G")
         
         assertEquals(3, sessionInfo.screenCount)
-        assertTrue(sessionInfo.visitedScreens.contains("Home"))
-        assertTrue(sessionInfo.visitedScreens.contains("Profile"))
-        assertTrue(sessionInfo.visitedScreens.contains("Settings"))
+        assertTrue(sessionInfo.visitedScreens!!.contains("Home"))
+        assertTrue(sessionInfo.visitedScreens!!.contains("Profile"))
+        assertTrue(sessionInfo.visitedScreens!!.contains("Settings"))
     }
 
     @Test
@@ -193,7 +193,7 @@ class SessionServiceTest {
         
         val sessionInfo = service.getSessionInfo(0, 0, "WiFi")
         
-        assertTrue(sessionInfo.isFirstSession)
+        assertTrue(sessionInfo.isFirstSession!!)
         assertEquals(1, sessionInfo.totalSessions)
     }
 
@@ -204,7 +204,7 @@ class SessionServiceTest {
         
         val sessionInfo = service.getSessionInfo(0, 0, "WiFi")
         
-        assertFalse(sessionInfo.isFirstSession)
+        assertFalse(sessionInfo.isFirstSession!!)
         assertEquals(6, sessionInfo.totalSessions)
     }
 
@@ -348,7 +348,7 @@ class SessionServiceTest {
         Thread.sleep(100)
         val info2 = service.getSessionInfo(0, 0, "WiFi")
         
-        assertTrue(info2.durationMs > info1.durationMs)
+        assertTrue(info2.durationMs!! > info1.durationMs!!)
     }
 
     @Test
@@ -376,9 +376,9 @@ class SessionServiceTest {
         
         val sessionInfo = service.getSessionInfo(0, 0, "WiFi")
         
-        assertTrue(sessionInfo.startTime.contains("T"))
-        assertTrue(sessionInfo.startTime.endsWith("Z"))
-        assertTrue(sessionInfo.startTime.matches(Regex("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z")))
+        assertTrue(sessionInfo.startTime!!.contains("T"))
+        assertTrue(sessionInfo.startTime!!.endsWith("Z"))
+        assertTrue(sessionInfo.startTime!!.matches(Regex("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z")))
     }
 
     @Test

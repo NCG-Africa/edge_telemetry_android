@@ -377,7 +377,7 @@ class CrashReportingServiceTest {
         
         service.sendPersistedCrashIfAny()
         
-        verify(exactly = 0) { httpClient.sendBatch(any()) }
+        coVerify(exactly = 0) { httpClient.sendBatch(any(), any()) }
     }
 
     @Test

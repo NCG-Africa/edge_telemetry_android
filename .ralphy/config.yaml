@@ -1,0 +1,101 @@
+project:
+  name: "edge_telemetry_android"
+  language: "Kotlin"
+  framework: "Android / Gradle (AGP + Kotlin multi-module monolith)"
+  description: >
+    OpenTelemetry-backed Android observability SDK (v2.x). Currently undergoing
+    a pre-3.0 refactor to Clean Architecture (domain / data / api layers) inside
+    a single Gradle module, with package seams ready for later modularization.
+    See refactor-plan.md for the authoritative design. See plan.md for the
+    subsequent 3.0 OpenTelemetry + ByteBuddy rewrite — DO NOT start 3.0 work
+    during this refactor pass.
+
+commands:
+  test: "./gradlew :telemetry_library:testDebugUnitTest"
+  lint: "./gradlew :telemetry_library:detekt :telemetry_library:lintDebug"
+  build: "./gradlew :telemetry_library:assembleDebug"
+  coverage: "./gradlew :telemetry_library:koverVerify"
+  arch_test: "./gradlew :telemetry_library:konsistTest"
+  api_check: "./gradlew :telemetry_library:apiCheck"
+  check_all: "./gradlew check"
+
+rules:
+  # ── Refactor invariants (highest priority) ─────────────────────────────────
+  - "This is a PURE REFACTOR. Zero behavior changes. Existing wire payloads must be byte-identical — golden JSON snapshots in src/test/resources/golden/ must not change without explicit human approval."
+  - "Every public method on TelemetryManager must retain its exact existing signature (name, parameters, return type, nullability). Add new methods alongside old ones; never modify or remove."
+  - "Do not begin 3.0 / OpenTelemetry / ByteBuddy / Gradle plugin work. That is for a later milestone after 2.2.0 ships."
+  - "Version stays in the 2.x series throughout this refactor. Final release is 2.2.0."
+
+  # ── Architecture ───────────────────────────────────────────────────────────
+  - "Follow Clean Architecture layering: domain/ (pure Kotlin, no android.*), data/ (platform + IO adapters), api/ (public facade). See refactor-plan.md §2 for the exact package structure."
+  - "domain/** must never import android.*, androidx.*, okhttp3.*, retrofit2.*, io.opentelemetry.*, androidx.room.*. Konsist tests enforce this — if they fail, fix the code, not the test."
+  - "Use manual constructor injection only. Do not introduce Hilt, Koin, Dagger, kotlin-inject, or any other DI framework."
+  - "The only SDK-level singleton is TelemetryGraph (the composition root). Do not introduce new `object` declarations with mutable state. Existing ones are being removed — do not add more."
+  - "One Gradle module only. Do not split telemetry_library into multiple modules during this refactor — that happens in the 3.0 work later."
+
+  # ── Async & threading ──────────────────────────────────────────────────────
+  - "Use Kotlin coroutines + Flow for all new internal async code. No raw Thread, no Executors.new*, no HandlerThread in main source."
+  - "All coroutines launch into the injected TelemetryScope, never GlobalScope. Dispatchers come from the injected CoroutineDispatchers holder, never hardcoded."
+  - "Public non-suspend methods keep fire-and-forget semantics. When adding suspend variants, add them alongside — do not replace."
+
+  # ── Error handling ─────────────────────────────────────────────────────────
+  - "No empty catch blocks. Every caught exception must either be rethrown, converted to TelemetryResult.Err, or reported via ErrorReporter with a justification comment."
+  - "Do not use the !! operator in main source. Use requireNotNull, checkNotNull, or explicit null handling."
+  - "Internal use cases return TelemetryResult<T> on fallible paths. Exceptions never escape the SDK boundary to the host app."
+
+  # ── Testing & quality gates ────────────────────────────────────────────────
+  - "Run ./gradlew check before marking any task complete. Tests, coverage, detekt, konsist, and metalava must all pass."
+  - "Coverage must never decrease. Current thresholds: 80% on domain/**, 70% overall. If a refactor would drop coverage below threshold, add tests as part of the same change."
+  - "When extracting a class or use case, add isolated unit tests for the new unit in the same commit. Do not defer tests to a later task."
+  - "Robolectric is permitted only where Android SDK touch is unavoidable. Domain-layer tests must run on plain JVM with no Robolectric."
+
+  # ── Public API discipline ──────────────────────────────────────────────────
+  - "Only symbols in the api/ package are public. Everything else must be marked `internal` or annotated @InternalTelemetryApi with @RequiresOptIn."
+  - "Do not change the Metalava public API baseline without a matching CHANGELOG.md entry in the same commit."
+  - "Do not add new public types, methods, or fields unless the task explicitly calls for it."
+
+  # ── Dependencies ───────────────────────────────────────────────────────────
+  - "Do not add new runtime dependencies without explicit human approval. Test-only dependencies (Mockk, Turbine, Kotest-assertions, Konsist, Kover) are pre-approved per refactor-plan.md §6."
+  - "Do not upgrade existing dependency versions as part of a refactor task. Version bumps are separate, reviewed changes."
+
+  # ── Commit hygiene ─────────────────────────────────────────────────────────
+  - "Every commit message must reference the refactor phase, e.g. 'R4: extract Clock port and AndroidClock impl'."
+  - "Keep commits small and focused — one logical change per commit. If a task touches more than ~10 files, split it."
+  - "Do not reformat unrelated files. Do not change import order or whitespace outside the lines you are editing."
+  - "Do not leave TODO, FIXME, or commented-out code behind. If something is unfinished, it belongs as a follow-up task in REFACTOR-PRD.md."
+
+  # ── Ralphy-specific guardrails ─────────────────────────────────────────────
+  - "Work through REFACTOR-PRD.md in strict phase order. Do not skip ahead. Do not pull tasks from later phases when current-phase tasks remain."
+  - "Phases R0 through R3 are cross-cutting foundational work — do not attempt these in parallel mode even if invoked with --parallel."
+  - "If ./gradlew check fails after your changes, do not mark the task complete. Fix the failure or revert and report."
+  - "Golden snapshot failures are a STOP signal. Do not regenerate golden files to make tests pass — investigate the behavioral drift first."
+
+boundaries:
+  never_touch:
+    - "gradle/wrapper/**"
+    - "gradlew"
+    - "gradlew.bat"
+    - "*.lock"
+    - "local.properties"
+    - ".idea/**"
+    - ".gradle/**"
+    - "build/**"
+    - "**/build/**"
+    - "docs/deps.txt"                       # R0 baseline — immutable reference
+    - "docs/coverage-baseline.md"            # R0 baseline — immutable reference
+    - "docs/code-audit.md"                   # R0 audit output — immutable reference
+    - "detekt-baseline.xml"                  # only regenerated via explicit task
+    - "src/test/resources/golden/**"         # byte-identical wire format — needs human approval to change
+    - "plan.md"                              # 3.0 design doc — out of scope for this refactor
+    - "refactor-plan.md"                     # the plan itself — do not self-edit
+    - "REFACTOR-PRD.md"                      # Ralphy's own task list
+    - ".ralphy/**"                           # Ralphy config + progress
+
+capabilities:
+  browser: "false"   # pure backend/library refactor — no UI to automate
+
+notifications:
+# Fill in if you want Discord/Slack pings when Ralphy finishes a phase.
+# Leave commented out to disable.
+# discord_webhook: "https://discord.com/api/webhooks/..."
+# slack_webhook: "https://hooks.slack.com/services/..."

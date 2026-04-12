@@ -573,7 +573,7 @@ class TelemetryManager private constructor(
             } else {
                 null
             }
-            batchProcessingService.triggerBatchSend(eventTrackingService.getEventQueue(), location)
+            batchProcessingService.triggerBatchSend(eventTrackingService.getEventQueue(), location, userProfileService.getUserInfo())
         }
     }
 
@@ -590,19 +590,20 @@ class TelemetryManager private constructor(
             eventTrackingService.getEventQueue(),
             forceSend,
             flushOffline,
-            location
+            location,
+            userProfileService.getUserInfo()
         )
     }
 
     // Method to send any batches stored in the offline queue.
     // Delegated to BatchProcessingService
     private suspend fun sendStoredBatches() {
-        batchProcessingService.sendStoredBatches()
+        batchProcessingService.sendStoredBatches(userProfileService.getUserInfo())
     }
 
     // Crash persistence methods delegated to CrashReportingService
     private suspend fun sendPersistedCrashIfAny() {
-        crashReportingService.sendPersistedCrashIfAny()
+        crashReportingService.sendPersistedCrashIfAny(userProfileService.getUserInfo())
     }
 
 

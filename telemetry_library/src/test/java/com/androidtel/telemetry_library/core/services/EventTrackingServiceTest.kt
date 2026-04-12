@@ -48,21 +48,24 @@ class EventTrackingServiceTest {
         service = EventTrackingService(context, config)
         
         appInfo = AppInfo(
-            appId = "com.test.app",
             appName = "Test App",
             appVersion = "1.0.0",
-            buildNumber = "100",
-            environment = "test"
+            appBuildNumber = "100",
+            appPackageName = "com.test.app"
         )
-        
+
         deviceInfo = DeviceInfo(
             deviceId = "test-device-id",
-            deviceModel = "Test Model",
-            osVersion = "Android 10",
+            platform = "Android",
+            platformVersion = "10",
+            model = "Test Model",
             manufacturer = "Test Manufacturer",
-            screenResolution = "1080x1920",
-            locale = "en_US",
-            timezone = "UTC"
+            brand = "TestBrand",
+            androidSdk = "28",
+            androidRelease = "9.0",
+            fingerprint = "test/fingerprint",
+            hardware = "test_hw",
+            product = "test_product"
         )
         
         userInfo = UserInfo(
@@ -167,7 +170,7 @@ class EventTrackingServiceTest {
         assertNotNull(event)
         assertEquals("metric|event", event?.type)
         assertEquals(metricName, event?.metricName)
-        assertEquals(value, event?.value, 0.001)
+        assertEquals(value, event?.value!!, 0.001)
         assertEquals(1, service.getMetricCount())
     }
 
@@ -326,7 +329,7 @@ class EventTrackingServiceTest {
         assertNotNull(event?.attributes?.user)
         assertNotNull(event?.attributes?.session)
         
-        assertEquals(appInfo.appId, event?.attributes?.app?.appId)
+        assertEquals(appInfo.appPackageName, event?.attributes?.app?.appPackageName)
         assertEquals(deviceInfo.deviceId, event?.attributes?.device?.deviceId)
         assertEquals(userInfo.userId, event?.attributes?.user?.userId)
         assertEquals(sessionInfo.sessionId, event?.attributes?.session?.sessionId)
