@@ -5,12 +5,18 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose") // ⬅️ required in Kotlin 2.0+
     id("maven-publish")
     alias(libs.plugins.detekt)
+    alias(libs.plugins.metalava)
 }
 
 detekt {
     buildUponDefaultConfig = true
     config.setFrom(files())          // default rules only, no custom config
     baseline = file("$rootDir/detekt-baseline.xml")
+}
+
+metalava {
+    filename.set("api/current.api")
+    sourcePaths.setFrom("src/main")
 }
 
 android {
