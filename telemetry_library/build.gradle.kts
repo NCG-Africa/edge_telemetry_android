@@ -4,6 +4,13 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose") // ⬅️ required in Kotlin 2.0+
     id("maven-publish")
+    alias(libs.plugins.detekt)
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(files())          // default rules only, no custom config
+    baseline = file("$rootDir/detekt-baseline.xml")
 }
 
 android {
