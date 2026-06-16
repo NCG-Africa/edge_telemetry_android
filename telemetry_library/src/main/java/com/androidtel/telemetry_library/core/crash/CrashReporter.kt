@@ -22,7 +22,7 @@ import java.time.Instant
  */
 class CrashReporter(
     private val context: Context,
-    private val telemetryManager: TelemetryManager,
+    private val telemetryManager: TelemetryManager?,
     private val breadcrumbManager: BreadcrumbManager,
     private val idGenerator: IdGenerator,
     private val apiKey: String,
@@ -40,8 +40,9 @@ class CrashReporter(
     private val retryManager = CrashRetryManager(context, apiKey, telemetryEndpoint, debugMode)
     private val deviceInfoCollector = DeviceInfoCollector(context, idGenerator)
     private var originalHandler: Thread.UncaughtExceptionHandler? = null
+    private val handlerInstalled = java.util.concurrent.atomic.AtomicBoolean(false)
     
-    // Product context and user action tracking (Phase 2C)
+    // Product context and user action tracking
     private var currentProductId: String? = null
     private var lastUserAction: String? = null
     private var currentLocation: String? = null
@@ -55,7 +56,11 @@ class CrashReporter(
     /**
      * Install global exception handler for automatic crash detection
      */
-    private fun installGlobalExceptionHandler() {
+    fun installGlobalExceptionHandler() {
+        if (handlerInstalled.getAndSet(true)) {
+            Log.d(TAG, "Global exception handler already installed — skipping")
+            return
+        }
         originalHandler = Thread.getDefaultUncaughtExceptionHandler()
         
         Thread.setDefaultUncaughtExceptionHandler { thread, exception ->
@@ -260,7 +265,7 @@ class CrashReporter(
     }
     
     /**
-     * Set product context for crash reporting (Phase 2C)
+     * Set product context for crash reporting
      */
     fun setProductContext(productId: String) {
         this.currentProductId = productId.take(255)
@@ -268,7 +273,7 @@ class CrashReporter(
     }
     
     /**
-     * Set last user action for crash context (Phase 2C)
+     * Set last user action for crash context
      */
     fun setLastUserAction(action: String) {
         this.lastUserAction = action.take(500)

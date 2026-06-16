@@ -54,16 +54,19 @@ class TelemetryFrameDropCollector(
                         else -> "low"
                     }
 
-                    telemetryManager.recordEvent(
-                        eventName = "frame_drop",
-                        attributes = mapOf(
-                            "frame.build_duration_ms" to buildMs,
-                            "frame.raster_duration_ms" to rasterMs,
-                            "frame.total_duration_ms" to totalMs,
-                            "frame.severity" to severity,
-                            "frame.target_fps" to targetFps
+                    // Only record if frame tracking is enabled
+                    if (telemetryManager.isFrameTrackingEnabled()) {
+                        telemetryManager.recordEvent(
+                            eventName = "frame_drop",
+                            attributes = mapOf(
+                                "frame.build_duration_ms" to buildMs,
+                                "frame.raster_duration_ms" to rasterMs,
+                                "frame.total_duration_ms" to totalMs,
+                                "frame.severity" to severity,
+                                "frame.target_fps" to targetFps
+                            )
                         )
-                    )
+                    }
                 } catch (e: Exception) {
                     Log.w("TelemetryFrameDropCollector", "Error processing frame metrics: ${e.localizedMessage}")
                 }

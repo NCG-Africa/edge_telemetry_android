@@ -221,7 +221,7 @@ class TelemetryHttpClientTest {
             model = "TestModel",
             manufacturer = "TestManufacturer",
             brand = "TestBrand",
-            androidSdk = 33,
+            androidSdk = "33",
             androidRelease = "13",
             fingerprint = "test_fingerprint",
             hardware = "test_hardware",
@@ -232,18 +232,17 @@ class TelemetryHttpClientTest {
             userId = "test_user_123",
             name = null,
             email = null,
-            phone = null,
-            profileVersion = null
+            phone = null
         )
 
         val sessionInfo = SessionInfo(
             sessionId = "test_session_123",
-            startTime = System.currentTimeMillis(),
-            durationMs = 1000,
+            startTime = System.currentTimeMillis().toString(),
+            durationMs = 1000L,
             eventCount = 1,
             metricCount = 0,
             screenCount = 1,
-            visitedScreens = listOf("TestScreen"),
+            visitedScreens = "TestScreen",
             isFirstSession = false,
             totalSessions = 5,
             networkType = "WiFi"
@@ -262,13 +261,13 @@ class TelemetryHttpClientTest {
             eventName = "test.event",
             metricName = null,
             value = null,
-            timestamp = System.currentTimeMillis(),
+            timestamp = System.currentTimeMillis().toString(),
             attributes = attributes
         )
 
         return TelemetryBatch(
             batchSize = 1,
-            timestamp = System.currentTimeMillis(),
+            timestamp = System.currentTimeMillis().toString(),
             events = listOf(event)
         )
     }

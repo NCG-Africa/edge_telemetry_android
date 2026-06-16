@@ -39,51 +39,38 @@ class MyApplication : Application() {
         // See README.md "API Key Security Best Practices" section for details.
         // For comprehensive guide, see: API_KEY_GUIDE.md
         
-        // Option 1: Initialize with TelemetryConfig (Recommended)
-        // Cleaner, more maintainable approach for complex configurations
-        val config = TelemetryConfig.builder(this, BuildConfig.TELEMETRY_API_KEY)
-            .debugMode(true) // Set to false in production
-            .batchSize(30)
-            .endpoint("https://edgetelemetry.ncgafrica.com/collector/telemetry")
-            .enableCrashReporting(true)
-            .enableUserProfiles(true)
-            .enableSessionTracking(true)
-            .globalAttributes(mapOf(
-                "app.environment" to "development",
-                "app.version" to "1.0.0"
-            ))
-            .build()
+        // Initialize with TelemetryConfig
+        val config = TelemetryConfig(
+            apiKey = BuildConfig.TELEMETRY_API_KEY,
+            endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
+            batchSize = 30,
+            flushIntervalMs = 30_000L,
+            sessionTimeoutMs = 30 * 60 * 1000L,
+            enableScreenTracking = true,
+            enableCrashReporting = true,
+            enableNetworkTracking = true,
+            enableLifecycleTracking = true,
+            enableMemoryTracking = true,
+            enableStorageTracking = true,
+            enableFrameTracking = true,
+            enableLegacyScreenEvents = false,
+            enableUserInteractionEvents = true,
+            enableCapabilityEvents = true
+        )
         
-        TelemetryManager.initialize(config)
-        
-        // Option 2: Initialize with individual parameters (Legacy)
-        // Still fully supported for backward compatibility
-        /*
         TelemetryManager.initialize(
             application = this,
-            apiKey = BuildConfig.TELEMETRY_API_KEY,  // ✅ Secure: API key from BuildConfig
-            // apiKey = "your-api-key",  // ❌ NEVER hardcode API keys!
-            endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
-            debugMode = true, // Set to false in production
-            batchSize = 30,
-            enableCrashReporting = true,
-            enableUserProfiles = true,
-            enableSessionTracking = true,
-            globalAttributes = mapOf(
-                "app.environment" to "development",
-                "app.version" to "1.0.0"
-            )
+            config = config
         )
-        */
+        
+        // Note: Sessions are automatically tracked by the SDK
+        // User profiles can be set after initialization
         
         // Set initial user profile (if user is logged in)
         TelemetryManager.getInstance().setUserProfile(
             name = "Demo User",
             email = "demo@example.com",
-            customAttributes = mapOf(
-                "user_type" to "demo",
-                "signup_date" to "2024-01-15"
-            )
+            phone = "+1234567890"
         )
     }
 }
@@ -272,10 +259,7 @@ fun ProfileScreen(navController: NavController) {
                 TelemetryManager.getInstance().setUserProfile(
                     name = userName.takeIf { it.isNotEmpty() },
                     email = userEmail.takeIf { it.isNotEmpty() },
-                    customAttributes = mapOf(
-                        "profile_updated_at" to System.currentTimeMillis().toString(),
-                        "update_method" to "manual"
-                    )
+                    phone = null
                 )
                 
                 TelemetryManager.getInstance().trackEvent("user.profile_updated", mapOf(

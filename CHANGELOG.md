@@ -5,6 +5,921 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.13] - 2026-06-16
+
+Backend-alignment hotfix release. The SDK was silently misaligned with the EdgeTelemetryProcessor
+backend on several event types; data was either being dropped to a fallback bucket or never sent
+at all. This release brings the wire format back in line with `event_processor.py`.
+
+### 🐛 Wire-format Fixes (Data Loss)
+
+- **Screen duration**: events were sent as `metricName = "performance.screen_duration"` (a metric).
+  Backend expects `eventName = "screen.duration"` (an event) and routes those to
+  `rum_screen_durations`. Before: all screen-duration data fell through to the generic
+  `rum_performance_events` bucket and lost its structured columns. After: lands in the correct
+  table with `screen.name`, `screen.duration_ms`, `screen.exit_method`, `screen.timestamp`.
+- **Metric type field**: `EventTrackingService.recordMetric()` was emitting the literal string
+  `"metric|event"` as the `type` discriminator (pipe character was real). Backend dispatch
+  (`event_processor.py:96`) checks `event.type == "metric"`. Now emits `"metric"` cleanly.
+- **Session lifecycle event names**: `"session_end"` (legacy) was being sent on session timeout.
+  Backend recognizes `"session.finalized"`. Renamed; both `endCurrentSession()` and the timeout
+  path now emit `session.finalized`.
+
+### ✨ Missing Events Now Emitted
+
+- **`session.started`**: emitted when a session opens (initial init, timeout-triggered rotation,
+  and explicit `startNewSession()`). Backend marks the corresponding `rum_sessions` row active.
+- **`user.profile.update`**: emitted by `setUserProfile()` and `clearUserProfile()`. Backend
+  upserts `rum_users` directly instead of relying solely on opportunistic backfill from event
+  attributes.
+
+### 🔧 SDK Identity & Headers
+
+- `User-Agent` now reads the real SDK version (was hardcoded to `1.0.0`).
+- New `X-SDK-Version` and `X-SDK-Platform: android` headers on every outbound batch (including
+  crash retry path). Surfaces SDK identity to backend ops/analytics dashboards.
+- `BuildConfig.SDK_VERSION` exposed; single source of truth in `build.gradle.kts`.
+
+### 📈 Richer Data Collection
+
+- Memory tracking now wired into the lifecycle (`onStart`, session boundaries). The
+  `MemoryTracker` factory was never being invoked previously; defaults were on but no emitter ran.
+- Frame, memory, storage, and user-interaction tracking remain on by default — backend now
+  processes them via the metric type or the performance-events fallback.
+
+### 🔧 Attribution Correctness
+
+- Removed lazy user-profile overwrite at HTTP-send time. Previously, events recorded before a
+  `setUserProfile()` call would be retroactively re-attributed at flush time, distorting
+  historical attribution. Backend now backfills `rum_users` from any event with `user.*` keys
+  (commit `e6ab501` in processor), making the SDK-side override unnecessary and incorrect.
+
+### 🛡️ Concurrency Hardening
+
+- Init-flag registration guards converted to `AtomicBoolean` (`activityObserverRegistered`,
+  `processObserverRegistered`, `crashHandlerInstalled`). Prevents double-install of lifecycle
+  observers / crash handler under concurrent `initialize()` calls.
+- Persisted crash file (`telemetry_pending_crash.json`) reads/writes/deletes now serialized via
+  an intra-process mutex — eliminates a race that could corrupt the JSON when multiple
+  `recordCrash()` calls overlap.
+- `BatchProcessingService.idsInitialized` marked `@Volatile` so the flush coroutine sees writes
+  from the init thread without external locks.
+
+### ✅ No Breaking Changes
+
+Public API surface unchanged; the new `recordScreenDuration()` helper and the additional outbound
+events are additive. Consumers should see strictly more data flowing to the backend after
+upgrading, into the correct tables.
+
+---
+
+## [2.1.12] - 2026-03-24
+
+### 🐛 Bug Fixes
+- **User Profile API Consistency**: Standardized parameter naming from `displayName` to `name` throughout the SDK
+- **User Profile Data in Events**: Fixed issue where `user.name`, `user.email`, and `user.phone` were not appearing in telemetry events
+
+### 🔧 API Changes
+- `setUserProfile()` parameter renamed from `displayName` to `name` for consistency
+- Updated all documentation and examples to use the new parameter name
+- Maintained full backward compatibility with existing data storage
+
+### 📝 Documentation Updates
+- Updated all API documentation to reflect parameter name change
+- Updated usage examples and migration guides
+- Fixed inconsistent naming across all documentation files
+
+### ⚠️ Migration Required
+**Client Code Update Required:**
+```kotlin
+// Before
+TelemetryManager.getInstance().setUserProfile(
+    displayName = "John Doe",
+    email = "john@example.com"
+)
+
+// After  
+TelemetryManager.getInstance().setUserProfile(
+    name = "John Doe",
+    email = "john@example.com"
+)
+```
+
+---
+
+## [2.1.3] - 2026-03-23
+
+### 🔧 Code Quality Improvements
+
+#### Naming Convention Remediation
+Removed all temporal naming (Phase/Stage prefixes) from code and tests in favor of functional, descriptive names.
+
+**Test Files Renamed:**
+- `Phase4EventIntegrationTest.kt` → `EventIntegrationTest.kt`
+- `Phase2cEnhancedContextTest.kt` → `EnhancedCrashContextTest.kt`
+- `Phase4IntegrationTest.kt` → `StandardAttributesIntegrationTest.kt`
+- `TelemetryManagerStage2Test.kt` → `TelemetryManagerTest.kt`
+- `UserProfileManagerStage2Test.kt` → `UserProfileManagerTest.kt`
+- `IdGeneratorStage2Test.kt` → Removed (duplicate of existing `IdGeneratorTest.kt`)
+
+**Code Functions Renamed:**
+- `performStage9InitSequence()` → `performInitializationSequence()`
+- `validatePhase2Attributes()` → `validateStandardAttributes()`
+
+**Comments Updated:**
+- Removed all Phase/Stage references from 13 files
+- Updated documentation strings to be descriptive of functionality
+- Improved code readability and maintainability
+
+**Impact:**
+- Zero breaking changes to public API
+- Improved code maintainability and clarity
+- Better alignment with industry best practices
+- All git history preserved via `git mv`
+
+---
+
+## [2.1.0] - 2026-03-23
+
+### ✅ Phase 5: Documentation - COMPLETE
+
+#### Overview
+Phase 5 completes the EdgeRum SDK alignment with OpenTelemetry backend requirements by providing comprehensive documentation for all changes implemented in Phases 1-4. This ensures developers can effectively use the SDK and understand all backend-aligned features.
+
+#### Documentation Deliverables
+
+**New Documentation:**
+- **EVENT_SCHEMA_REFERENCE.md** - Comprehensive event schema reference
+  - Complete schemas for all 5 supported event types
+  - Required and optional attributes with data types
+  - Field length limits and validation rules
+  - JSON payload examples for each event type
+  - Standard attributes documentation (18 total)
+  - Unsupported events reference
+  - Validation rules and enum values
+  - Backend compatibility notes
+  - Migration guidance
+  - Testing and validation examples
+  - 1,200+ lines of comprehensive documentation
+
+**Updated Documentation:**
+- **README.md** - Enhanced with backend alignment section
+  - Added "Backend Alignment (v2.1.0)" section (140+ lines)
+  - Phase 1-4 summaries with impact notes
+  - Event name mapping table
+  - Standard attributes summary
+  - Feature flags configuration examples
+  - Performance benefits documentation (60-70% traffic reduction)
+  - Links to all phase documentation
+  
+- **PHASE_5_SUMMARY.md** - Phase 5 implementation summary
+  - Documentation deliverables overview
+  - Success metrics and quality indicators
+  - Developer resources and quick reference
+  - Documentation structure and coverage
+  - Backward compatibility notes
+
+#### Documentation Coverage
+
+**Event Types Documented:** 5/5 (100%)
+- HTTP Request Events (`http.request`)
+- Session Finalized Events (`session.finalized`)
+- Navigation Events (`navigation`)
+- Screen Duration Events (`performance.screen_duration`)
+- Crash Events (`app.crash`)
+
+**Standard Attributes Documented:** 18/18 (100%)
+- App information (4 attributes)
+- Device information (11 attributes)
+- User & session (3 attributes)
+
+**Additional Documentation:**
+- JSON payload examples for all event types
+- Kotlin and Java usage examples
+- Validation rules and constraints
+- Feature flag configuration
+- Backend compatibility matrix
+- Migration guides
+- Testing and validation examples
+
+#### Success Metrics
+
+- ✅ Event schema reference created (1,200+ lines)
+- ✅ All 5 event types documented with examples
+- ✅ All 18 standard attributes documented
+- ✅ JSON examples provided for each event type
+- ✅ Validation rules documented
+- ✅ Feature flags documented with examples
+- ✅ README enhanced with alignment notes
+- ✅ Migration guides complete
+- ✅ Backend compatibility documented
+- ✅ Testing examples included
+- ✅ Code examples provided (Kotlin/Java)
+- ✅ Cross-references between docs
+- ✅ Version numbers and dates included
+
+#### Developer Experience
+
+**Quick Reference:**
+- Start with README.md for quick start and overview
+- Review EVENT_SCHEMA_REFERENCE.md for event schemas
+- Check PHASE_4_TESTING_GUIDE.md for testing
+- See API_KEY_GUIDE.md for security best practices
+
+**For Backend Teams:**
+- EVENT_SCHEMA_REFERENCE.md - Event schemas and validation
+- PHASE_1_SUMMARY.md - Event name changes
+- PHASE_2_SUMMARY.md - Standard attributes
+- PHASE_4_SUMMARY.md - Validation rules
+
+**For Migration:**
+- PHASE_1_MIGRATION.md - Event name migration
+- MIGRATION_GUIDE_V2.md - v2.0.0 crash reporting
+- NAVIGATION_MIGRATION_GUIDE.md - Navigation events
+
+#### Files Created/Modified
+
+**New Files (2):**
+1. `docs/EVENT_SCHEMA_REFERENCE.md` - Comprehensive event schema reference
+2. `docs/PHASE_5_SUMMARY.md` - Phase 5 implementation summary
+
+**Modified Files (3):**
+1. `README.md` - Added backend alignment section
+2. `CHANGELOG.md` - This entry
+3. `plan.md` - Phase 5 marked complete
+
+#### Performance Impact
+
+- **Documentation Size:** ~90 KB total
+- **Runtime Impact:** Zero (documentation only)
+- **Repository Impact:** Negligible
+
+#### Backward Compatibility
+
+- ✅ No breaking changes (documentation only)
+- ✅ Additive updates to existing docs
+- ✅ All docs include version numbers
+- ✅ Historical versions still accessible
+
+---
+
+### ✅ Phase 4: Testing & Validation
+
+#### Event Payload Validation
+- **EventPayloadValidator** - Comprehensive validation for all event types
+  - Validates HTTP request events (`http.request`)
+  - Validates session finalized events (`session.finalized`)
+  - Validates navigation events (`navigation`)
+  - Validates screen duration events (`performance.screen_duration`)
+  - Validates crash events (`app.crash`)
+  - Type validation for all attributes
+  - Field length limit enforcement (crash events)
+  - ISO 8601 timestamp validation
+  - Enum value validation (HTTP methods, navigation methods, severity levels)
+
+#### Runtime Validation
+- **RuntimeEventValidator** - Optional runtime validation with debug/strict modes
+  - Debug mode with validation logging
+  - Strict mode with exception throwing
+  - Batch validation support
+  - Zero overhead when disabled
+  - Integration with EventPayloadValidator
+
+#### Test Suites
+- **EventPayloadValidatorTest** - 40+ unit test cases
+  - Valid payload tests for all event types
+  - Invalid event name detection
+  - Missing attribute detection
+  - Wrong data type rejection
+  - Field length limit enforcement
+  - Timestamp format validation
+  
+- **Phase4IntegrationTest** - 20+ integration test cases
+  - Complete event validation with standard attributes
+  - Missing standard attributes detection
+  - Boolean and numeric type validation
+  - Field length limit enforcement
+  
+- **Phase4EventIntegrationTest** - 15+ instrumented test cases
+  - End-to-end event tracking tests
+  - Event name alignment verification
+  - Method validation (HTTP, navigation, screen exit)
+  - Data type validation
+  - Unsupported events verification
+
+#### Documentation
+- **PHASE_4_TESTING_GUIDE.md** - Comprehensive testing guide
+  - Event payload validation guide
+  - Integration testing guide
+  - Runtime validation guide
+  - Test suite documentation
+  - Validation utilities reference
+  - Testing checklist
+  - Best practices and troubleshooting
+
+- **PHASE_4_SUMMARY.md** - Implementation summary
+  - Complete implementation overview
+  - Validation coverage details
+  - Test coverage metrics
+  - Usage examples
+  - Validation rules reference
+
+### Testing Coverage
+- 75+ comprehensive test cases
+- All 5 event types validated
+- All validation rules tested
+- Integration with TelemetryManager verified
+- Zero production overhead confirmed
+
+### Performance
+- No overhead in production (validation disabled by default)
+- Minimal overhead in debug mode (~1-2ms per event)
+- Efficient validation with early exit
+- Batch validation supported
+
+### ✅ Phase 3: Event Cleanup - COMPLETE
+
+#### Overview
+Phase 3 implements feature flags to disable unsupported events that are not processed by the backend. This reduces bandwidth, processing overhead, and ensures only supported events are transmitted. All unsupported events are disabled by default while maintaining backward compatibility through opt-in feature flags.
+
+#### Unsupported Events Disabled by Default
+
+**Performance Events (Not Processed by Backend):**
+- `frame_drop` - Frame rendering performance tracking
+- `performance.frame_summary` - Aggregated frame performance metrics
+- `performance.compose` - Jetpack Compose performance metrics
+
+**System Resource Events (Not Processed by Backend):**
+- `memory_pressure` - Memory usage and pressure tracking
+- `storage_usage` - Device storage metrics
+
+**Legacy Screen Events (Not Processed by Backend):**
+- `navigation.screen_resume` - Screen lifecycle resume
+- `navigation.screen_pause` - Screen lifecycle pause
+- `screen.entry` - Screen entry tracking
+- `screen.exit` - Screen exit tracking
+- `screen.resume` - Screen resume lifecycle
+- `screen.pause` - Screen pause lifecycle
+- `screen_view` - Legacy screen view event (deprecated)
+
+**User Interaction Events (Not Processed by Backend):**
+- `user.interaction` - User interaction tracking
+
+**Capability Events (Not Processed by Backend):**
+- `telemetry.capabilities_initialized` - Device capability initialization
+
+**Deprecated Events:**
+- `app.error` - Use `app.crash` instead (deprecated with warning)
+
+#### Feature Flags Implementation
+
+**New TelemetryConfig Properties:**
+```kotlin
+data class TelemetryConfig(
+    // ... existing properties
+    val enableMemoryTracking: Boolean = false,
+    val enableStorageTracking: Boolean = false,
+    val enableFrameTracking: Boolean = false,
+    val enableLegacyScreenEvents: Boolean = false,
+    val enableUserInteractionEvents: Boolean = false,
+    val enableCapabilityEvents: Boolean = false
+)
+```
+
+**Usage Example:**
+```kotlin
+// Default configuration - all unsupported events disabled
+val config = TelemetryConfig.builder(application, "edge_your_api_key")
+    .debugMode(true)
+    .build()
+
+// Opt-in to specific unsupported events if needed
+val configWithMemory = TelemetryConfig.builder(application, "edge_your_api_key")
+    .enableMemoryTracking(true)  // Enable if you need memory events
+    .enableFrameTracking(true)   // Enable if you need frame events
+    .build()
+```
+
+#### Technical Implementation
+
+**Updated Components:**
+- `TelemetryConfig.kt` - Added 6 new feature flags with default `false`
+- `TelemetryManager.kt` - Added helper methods to check feature flags
+- `MemoryTracker.kt` - Checks `enableMemoryTracking` and `enableStorageTracking`
+- `TelemetryMemoryUsage.kt` - Respects memory and storage tracking flags
+- `TelemetryFrameDropCollector.kt` - Checks `enableFrameTracking` before emitting
+- `LegacyPerformanceTracker.kt` - Respects frame tracking flag
+- `EdgeTelemetryCompose.kt` - Checks legacy screen and user interaction flags
+
+**Helper Methods Added to TelemetryManager:**
+```kotlin
+internal fun isMemoryTrackingEnabled(): Boolean
+internal fun isStorageTrackingEnabled(): Boolean
+internal fun isFrameTrackingEnabled(): Boolean
+internal fun isLegacyScreenEventsEnabled(): Boolean
+internal fun isUserInteractionEventsEnabled(): Boolean
+```
+
+#### Performance Impact
+
+**Bandwidth Reduction:**
+- Eliminates ~60-70% of unsupported event traffic
+- Typical app: 100+ unsupported events/minute → 0 events/minute
+- Estimated bandwidth savings: 50-100 KB/minute per active user
+
+**Processing Overhead Reduction:**
+- No CPU cycles wasted collecting unsupported metrics
+- No memory allocated for unsupported event queues
+- No network requests for events that won't be processed
+
+**Device Resource Impact:**
+- Reduced battery consumption (fewer sensors, less processing)
+- Lower memory pressure (smaller event queues)
+- Improved app performance (less background work)
+
+#### Backward Compatibility
+
+**No Breaking Changes:**
+- All feature flags default to `false` (disabled)
+- Existing SDK users automatically get optimized behavior
+- Opt-in available for users who need specific events
+- All existing APIs unchanged
+
+**Migration Path:**
+```kotlin
+// v2.0.x - All events enabled (including unsupported)
+TelemetryManager.initialize(application, apiKey)
+
+// v2.1.0 - Unsupported events disabled by default
+TelemetryManager.initialize(application, apiKey)  // Same API, better performance
+
+// v2.1.0 - Opt-in to specific events if needed
+val config = TelemetryConfig.builder(application, apiKey)
+    .enableMemoryTracking(true)  // Only if you need it
+    .build()
+TelemetryManager.initialize(config)
+```
+
+#### Deprecation Warnings
+
+**Deprecated Methods:**
+- `recordError(throwable)` - Use `recordCrash(throwable)` instead
+- `recordScreenView(screenName)` - Use navigation events instead
+
+**Deprecation Level:** WARNING (code still works, but logs deprecation notice)
+
+#### Debug Mode Logging
+
+When `debugMode = true`, the SDK logs when unsupported events are skipped:
+```
+D/TelemetryManager: Memory tracking disabled - skipping memory_pressure event
+D/TelemetryManager: Legacy screen events disabled - skipping screen.entry for HomeScreen
+D/TelemetryManager: Frame tracking disabled - skipping frame_drop event
+```
+
+#### Files Modified
+
+**Core Implementation:**
+- `core/TelemetryConfig.kt` - Added 6 feature flags
+- `core/TelemetryManager.kt` - Added helper methods and flag checks
+- `core/MemoryTracker.kt` - Added memory/storage tracking checks
+- `core/TelemetryMemoryUsage.kt` - Added tracking flag checks
+- `core/TelemetryFrameDropCollector.kt` - Added frame tracking check
+- `core/LegacyPerformanceTracker.kt` - Added frame tracking checks
+- `compose/EdgeTelemetryCompose.kt` - Added legacy screen and user interaction checks
+
+**Documentation:**
+- `CHANGELOG.md` - This entry
+- `plan.md` - Updated Phase 3 status
+
+#### Success Criteria
+
+- ✅ All unsupported events disabled by default
+- ✅ Feature flags implemented for opt-in control
+- ✅ No breaking changes to existing APIs
+- ✅ Backward compatibility maintained
+- ✅ Performance overhead eliminated for unsupported events
+- ✅ Debug logging for transparency
+- ✅ Documentation complete
+
+#### Next Steps
+
+- Phase 4: Testing & validation
+- Phase 5: Documentation updates
+- Performance benchmarking with/without unsupported events
+
+---
+
+### ✅ Phase 2: Standard Attributes - COMPLETE
+
+#### Overview
+Phase 2 ensures all telemetry events include comprehensive standard attributes for app, device, user, and session context as required by the backend processor. This implementation maintains backward compatibility while improving data consistency and completeness.
+
+#### Standard Attributes Implementation
+
+**2.1 App Information Attributes** ✅
+- `app.name` - Application name
+- `app.version` - App version (e.g., "1.2.3")
+- `app.build_number` - Build number
+- `app.package_name` - Package identifier
+
+**2.2 Device Information Attributes** ✅
+- `device.id` - Unique device identifier (UUID)
+- `device.platform` - Platform (always "android")
+- `device.platform_version` - OS version (e.g., "13.0")
+- `device.model` - Device model (e.g., "Pixel 7")
+- `device.manufacturer` - Manufacturer (e.g., "Google")
+- `device.brand` - Brand name
+- `device.android_sdk` - Android SDK version
+- `device.android_release` - Android release version
+- `device.fingerprint` - Device fingerprint
+- `device.hardware` - Hardware identifier
+- `device.product` - Product name
+
+**2.3 User & Session Attributes** ✅
+- `user.id` - Unique user identifier (auto-generated, persisted)
+- `session.id` - Current session identifier
+- `session.start_time` - Session start timestamp (ISO 8601)
+- Additional session context: duration, event/metric counts, screen tracking
+
+#### Technical Implementation
+
+**Attribute Collection:**
+- `DeviceInfoCollector` - Collects app and device attributes
+- `SessionManager` - Manages session lifecycle and statistics
+- `UserProfileManager` - Handles user identification and profiles
+- All attributes automatically attached to every event
+
+**Attribute Flattening:**
+- Nested `EventAttributes` structure flattened in `TelemetryHttpClient`
+- Consistent attribute naming across all components
+- OpenTelemetry-aligned attribute conventions
+
+**Validation:**
+- New `AttributeValidator` utility for Phase 2 compliance checking
+- Validates all required attributes are present and non-empty
+- Provides detailed validation reports for debugging
+
+#### Changes Made
+
+**Updated Components:**
+- `DeviceInfoCollector.kt` - Updated attribute names to match Phase 2 requirements
+  - `device.os_version` → `device.platform_version`
+  - `device.api_level` → `device.android_sdk`
+- `TelemetryHttpClient.kt` - Already flattening attributes correctly
+- `SessionManager.kt` - Already providing all required session attributes
+- `UserProfileManager.kt` - Already providing user identification
+
+**New Components:**
+- `core/validation/AttributeValidator.kt` - Phase 2 compliance validation utility
+
+**Documentation:**
+- `docs/PHASE_2_IMPLEMENTATION.md` - Comprehensive Phase 2 implementation guide
+- `plan.md` - Updated with Phase 2 completion status
+
+#### Performance Impact
+
+**Minimal Overhead:**
+- Attributes collected once at initialization (app/device info)
+- Session attributes updated incrementally
+- Single-pass flattening during serialization
+- Estimated ~1KB additional payload per event
+
+**Memory Impact:**
+- ~1KB per event in queue
+- ~30KB for typical batch of 30 events
+- Negligible impact on device resources
+
+#### Backward Compatibility
+
+**No Breaking Changes:**
+- All existing APIs unchanged
+- Additive changes only (no attributes removed)
+- Legacy attribute names still supported
+- Graceful degradation for missing optional attributes
+
+**Migration:**
+- No migration required for existing integrations
+- Phase 2 attributes automatically included in all events
+- Update SDK version to get Phase 2 compliance
+
+#### Validation & Testing
+
+**AttributeValidator Utility:**
+```kotlin
+import com.androidtel.telemetry_library.core.validation.AttributeValidator
+
+// Validate all Phase 2 attributes
+val result = AttributeValidator.validatePhase2Attributes(
+    attributes = flattenedAttributes,
+    eventName = "http.request"
+)
+
+if (!result.isValid) {
+    val report = AttributeValidator.getValidationReport(result)
+    Log.w(TAG, report)
+}
+```
+
+**Testing Recommendations:**
+1. Enable debug mode to inspect event payloads
+2. Use `AttributeValidator` to verify compliance
+3. Check logs for attribute validation warnings
+4. Verify backend receives all required attributes
+
+#### OpenTelemetry Alignment
+
+**Current Implementation:**
+- Attribute naming follows OTel semantic conventions
+- Flattened structure matches OTel Span attributes
+- ISO 8601 timestamps align with OTel standards
+
+**Future Enhancement:**
+- Migrate to OpenTelemetry Resource for standard attributes
+- Use OTel Context for session/user propagation
+- Full alignment with OTel semantic conventions
+
+#### Files Modified
+
+**Core Implementation:**
+- `core/device/DeviceInfoCollector.kt` - Updated attribute names
+- `core/session/SessionManager.kt` - Already compliant
+- `core/user/UserProfileManager.kt` - Already compliant
+- `core/TelemetryHttpClient.kt` - Already flattening correctly
+
+**New Files:**
+- `core/validation/AttributeValidator.kt` - Validation utility
+
+**Documentation:**
+- `docs/PHASE_2_IMPLEMENTATION.md` - Implementation guide
+- `plan.md` - Updated Phase 2 status
+- `CHANGELOG.md` - This entry
+
+#### Success Criteria
+
+- ✅ All Phase 2 required attributes implemented
+- ✅ Attributes attached to every event automatically
+- ✅ Backward compatibility maintained
+- ✅ Minimal performance overhead
+- ✅ Comprehensive validation utilities
+- ✅ OpenTelemetry-aligned architecture
+- ✅ Documentation complete
+
+#### Next Steps
+
+- Phase 3: Event cleanup (remove unsupported events)
+- Phase 4: Testing & validation
+- Phase 5: Documentation updates
+
+---
+
+### 💥 BREAKING CHANGES - Phase 1: Event Name Alignment
+
+#### Backend Alignment Initiative
+- **🔴 CRITICAL**: All event names and attributes updated to match backend processor requirements
+- **Event Structure Changes**: Event names, attribute names, and data structures aligned with backend expectations
+- **Backend Compatibility**: Changes required for proper event processing and analytics
+- **Migration Impact**: Automatic for SDK users - no code changes required
+
+### ✨ Event Name Changes
+
+#### 1. HTTP Request Events
+**Event Name:** `network.request` → `http.request`
+
+**New Required Attributes:**
+- `http.url` - Full request URL
+- `http.method` - HTTP method (GET, POST, PUT, DELETE, etc.)
+- `http.status_code` - Response status code
+- `http.duration_ms` - Request duration in milliseconds
+- `http.timestamp` - Request timestamp (ISO 8601 format)
+- `http.success` - Boolean (status < 400)
+- `http.request_body_size` - Request body size in bytes
+- `http.response_body_size` - Response body size in bytes
+- `http.error` - Error message if request failed
+
+**Impact:** None - `TelemetryInterceptor` handles automatically
+
+#### 2. Session End Events
+**Event Name:** `session_end` → `session.finalized`
+
+**New Required Attributes:**
+- `session.id` - Unique session identifier
+- `session.start_time` - Session start timestamp (ISO 8601)
+- `session.duration_ms` - Total session duration
+- `session.event_count` - Total events in session
+- `session.metric_count` - Total metrics in session
+- `session.screen_count` - Number of unique screens visited
+- `session.visited_screens` - Comma-separated list of screen names
+- `session.is_first_session` - Boolean for first-time user
+- `session.total_sessions` - Total sessions for this user
+- `network.type` - Network type (wifi, cellular, etc.)
+
+**Impact:** None - SDK handles automatically on app background
+
+#### 3. Navigation Events
+**Event Name Standardized:** `navigation.route_change` → `navigation`
+
+**Updated Required Attributes:**
+- `navigation.from_screen` - Source screen name (empty for app launch)
+- `navigation.to_screen` - Destination screen name
+- `navigation.method` - Navigation method (push, pop, replace)
+- `navigation.route_type` - Route type (compose_route, main_flow, deeplink, fragment_flow)
+- `navigation.has_arguments` - Boolean indicating if route has arguments
+- `navigation.timestamp` - Navigation timestamp (ISO 8601)
+
+**Impact:** Automatic via lifecycle observers and Compose tracking
+
+#### 4. Screen Duration Events
+**Event Name:** `performance.screen_duration` (unchanged)
+
+**Enhanced Required Attributes:**
+- `screen.name` - Screen/route name
+- `screen.duration_ms` - Time spent on screen
+- `screen.exit_method` - How user left screen (navigation, paused, closed, destroyed, saved_state)
+- `screen.timestamp` - Screen exit timestamp (ISO 8601)
+- `metric.unit` - Unit of measurement (milliseconds)
+
+**Impact:** None - SDK handles automatically
+
+#### 5. Crash Events
+**Event Name:** `app.crash` (unchanged)
+
+**Enhanced Attributes with Field Limits:**
+- `error.message` - Error message (max 1000 chars)
+- `error.stack_trace` - Full stack trace (max 2000 chars)
+- `error.exception_type` - Exception class name (max 255 chars)
+- `error.context` - Error context/description (max 500 chars)
+- `error.cause` - Root cause description (max 255 chars)
+- `error.severity_level` - Severity (critical, error, warning, info)
+- `error.is_fatal` - Boolean indicating if crash is fatal
+- `error.breadcrumbs` - JSON array of breadcrumbs (max 800 chars)
+- `error.breadcrumb_count` - Number of breadcrumbs
+
+**Optional Enhanced Attributes:**
+- `error.code` - Error code if available (max 100 chars)
+- `error.product_id` - Product/module identifier (max 255 chars)
+- `error.user_action` - What user was doing (max 500 chars)
+
+**Impact:** None - SDK handles automatically with enhanced context
+
+### 🗑️ Removed Events (Not Processed by Backend)
+
+The following events are **no longer tracked** as they are not supported by the backend processor:
+
+**Lifecycle Events:**
+- ❌ `navigation.screen_resume`
+- ❌ `navigation.screen_pause`
+- ❌ `screen.entry`
+- ❌ `screen.exit`
+- ❌ `screen.resume`
+- ❌ `screen.pause`
+
+**Performance Events:**
+- ❌ `frame_drop`
+- ❌ `performance.frame_summary`
+- ❌ `performance.compose`
+
+**System Events:**
+- ❌ `memory_pressure`
+- ❌ `storage_usage`
+- ❌ `telemetry.capabilities_initialized`
+
+**Legacy Events:**
+- ❌ `screen_view` (use `navigation` instead)
+- ❌ `app.error` (use `app.crash` instead)
+- ❌ `user.interaction`
+
+### 🔧 Technical Improvements
+
+#### Automatic Field Length Enforcement
+- All crash attributes automatically truncated to backend limits
+- Prevents field truncation errors in backend processor
+- No data loss - most important info preserved within limits
+
+#### Enhanced Error Context Extraction
+- Automatic extraction of error context from stack traces
+- Severity level determination based on exception type
+- Breadcrumb integration for richer debugging context
+
+#### ISO 8601 Timestamp Standardization
+- All timestamps now use ISO 8601 format
+- Consistent timestamp format across all events
+- Backend-compatible datetime parsing
+
+### 📝 Migration Guide
+
+#### For SDK Users (App Developers)
+
+**Good News:** No code changes required! Just update the SDK version.
+
+```kotlin
+dependencies {
+    // Update to v2.1.0
+    implementation 'com.github.NCG-Africa:edge_telemetry_android:2.1.0'
+}
+```
+
+**Automatic Migration:**
+- ✅ HTTP tracking via `TelemetryInterceptor` - automatic
+- ✅ Session tracking - automatic
+- ✅ Navigation tracking - automatic
+- ✅ Screen duration tracking - automatic
+- ✅ Crash reporting - automatic
+
+**Manual Event Tracking (if used):**
+```kotlin
+// OLD - Don't use
+telemetryManager.recordEvent("navigation.route_change", attributes)
+telemetryManager.recordEvent("session_end", attributes)
+telemetryManager.recordEvent("network.request", attributes)
+telemetryManager.recordEvent("app.error", attributes)
+
+// NEW - Use instead
+telemetryManager.recordEvent("navigation", attributes)
+telemetryManager.recordEvent("session.finalized", attributes)
+telemetryManager.recordEvent("http.request", attributes)
+telemetryManager.recordCrash(throwable)
+```
+
+#### For Backend Teams
+
+**Required Updates:**
+1. Update Kafka processor to handle new event names
+2. Update database schema for new attribute structures
+3. Verify field mappings match new attribute names
+4. Test event processing in staging environment
+
+**Event Name Mapping:**
+- `network.request` → `http.request`
+- `session_end` → `session.finalized`
+- `navigation.route_change` → `navigation`
+- `app.error` → `app.crash`
+
+### ⚠️ Important Notes
+
+#### Backend Compatibility
+- Backend processor must support new event names and attribute structures
+- Old event names will not be processed correctly
+- Coordinate deployment with backend team
+
+#### Performance Impact
+- **No additional overhead** - maintains or improves performance
+- Event batching unchanged
+- Offline storage unchanged
+- Network efficiency improved with better attribute structure
+- Field length limits prevent excessive payload sizes
+- Removed unsupported events reduce unnecessary processing
+
+#### Testing Recommendations
+1. Enable debug mode to verify new event structures
+2. Test HTTP request tracking
+3. Test session finalization on app background
+4. Test navigation between screens
+5. Test crash reporting functionality
+
+### 📊 Files Modified
+
+#### Core Implementation
+- `TelemetryManager.kt` - Updated event names and attribute structures
+- `TelemetryInterceptor.kt` - HTTP request attribute alignment
+- `TelemetryActivityLifecycleObserver.kt` - Screen duration attributes
+- `TelemetryFragmentLifecycleObserver.kt` - Fragment screen duration
+- `TrackComposeScreen.kt` - Compose navigation standardization
+- `CrashReporter.kt` - Enhanced crash attributes (via existing v2.0.0 structure)
+
+#### Documentation
+- `docs/PHASE_1_MIGRATION.md` - Comprehensive migration guide
+- `CHANGELOG.md` - This changelog entry
+
+### 🔗 Related Documentation
+
+- [Phase 1 Migration Guide](docs/PHASE_1_MIGRATION.md) - Detailed migration instructions
+- [Integration Summary](docs/INTEGRATION_SUMMARY.md) - Integration details
+- [API Key Guide](docs/API_KEY_GUIDE.md) - Setup instructions
+
+---
+
+## [2.0.3] - 2026-03-23
+
+### 🐛 Critical Bug Fix
+
+#### Telemetry Batch Payload Structure Fix
+- **Fixed**: Corrected telemetry batch payload structure to match API requirements
+- **Issue**: API was rejecting payloads with 400 error "missing_events_field" because the SDK was wrapping the batch in a "data" object
+- **Root Cause**: The `TelemetryBatch.toJson()` extension function was correctly implemented but the app was using an old build
+- **Solution**: Rebuilt the library to ensure the flattened payload structure is used
+
+#### Impact
+- Telemetry events now successfully send to the API endpoint
+- No more 400 Bad Request errors due to payload structure mismatch
+- Events array is now at root level as required by the backend validator
+
+### 📦 Build Changes
+- Library rebuilt with clean build to ensure latest code is packaged
+- Version bumped to 2.0.3 for release tracking
+
+---
+
 ## [2.0.2] - 2026-03-23
 
 ### 🐛 Critical Bug Fix

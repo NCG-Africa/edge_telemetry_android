@@ -1,0 +1,361 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues>
+    <ID>ConstructorParameterNaming:FlutterCompatiblePayload.kt$CrashBatchData$val batch_size: Int = 1</ID>
+    <ID>ConstructorParameterNaming:FlutterCompatiblePayload.kt$CrashBatchData$val tenant_id: String? = null</ID>
+    <ID>ConstructorParameterNaming:FlutterCompatiblePayload.kt$CrashBatchEnvelope$val device_id: String</ID>
+    <ID>ConstructorParameterNaming:FlutterCompatiblePayload.kt$CrashEventAttributes$val error_code: String? = null // max 100 chars</ID>
+    <ID>ConstructorParameterNaming:FlutterCompatiblePayload.kt$CrashEventAttributes$val error_context: String? = null</ID>
+    <ID>ConstructorParameterNaming:FlutterCompatiblePayload.kt$CrashEventAttributes$val exception_type: String</ID>
+    <ID>ConstructorParameterNaming:FlutterCompatiblePayload.kt$CrashEventAttributes$val is_fatal: Boolean = false</ID>
+    <ID>ConstructorParameterNaming:FlutterCompatiblePayload.kt$CrashEventAttributes$val product_id: String? = null</ID>
+    <ID>ConstructorParameterNaming:FlutterCompatiblePayload.kt$CrashEventAttributes$val user_action: String? = null</ID>
+    <ID>ConstructorParameterNaming:FlutterCompatiblePayload.kt$CrashPayload$val device_id: String</ID>
+    <ID>ConstructorParameterNaming:FlutterCompatiblePayload.kt$EventBatchData$val batch_size: Int</ID>
+    <ID>ConstructorParameterNaming:FlutterCompatiblePayload.kt$EventBatchPayload$val device_id: String</ID>
+    <ID>ConstructorParameterNaming:TelemetryBatch.kt$TelemetryDataOut$val batch_size: Int</ID>
+    <ID>ConstructorParameterNaming:TelemetryBatch.kt$TelemetryDataOut$val device_id: String</ID>
+    <ID>ConstructorParameterNaming:TelemetryBatch.kt$TelemetryPayload$val device_id: String</ID>
+    <ID>CyclomaticComplexMethod:RuntimeEventValidator.kt$RuntimeEventValidator$fun validateEvent(event: TelemetryEvent): EventValidationResult</ID>
+    <ID>CyclomaticComplexMethod:TelemetryMemoryUsage.kt$TelemetryMemoryUsage$private fun recordEnhancedMemoryUsage()</ID>
+    <ID>FunctionNaming:EdgeTelemetryCompose.kt$@Composable fun TrackComposeScreen( navController: NavController, screenName: String? = null, additionalData: Map&lt;String, String&gt;? = null )</ID>
+    <ID>FunctionNaming:EdgeTelemetryCompose.kt$@Composable fun TrackScreen( screenName: String, category: String = "screen", attributes: Map&lt;String, String&gt;? = null )</ID>
+    <ID>FunctionNaming:TrackComposeScreen.kt$@Composable fun TrackComposeScreen( navController: NavController, screenName: String? = null, additionalData: Map&lt;String, String&gt;? = null, telemetryManager: TelemetryManager = TelemetryManager.getInstance() )</ID>
+    <ID>ImplicitDefaultLocale:LegacyPerformanceTracker.kt$LegacyPerformanceTracker$String.format("%.1f", slowFramePercentage)</ID>
+    <ID>ImplicitDefaultLocale:LegacyPerformanceTracker.kt$LegacyPerformanceTracker$String.format("%.2f", avgFrameTimeMs)</ID>
+    <ID>LongMethod:EdgeTelemetryCompose.kt$@Composable fun TrackComposeScreen( navController: NavController, screenName: String? = null, additionalData: Map&lt;String, String&gt;? = null )</ID>
+    <ID>LongMethod:EdgeTelemetryCompose.kt$@Composable fun TrackScreen( screenName: String, category: String = "screen", attributes: Map&lt;String, String&gt;? = null )</ID>
+    <ID>LongMethod:TelemetryManager.kt$TelemetryManager$private fun performInitializationSequence()</ID>
+    <ID>LongMethod:TelemetryMemoryUsage.kt$TelemetryMemoryUsage$private fun recordEnhancedMemoryUsage()</ID>
+    <ID>LongMethod:TrackComposeScreen.kt$@Composable fun TrackComposeScreen( navController: NavController, screenName: String? = null, additionalData: Map&lt;String, String&gt;? = null, telemetryManager: TelemetryManager = TelemetryManager.getInstance() )</ID>
+    <ID>LongParameterList:CrashReporter.kt$CrashReporter$( private val context: Context, private val telemetryManager: TelemetryManager?, private val breadcrumbManager: BreadcrumbManager, private val idGenerator: IdGenerator, private val apiKey: String, private val telemetryEndpoint: String, private val enabled: Boolean = true, private val debugMode: Boolean = false )</ID>
+    <ID>LongParameterList:CrashReportingService.kt$CrashReportingService$( private val context: Context, private val config: TelemetryConfig, private val idGenerator: IdGenerator, private val httpClient: TelemetryHttpClient, private val offlineStorage: OfflineBatchStorage, private val scope: CoroutineScope, private val apiKey: String, private val telemetryEndpoint: String )</ID>
+    <ID>LongParameterList:EventTrackingService.kt$EventTrackingService$( url: String, method: String, statusCode: Int, durationMs: Long, requestBodySize: Long = 0, responseBodySize: Long = 0, error: String? = null, attributes: Map&lt;String, Any&gt; = emptyMap(), userInfo: UserInfo, sessionInfo: SessionInfo )</ID>
+    <ID>LongParameterList:FlutterCompatiblePayload.kt$FlutterPayloadFactory$( deviceAttributes: Map&lt;String, String&gt;, appAttributes: Map&lt;String, String&gt;, sessionAttributes: Map&lt;String, String&gt;, userAttributes: Map&lt;String, String&gt;, networkType: String, customAttributes: Map&lt;String, String&gt; = emptyMap() )</ID>
+    <ID>LongParameterList:FlutterCompatiblePayload.kt$FlutterPayloadFactory$( message: String, stackTrace: String, deviceId: String, baseAttributes: Map&lt;String, String&gt;, location: String? = null, productId: String? = null, userAction: String? = null, errorCode: String? = null, additionalAttributes: Map&lt;String, String&gt; = emptyMap() )</ID>
+    <ID>LongParameterList:FlutterCompatiblePayload.kt$FlutterPayloadFactory$( throwable: Throwable, deviceId: String, baseAttributes: Map&lt;String, String&gt;, location: String? = null, productId: String? = null, userAction: String? = null, errorCode: String? = null, additionalAttributes: Map&lt;String, String&gt; = emptyMap() )</ID>
+    <ID>LongParameterList:JsonEventTracker.kt$JsonEventTracker$( private val telemetryManager: TelemetryManager, private val sessionManager: SessionManager, private val userProfileManager: UserProfileManager, private val breadcrumbManager: BreadcrumbManager, private val idGenerator: IdGenerator, private val batchSize: Int = 30, private val batchTimeout: Duration = Duration.ofSeconds(5) )</ID>
+    <ID>LongParameterList:TelemetryManager.kt$TelemetryManager$( private val context: Context, private val httpClient: TelemetryHttpClient, private val offlineStorage: OfflineBatchStorage, private val screenTimingTracker: ScreenTimingTracker, private val batchSize: Int, private val apiKey: String, private val telemetryEndpoint: String, private val debugMode: Boolean, private val config: TelemetryConfig, )</ID>
+    <ID>LongParameterList:TelemetryManager.kt$TelemetryManager$( url: String, method: String, statusCode: Int, durationMs: Long, requestBodySize: Long = 0, responseBodySize: Long = 0, error: String? = null, attributes: Map&lt;String, Any&gt; = emptyMap() )</ID>
+    <ID>MagicNumber:ApiKeyRedactionInterceptor.kt$ApiKeyRedactionInterceptor$4</ID>
+    <ID>MagicNumber:CrashReporter.kt$CrashReporter$255</ID>
+    <ID>MagicNumber:CrashReporter.kt$CrashReporter$500</ID>
+    <ID>MagicNumber:CrashReportingService.kt$CrashReportingService$1000</ID>
+    <ID>MagicNumber:CrashReportingService.kt$CrashReportingService$2000</ID>
+    <ID>MagicNumber:CrashReportingService.kt$CrashReportingService$255</ID>
+    <ID>MagicNumber:CrashReportingService.kt$CrashReportingService$3</ID>
+    <ID>MagicNumber:CrashReportingService.kt$CrashReportingService$500</ID>
+    <ID>MagicNumber:CrashReportingService.kt$CrashReportingService$800</ID>
+    <ID>MagicNumber:CrashRetryManager.kt$CrashRetryManager$10</ID>
+    <ID>MagicNumber:CrashRetryManager.kt$CrashRetryManager$30</ID>
+    <ID>MagicNumber:EdgeTelemetryTester.kt$EdgeTelemetryTester$1000</ID>
+    <ID>MagicNumber:EdgeTelemetryTester.kt$EdgeTelemetryTester$2000</ID>
+    <ID>MagicNumber:EdgeTelemetryTester.kt$EdgeTelemetryTester$3000</ID>
+    <ID>MagicNumber:EdgeTelemetryTester.kt$EdgeTelemetryTester$500</ID>
+    <ID>MagicNumber:EventPayloadValidator.kt$EventPayloadValidator$100</ID>
+    <ID>MagicNumber:EventPayloadValidator.kt$EventPayloadValidator$1000</ID>
+    <ID>MagicNumber:EventPayloadValidator.kt$EventPayloadValidator$2000</ID>
+    <ID>MagicNumber:EventPayloadValidator.kt$EventPayloadValidator$255</ID>
+    <ID>MagicNumber:EventPayloadValidator.kt$EventPayloadValidator$500</ID>
+    <ID>MagicNumber:EventPayloadValidator.kt$EventPayloadValidator$599</ID>
+    <ID>MagicNumber:EventPayloadValidator.kt$EventPayloadValidator$800</ID>
+    <ID>MagicNumber:EventTrackingService.kt$EventTrackingService$400</ID>
+    <ID>MagicNumber:FlutterCompatiblePayload.kt$FlutterPayloadFactory$100</ID>
+    <ID>MagicNumber:FlutterCompatiblePayload.kt$FlutterPayloadFactory$1000</ID>
+    <ID>MagicNumber:FlutterCompatiblePayload.kt$FlutterPayloadFactory$2000</ID>
+    <ID>MagicNumber:FlutterCompatiblePayload.kt$FlutterPayloadFactory$255</ID>
+    <ID>MagicNumber:FlutterCompatiblePayload.kt$FlutterPayloadFactory$3</ID>
+    <ID>MagicNumber:FlutterCompatiblePayload.kt$FlutterPayloadFactory$500</ID>
+    <ID>MagicNumber:IpLocationProvider.kt$IpLocationProvider$2000</ID>
+    <ID>MagicNumber:IpLocationProvider.kt$IpLocationProvider$3000</ID>
+    <ID>MagicNumber:IpLocationProvider.kt$IpLocationProvider$429</ID>
+    <ID>MagicNumber:JsonEventTracker.kt$JsonEventTracker$5</ID>
+    <ID>MagicNumber:LegacyPerformanceTracker.kt$LegacyPerformanceTracker$0.3</ID>
+    <ID>MagicNumber:LegacyPerformanceTracker.kt$LegacyPerformanceTracker$0.4</ID>
+    <ID>MagicNumber:LegacyPerformanceTracker.kt$LegacyPerformanceTracker$100</ID>
+    <ID>MagicNumber:LegacyPerformanceTracker.kt$LegacyPerformanceTracker$1000</ID>
+    <ID>MagicNumber:LegacyPerformanceTracker.kt$LegacyPerformanceTracker$1_000_000.0</ID>
+    <ID>MagicNumber:LegacyPerformanceTracker.kt$LegacyPerformanceTracker$60</ID>
+    <ID>MagicNumber:MemoryCapabilityTracker.kt$MemoryCapabilityTracker$1.5</ID>
+    <ID>MagicNumber:MemoryCapabilityTracker.kt$MemoryCapabilityTracker$1024</ID>
+    <ID>MagicNumber:MemoryTracker.kt$1024</ID>
+    <ID>MagicNumber:MemoryTracker.kt$BasicMemoryTracker$0.5</ID>
+    <ID>MagicNumber:MemoryTracker.kt$BasicMemoryTracker$0.75</ID>
+    <ID>MagicNumber:MemoryTracker.kt$BasicMemoryTracker$1024.0</ID>
+    <ID>MagicNumber:MemoryTracker.kt$EnhancedMemoryTracker$0.65</ID>
+    <ID>MagicNumber:MemoryTracker.kt$EnhancedMemoryTracker$0.85</ID>
+    <ID>MagicNumber:MemoryTracker.kt$EnhancedMemoryTracker$1024</ID>
+    <ID>MagicNumber:MemoryTracker.kt$EnhancedMemoryTracker$64</ID>
+    <ID>MagicNumber:TelemetryConfig.kt$TelemetryConfig$1000L</ID>
+    <ID>MagicNumber:TelemetryConfig.kt$TelemetryConfig$30</ID>
+    <ID>MagicNumber:TelemetryConfig.kt$TelemetryConfig$60</ID>
+    <ID>MagicNumber:TelemetryFrameDropCollector.kt$TelemetryFrameDropCollector$1000.0</ID>
+    <ID>MagicNumber:TelemetryFrameDropCollector.kt$TelemetryFrameDropCollector$1_000_000.0</ID>
+    <ID>MagicNumber:TelemetryFrameDropCollector.kt$TelemetryFrameDropCollector$3</ID>
+    <ID>MagicNumber:TelemetryFrameDropCollector.kt$TelemetryFrameDropCollector$60</ID>
+    <ID>MagicNumber:TelemetryHttpClient.kt$TelemetryHttpClient$10</ID>
+    <ID>MagicNumber:TelemetryHttpClient.kt$TelemetryHttpClient$1000</ID>
+    <ID>MagicNumber:TelemetryHttpClient.kt$TelemetryHttpClient$1000L</ID>
+    <ID>MagicNumber:TelemetryHttpClient.kt$TelemetryHttpClient$200</ID>
+    <ID>MagicNumber:TelemetryHttpClient.kt$TelemetryHttpClient$299</ID>
+    <ID>MagicNumber:TelemetryHttpClient.kt$TelemetryHttpClient$30</ID>
+    <ID>MagicNumber:TelemetryHttpClient.kt$TelemetryHttpClient$400</ID>
+    <ID>MagicNumber:TelemetryHttpClient.kt$TelemetryHttpClient$499</ID>
+    <ID>MagicNumber:TelemetryHttpClient.kt$TelemetryHttpClient$500</ID>
+    <ID>MagicNumber:TelemetryHttpClient.kt$TelemetryHttpClient$599</ID>
+    <ID>MagicNumber:TelemetryManager.kt$TelemetryManager$50</ID>
+    <ID>MagicNumber:TelemetryMemoryUsage.kt$TelemetryMemoryUsage$0.5</ID>
+    <ID>MagicNumber:TelemetryMemoryUsage.kt$TelemetryMemoryUsage$0.65</ID>
+    <ID>MagicNumber:TelemetryMemoryUsage.kt$TelemetryMemoryUsage$0.75</ID>
+    <ID>MagicNumber:TelemetryMemoryUsage.kt$TelemetryMemoryUsage$0.85</ID>
+    <ID>MagicNumber:TelemetryMemoryUsage.kt$TelemetryMemoryUsage$1024</ID>
+    <ID>MagicNumber:TelemetryMemoryUsage.kt$TelemetryMemoryUsage$1024.0</ID>
+    <ID>MagicNumber:TelemetryMemoryUsage.kt$TelemetryMemoryUsage$64</ID>
+    <ID>MatchingDeclarationName:ScreenLifeCycleObserver.kt$ScreenLifecycleObserver : FragmentLifecycleCallbacks</ID>
+    <ID>MaxLineLength:AttributeValidator.kt$AttributeValidator$Log.w(TAG, "Standard attributes validation failed$eventInfo. Missing: $missingAttributes, Empty: $emptyAttributes")</ID>
+    <ID>MaxLineLength:BatchProcessingService.kt$BatchProcessingService$Log.w(TAG, "Skipping batch send - IDs not properly initialized. Events remain queued (${eventQueue.size} events).")</ID>
+    <ID>MaxLineLength:BatchProcessingService.kt$BatchProcessingService$sendBatch(eventQueue, forceSend = false, flushOffline = true, location = location, currentUserInfo = currentUserInfo)</ID>
+    <ID>MaxLineLength:CrashRetryManager.kt$CrashRetryManager$Log.w(TAG, "🚫 Circuit breaker open - rate limited until ${rateLimitUntil.get() - System.currentTimeMillis()}ms")</ID>
+    <ID>MaxLineLength:EventPayloadValidator.kt$EventPayloadValidator$errors.add("Attribute '$attrName' must be ${expectedType.simpleName}, got ${value::class.java.simpleName}")</ID>
+    <ID>MaxLineLength:EventPayloadValidator.kt$EventPayloadValidator$errors.add("Timestamp '$fieldName' must be ISO 8601 format (yyyy-MM-dd'T'HH:mm:ss.SSS'Z'), got '$timestamp'")</ID>
+    <ID>MaxLineLength:EventPayloadValidator.kt$EventPayloadValidator$listOf("session.event_count", "session.metric_count", "session.screen_count", "session.total_sessions")</ID>
+    <ID>MaxLineLength:EventPayloadValidator.kt$EventPayloadValidator$timestamp !is String -&gt; errors.add("Timestamp '$fieldName' must be String, got ${timestamp::class.java.simpleName}")</ID>
+    <ID>MaxLineLength:FlutterCompatiblePayload.kt$FlutterPayloadFactory$// Note: crash.fingerprint and crash.breadcrumb_count removed - backend generates crash_hash and counts breadcrumbs</ID>
+    <ID>MaxLineLength:JsonEventTracker.kt$JsonEventTracker$// Note: crash.fingerprint and crash.breadcrumb_count removed - backend generates crash_hash and counts breadcrumbs</ID>
+    <ID>MaxLineLength:MemoryCapabilityTracker.kt$MemoryCapabilityTracker$val nativeHeapAllocatedSize = debugMemInfo.javaClass.getField("nativeHeapAllocatedSize").getInt(debugMemInfo)</ID>
+    <ID>MaxLineLength:RuntimeEventValidator.kt$RuntimeEventValidator$private</ID>
+    <ID>MaxLineLength:StandardAttributesIntegrationTest.kt$StandardAttributesIntegrationTest$assertTrue("Field $field with length ${validValue.length} should be valid (max: $maxLength)", result.isValid)</ID>
+    <ID>MaxLineLength:TelemetryActivityLifecycleObserver.kt$TelemetryActivityLifecycleObserver$"screen.timestamp" to java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).format(java.util.Date())</ID>
+    <ID>MaxLineLength:TelemetryActivityLifecycleObserver.kt$TelemetryActivityLifecycleObserver$private</ID>
+    <ID>MaxLineLength:TelemetryFragmentLifecycleObserver.kt$TelemetryFragmentLifecycleObserver$"screen.timestamp" to java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).format(java.util.Date())</ID>
+    <ID>MaxLineLength:TelemetryFragmentLifecycleObserver.kt$TelemetryFragmentLifecycleObserver$class</ID>
+    <ID>MaxLineLength:TelemetryFrameDropCollector.kt$TelemetryFrameDropCollector$Log.d("TelemetryFrameDropCollector", "Frame metrics listener removed for ${activity.javaClass.simpleName}")</ID>
+    <ID>MaxLineLength:TelemetryHttpClient.kt$TelemetryHttpClient$private</ID>
+    <ID>MaxLineLength:TelemetryHttpClient.kt$TelemetryHttpClient$private suspend</ID>
+    <ID>MaxLineLength:TelemetryHttpClient.kt$TelemetryHttpClient$suspend</ID>
+    <ID>MaxLineLength:TelemetryManager.kt$TelemetryManager$Log.i("TelemetryManager", " Advanced Memory: ${if (deviceCapabilities.canCollectAdvancedMemoryMetrics) "✓ Enabled" else "✗ Basic Mode"}")</ID>
+    <ID>MaxLineLength:TelemetryManager.kt$TelemetryManager$Log.i("TelemetryManager", " Frame Metrics: ${if (deviceCapabilities.canCollectFrameMetrics) "✓ Enabled" else "✗ Disabled (API &lt; 24)"}")</ID>
+    <ID>MaxLineLength:TelemetryManager.kt$TelemetryManager$Log.i("TelemetryManager", " Modern Networking: ${if (deviceCapabilities.canUseModernNetworkAPIs) "✓ Enabled" else "✗ Legacy Mode"}")</ID>
+    <ID>MaxLineLength:TelemetryManager.kt$TelemetryManager$Log.i("TelemetryManager", " Network Callbacks: ${if (deviceCapabilities.supportsNetworkCallback) "✓ Enabled" else "✗ Not Available"}")</ID>
+    <ID>MaxLineLength:TelemetryManager.kt$TelemetryManager$Log.i("TelemetryManager", " Notification Channels: ${if (deviceCapabilities.supportsNotificationChannels) "✓ Enabled" else "✗ Legacy Notifications"}")</ID>
+    <ID>MaxLineLength:TelemetryManager.kt$TelemetryManager$Log.i("TelemetryManager", " Runtime Permissions: ${if (deviceCapabilities.canHandleRuntimePermissions) "✓ Enabled" else "✗ Manifest Only"}")</ID>
+    <ID>MaxLineLength:TelemetryManager.kt$TelemetryManager$Log.i("TelemetryManager", " Scoped Storage: ${if (deviceCapabilities.canUseScopedStorage) "✓ Enabled" else "✗ Legacy Storage"}")</ID>
+    <ID>MaxLineLength:TelemetryManager.kt$TelemetryManager$Log.i("TelemetryManager", "API Level: ${deviceCapabilities.apiLevel} (Android ${deviceCapabilities.androidVersion})")</ID>
+    <ID>MaxLineLength:TelemetryManager.kt$TelemetryManager$batchProcessingService.triggerBatchSend(eventTrackingService.getEventQueue(), location, userProfileService.getUserInfo())</ID>
+    <ID>MaxLineLength:TelemetryManager.kt$TelemetryManager$offerToPreInitQueue { recordNetworkRequest(url, method, statusCode, durationMs, requestBodySize, responseBodySize, error, attributes) }</ID>
+    <ID>MaxLineLength:TelemetryManager.kt$TelemetryManager$url</ID>
+    <ID>MaxLineLength:TelemetryManagerIntegrationTest.kt$TelemetryManagerIntegrationTest$telemetryManager.recordMetric("concurrent_metric_${threadNum}_$metricNum", threadNum.toDouble(), emptyMap())</ID>
+    <ID>MaxLineLength:TelemetryMemoryUsage.kt$TelemetryMemoryUsage$Log.d(TAG, "Enhanced memory usage recorded: pressure=$pressureLevel, heap=${heapUsedMb}MB, API=${Build.VERSION.SDK_INT}")</ID>
+    <ID>MaxLineLength:TrackComposeScreen.kt$"navigation.timestamp" to java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).format(java.util.Date())</ID>
+    <ID>MaxLineLength:TrackComposeScreen.kt$"screen.timestamp" to java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).format(java.util.Date())</ID>
+    <ID>MaxLineLength:UserProfileService.kt$UserProfileService$Log.d(TAG, "getUserInfo() - userId: ${userInfo.userId}, name: ${userInfo.name}, email: ${userInfo.email}, phone: ${userInfo.phone}")</ID>
+    <ID>MaxLineLength:UserProfileService.kt$UserProfileService$fun</ID>
+    <ID>MaxLineLength:UserProfileServiceTest.kt$UserProfileServiceTest$service.setUserProfile("User $threadNum", "user$threadNum@example.com", "+${threadNum}${threadNum}${threadNum}")</ID>
+    <ID>NestedBlockDepth:CrashRetryManager.kt$CrashRetryManager$suspend fun retryOfflineCrashes()</ID>
+    <ID>NestedBlockDepth:NetworkCapabilityDetector.kt$NetworkCapabilityDetector$fun getNetworkCapabilitiesSummary(): Map&lt;String, Any&gt;</ID>
+    <ID>NewLineAtEndOfFile:ExampleUnitTest.kt$com.androidtel.telemetry_library.ExampleUnitTest.kt</ID>
+    <ID>NewLineAtEndOfFile:OfflineBatchStorage.kt$com.androidtel.telemetry_library.core.OfflineBatchStorage.kt</ID>
+    <ID>NewLineAtEndOfFile:ScreenLifeCycleObserver.kt$com.androidtel.telemetry_library.core.ScreenLifeCycleObserver.kt</ID>
+    <ID>NewLineAtEndOfFile:TelemetryHttpClient.kt$com.androidtel.telemetry_library.core.TelemetryHttpClient.kt</ID>
+    <ID>NewLineAtEndOfFile:TelemetryMemoryUsage.kt$com.androidtel.telemetry_library.core.TelemetryMemoryUsage.kt</ID>
+    <ID>NewLineAtEndOfFile:TrackComposeScreen.kt$com.androidtel.telemetry_library.core.TrackComposeScreen.kt</ID>
+    <ID>PackageNaming:ApiKeyRedactionInterceptor.kt$package com.androidtel.telemetry_library.core.interceptors</ID>
+    <ID>PackageNaming:AttributeValidator.kt$package com.androidtel.telemetry_library.core.validation</ID>
+    <ID>PackageNaming:BackendCompatibilityTest.kt$package com.androidtel.telemetry_library.core.crash</ID>
+    <ID>PackageNaming:BatchProcessingService.kt$package com.androidtel.telemetry_library.core.services</ID>
+    <ID>PackageNaming:BatchProcessingServiceTest.kt$package com.androidtel.telemetry_library.core.services</ID>
+    <ID>PackageNaming:Breadcrumb.kt$package com.androidtel.telemetry_library.core.breadcrumbs</ID>
+    <ID>PackageNaming:BreadcrumbManager.kt$package com.androidtel.telemetry_library.core.breadcrumbs</ID>
+    <ID>PackageNaming:CrashBatchEnvelopeTest.kt$package com.androidtel.telemetry_library.core.crash</ID>
+    <ID>PackageNaming:CrashFingerprinter.kt$package com.androidtel.telemetry_library.core.crash</ID>
+    <ID>PackageNaming:CrashReporter.kt$package com.androidtel.telemetry_library.core.crash</ID>
+    <ID>PackageNaming:CrashReporterIntegrationTest.kt$package com.androidtel.telemetry_library.core.crash</ID>
+    <ID>PackageNaming:CrashReportingService.kt$package com.androidtel.telemetry_library.core.services</ID>
+    <ID>PackageNaming:CrashReportingServiceTest.kt$package com.androidtel.telemetry_library.core.services</ID>
+    <ID>PackageNaming:CrashRetryManager.kt$package com.androidtel.telemetry_library.core.retry</ID>
+    <ID>PackageNaming:CrashRetryManagerTest.kt$package com.androidtel.telemetry_library</ID>
+    <ID>PackageNaming:CrashScenarioIntegrationTest.kt$package com.androidtel.telemetry_library.core.crash</ID>
+    <ID>PackageNaming:DeviceCapabilities.kt$package com.androidtel.telemetry_library.core</ID>
+    <ID>PackageNaming:DeviceInfoCollector.kt$package com.androidtel.telemetry_library.core.device</ID>
+    <ID>PackageNaming:EdgeTelemetry.kt$package com.androidtel.telemetry_library</ID>
+    <ID>PackageNaming:EdgeTelemetryCompose.kt$package com.androidtel.telemetry_library.compose</ID>
+    <ID>PackageNaming:EdgeTelemetryInterceptor.kt$package com.androidtel.telemetry_library.core.http</ID>
+    <ID>PackageNaming:EdgeTelemetryTester.kt$package com.androidtel.telemetry_library.testing</ID>
+    <ID>PackageNaming:EnhancedCrashContextTest.kt$package com.androidtel.telemetry_library.core.crash</ID>
+    <ID>PackageNaming:EventPayloadValidator.kt$package com.androidtel.telemetry_library.core.validation</ID>
+    <ID>PackageNaming:EventPayloadValidatorTest.kt$package com.androidtel.telemetry_library.core.validation</ID>
+    <ID>PackageNaming:EventTrackingService.kt$package com.androidtel.telemetry_library.core.services</ID>
+    <ID>PackageNaming:EventTrackingServiceTest.kt$package com.androidtel.telemetry_library.core.services</ID>
+    <ID>PackageNaming:ExampleUnitTest.kt$package com.androidtel.telemetry_library</ID>
+    <ID>PackageNaming:FlutterCompatiblePayload.kt$package com.androidtel.telemetry_library.core.payload</ID>
+    <ID>PackageNaming:IdConsistencyTest.kt$package com.androidtel.telemetry_library.core.ids</ID>
+    <ID>PackageNaming:IdGenerator.kt$package com.androidtel.telemetry_library.core.ids</ID>
+    <ID>PackageNaming:IdGeneratorTest.kt$package com.androidtel.telemetry_library.core.ids</ID>
+    <ID>PackageNaming:IpLocationProvider.kt$package com.androidtel.telemetry_library.core.location</ID>
+    <ID>PackageNaming:IpLocationProviderTest.kt$package com.androidtel.telemetry_library</ID>
+    <ID>PackageNaming:JsonEventTracker.kt$package com.androidtel.telemetry_library.core.events</ID>
+    <ID>PackageNaming:LegacyPerformanceTracker.kt$package com.androidtel.telemetry_library.core</ID>
+    <ID>PackageNaming:LocationIntegrationTest.kt$package com.androidtel.telemetry_library</ID>
+    <ID>PackageNaming:LocationProvider.kt$package com.androidtel.telemetry_library.core.location</ID>
+    <ID>PackageNaming:MemoryCapabilityTracker.kt$package com.androidtel.telemetry_library.core</ID>
+    <ID>PackageNaming:MemoryTracker.kt$package com.androidtel.telemetry_library.core</ID>
+    <ID>PackageNaming:NavigationEventTest.kt$package com.androidtel.telemetry_library.navigation</ID>
+    <ID>PackageNaming:NavigationMethodTest.kt$package com.androidtel.telemetry_library.navigation</ID>
+    <ID>PackageNaming:NavigationStackTracker.kt$package com.androidtel.telemetry_library.core.navigation</ID>
+    <ID>PackageNaming:NavigationStackTrackerTest.kt$package com.androidtel.telemetry_library.navigation</ID>
+    <ID>PackageNaming:NetworkCapabilityDetector.kt$package com.androidtel.telemetry_library.core</ID>
+    <ID>PackageNaming:OfflineBatchStorage.kt$package com.androidtel.telemetry_library.core</ID>
+    <ID>PackageNaming:PayloadStructureValidationTest.kt$package com.androidtel.telemetry_library.core.crash</ID>
+    <ID>PackageNaming:PerformanceTracker.kt$package com.androidtel.telemetry_library.core</ID>
+    <ID>PackageNaming:RuntimeEventValidator.kt$package com.androidtel.telemetry_library.core.validation</ID>
+    <ID>PackageNaming:ScreenLifeCycleObserver.kt$package com.androidtel.telemetry_library.core</ID>
+    <ID>PackageNaming:ScreenTimingTracker.kt$package com.androidtel.telemetry_library.core</ID>
+    <ID>PackageNaming:SessionManager.kt$package com.androidtel.telemetry_library.core.session</ID>
+    <ID>PackageNaming:SessionService.kt$package com.androidtel.telemetry_library.core.services</ID>
+    <ID>PackageNaming:SessionServiceTest.kt$package com.androidtel.telemetry_library.core.services</ID>
+    <ID>PackageNaming:StandardAttributesIntegrationTest.kt$package com.androidtel.telemetry_library.core.validation</ID>
+    <ID>PackageNaming:TelemetryActivityLifecycleObserver.kt$package com.androidtel.telemetry_library.core</ID>
+    <ID>PackageNaming:TelemetryBatch.kt$package com.androidtel.telemetry_library.core.models</ID>
+    <ID>PackageNaming:TelemetryConfig.kt$package com.androidtel.telemetry_library.core</ID>
+    <ID>PackageNaming:TelemetryFragmentLifecycleObserver.kt$package com.androidtel.telemetry_library.core</ID>
+    <ID>PackageNaming:TelemetryFrameDropCollector.kt$package com.androidtel.telemetry_library.core</ID>
+    <ID>PackageNaming:TelemetryHttpClient.kt$package com.androidtel.telemetry_library.core</ID>
+    <ID>PackageNaming:TelemetryHttpClientTest.kt$package com.androidtel.telemetry_library</ID>
+    <ID>PackageNaming:TelemetryIdValidationTest.kt$package com.androidtel.telemetry_library.core</ID>
+    <ID>PackageNaming:TelemetryInterceptor.kt$package com.androidtel.telemetry_library.core</ID>
+    <ID>PackageNaming:TelemetryManager.kt$package com.androidtel.telemetry_library.core</ID>
+    <ID>PackageNaming:TelemetryManagerIntegrationTest.kt$package com.androidtel.telemetry_library.core.services</ID>
+    <ID>PackageNaming:TelemetryManagerTest.kt$package com.androidtel.telemetry_library</ID>
+    <ID>PackageNaming:TelemetryManagerTest.kt$package com.androidtel.telemetry_library.core</ID>
+    <ID>PackageNaming:TelemetryMemoryUsage.kt$package com.androidtel.telemetry_library.core</ID>
+    <ID>PackageNaming:TrackComposeScreen.kt$package com.androidtel.telemetry_library.core</ID>
+    <ID>PackageNaming:UserProfileManager.kt$package com.androidtel.telemetry_library.core.user</ID>
+    <ID>PackageNaming:UserProfileManagerTest.kt$package com.androidtel.telemetry_library.core.user</ID>
+    <ID>PackageNaming:UserProfileService.kt$package com.androidtel.telemetry_library.core.services</ID>
+    <ID>PackageNaming:UserProfileServiceTest.kt$package com.androidtel.telemetry_library.core.services</ID>
+    <ID>ReturnCount:BatchProcessingService.kt$BatchProcessingService$suspend fun sendBatch( eventQueue: ConcurrentLinkedQueue&lt;TelemetryEvent&gt;, forceSend: Boolean = false, flushOffline: Boolean = true, location: String? = null, currentUserInfo: UserInfo? = null )</ID>
+    <ID>ReturnCount:CrashReportingService.kt$CrashReportingService$private fun extractErrorContext(stackTrace: String): String</ID>
+    <ID>ReturnCount:CrashRetryManager.kt$CrashRetryManager$private fun isNetworkAvailable(): Boolean</ID>
+    <ID>ReturnCount:CrashRetryManager.kt$CrashRetryManager$private fun loadOfflineCrashesInternal(raf: RandomAccessFile? = null): List&lt;Map&lt;String, Any&gt;&gt;</ID>
+    <ID>ReturnCount:CrashRetryManager.kt$CrashRetryManager$suspend fun sendCrashWithRetry(crashData: Map&lt;String, Any&gt;)</ID>
+    <ID>ReturnCount:FlutterCompatiblePayload.kt$FlutterPayloadFactory$private fun extractErrorContext(stackTrace: String): String</ID>
+    <ID>ReturnCount:NavigationStackTracker.kt$NavigationStackTracker$fun pop(): NavigationEvent?</ID>
+    <ID>ReturnCount:NetworkCapabilityDetector.kt$NetworkCapabilityDetector$@RequiresApi(Build.VERSION_CODES.M) private fun getNetworkTypeModern(): String</ID>
+    <ID>ReturnCount:NetworkCapabilityDetector.kt$NetworkCapabilityDetector$@RequiresApi(Build.VERSION_CODES.M) private fun isConnectedModern(): Boolean</ID>
+    <ID>ReturnCount:TelemetryHttpClient.kt$TelemetryHttpClient$private suspend fun sendWithRetry(batch: TelemetryBatch, maxRetries: Int, currentUserInfo: com.androidtel.telemetry_library.core.models.UserInfo? = null): Result&lt;Unit&gt;</ID>
+    <ID>ReturnCount:TelemetryInterceptor.kt$TelemetryInterceptor$private fun isTelemetryRequest(url: String): Boolean</ID>
+    <ID>ReturnCount:TelemetryManager.kt$TelemetryManager$@SuppressLint("MissingPermission") @Suppress("DEPRECATION") private fun getNetworkType(context: Context): String</ID>
+    <ID>SwallowedException:CrashReporterIntegrationTest.kt$CrashReporterIntegrationTest$e: Exception</ID>
+    <ID>SwallowedException:CrashReportingService.kt$CrashReportingService$e: Exception</ID>
+    <ID>SwallowedException:CrashRetryManager.kt$CrashRetryManager$e: RateLimitException</ID>
+    <ID>SwallowedException:EventPayloadValidator.kt$EventPayloadValidator$e: IllegalArgumentException</ID>
+    <ID>SwallowedException:FlutterCompatiblePayload.kt$FlutterPayloadFactory$e: Exception</ID>
+    <ID>SwallowedException:IdGeneratorTest.kt$IdGeneratorTest$e: Exception</ID>
+    <ID>SwallowedException:MemoryCapabilityTracker.kt$MemoryCapabilityTracker$e: Exception</ID>
+    <ID>SwallowedException:MemoryTracker.kt$BasicMemoryTracker$e: Exception</ID>
+    <ID>SwallowedException:MemoryTracker.kt$EnhancedMemoryTracker$e: Exception</ID>
+    <ID>SwallowedException:TelemetryIdValidationTest.kt$TelemetryIdValidationTest$e: Exception</ID>
+    <ID>SwallowedException:TelemetryIdValidationTest.kt$TelemetryIdValidationTest$e: NoSuchFieldException</ID>
+    <ID>SwallowedException:TelemetryManager.kt$TelemetryManager$e: Exception</ID>
+    <ID>SwallowedException:TelemetryManager.kt$TelemetryManager$e: SecurityException</ID>
+    <ID>TooGenericExceptionCaught:BatchProcessingService.kt$BatchProcessingService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:BreadcrumbManager.kt$BreadcrumbManager$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:CrashReporter.kt$CrashReporter$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:CrashReportingService.kt$CrashReportingService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:CrashRetryManager.kt$CrashRetryManager$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:CrashRetryManager.kt$CrashRetryWorker$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:DeviceInfoCollector.kt$DeviceInfoCollector$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:EdgeTelemetryInterceptor.kt$EdgeTelemetryInterceptor$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:EdgeTelemetryTester.kt$EdgeTelemetryTester$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:FlutterCompatiblePayload.kt$FlutterPayloadFactory$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:IpLocationProvider.kt$IpLocationProvider$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:JsonEventTracker.kt$JsonEventTracker$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:LegacyPerformanceTracker.kt$LegacyPerformanceTracker$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:LegacyPerformanceTracker.kt$LegacyPerformanceTracker.&lt;no name provided&gt;$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:MemoryCapabilityTracker.kt$MemoryCapabilityTracker$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:MemoryTracker.kt$BasicMemoryTracker$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:MemoryTracker.kt$EnhancedMemoryTracker$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:MemoryTracker.kt$MemoryTrackerFactory$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:NetworkCapabilityDetector.kt$NetworkCapabilityDetector$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:TelemetryFrameDropCollector.kt$TelemetryFrameDropCollector$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:TelemetryHttpClient.kt$TelemetryHttpClient$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:TelemetryManager.kt$TelemetryManager$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:TelemetryMemoryUsage.kt$TelemetryMemoryUsage$e: Exception</ID>
+    <ID>TooGenericExceptionThrown:CrashReportingServiceTest.kt$CrashReportingServiceTest$throw RuntimeException("Deep stack")</ID>
+    <ID>TooGenericExceptionThrown:CrashScenarioIntegrationTest.kt$CrashScenarioIntegrationTest$throw RuntimeException("Level $depth", e)</ID>
+    <ID>TooManyFunctions:BatchProcessingService.kt$BatchProcessingService</ID>
+    <ID>TooManyFunctions:BreadcrumbManager.kt$BreadcrumbManager</ID>
+    <ID>TooManyFunctions:CrashReporter.kt$CrashReporter</ID>
+    <ID>TooManyFunctions:CrashReportingService.kt$CrashReportingService</ID>
+    <ID>TooManyFunctions:CrashRetryManager.kt$CrashRetryManager</ID>
+    <ID>TooManyFunctions:EdgeTelemetryTester.kt$EdgeTelemetryTester</ID>
+    <ID>TooManyFunctions:EventPayloadValidator.kt$EventPayloadValidator</ID>
+    <ID>TooManyFunctions:EventTrackingService.kt$EventTrackingService</ID>
+    <ID>TooManyFunctions:FlutterCompatiblePayload.kt$FlutterPayloadFactory</ID>
+    <ID>TooManyFunctions:JsonEventTracker.kt$JsonEventTracker</ID>
+    <ID>TooManyFunctions:MemoryCapabilityTracker.kt$MemoryCapabilityTracker</ID>
+    <ID>TooManyFunctions:SessionService.kt$SessionService</ID>
+    <ID>TooManyFunctions:TelemetryManager.kt$TelemetryManager : DefaultLifecycleObserver</ID>
+    <ID>UnusedParameter:CrashRetryManager.kt$CrashRetryManager$raf: RandomAccessFile? = null</ID>
+    <ID>UnusedParameter:FlutterCompatiblePayload.kt$FlutterPayloadFactory$breadcrumbCount: Int</ID>
+    <ID>UnusedParameter:FlutterCompatiblePayload.kt$FlutterPayloadFactory$fingerprint: String</ID>
+    <ID>UnusedParameter:JsonEventTracker.kt$JsonEventTracker$crashData: Map&lt;String, Any&gt;</ID>
+    <ID>UnusedParameter:JsonEventTracker.kt$JsonEventTracker$fingerprint: String</ID>
+    <ID>UnusedParameter:TelemetryManager.kt$TelemetryManager$attributes: Map&lt;String, Any&gt; = emptyMap()</ID>
+    <ID>UnusedPrivateMember:CrashReporter.kt$CrashReporter$private fun getDeviceAttributes(): Map&lt;String, String&gt;</ID>
+    <ID>UnusedPrivateMember:CrashRetryManager.kt$CrashRetryManager$private fun isNetworkAvailable(): Boolean</ID>
+    <ID>UnusedPrivateProperty:CrashReporter.kt$CrashReporter$private val telemetryManager: TelemetryManager?</ID>
+    <ID>UnusedPrivateProperty:CrashReporterIntegrationTest.kt$CrashReporterIntegrationTest$private val gson = Gson()</ID>
+    <ID>UnusedPrivateProperty:CrashRetryManager.kt$CrashRetryManager$private val fileLock = Any()</ID>
+    <ID>UnusedPrivateProperty:EventTrackingService.kt$EventTrackingService$private val config: TelemetryConfig</ID>
+    <ID>UnusedPrivateProperty:EventTrackingService.kt$EventTrackingService$private val context: Context</ID>
+    <ID>UnusedPrivateProperty:UserProfileService.kt$UserProfileService$private val config: TelemetryConfig</ID>
+    <ID>UseCheckOrError:IdGenerator.kt$IdGenerator$throw IllegalStateException("IdGenerator not initialized")</ID>
+    <ID>UseCheckOrError:TelemetryManager.kt$TelemetryManager$throw IllegalStateException("Network interceptor not initialized")</ID>
+    <ID>UseCheckOrError:TelemetryManager.kt$TelemetryManager$throw IllegalStateException("Network tracking is disabled in TelemetryConfig")</ID>
+    <ID>UseCheckOrError:TelemetryManager.kt$TelemetryManager.Companion$throw IllegalStateException("TelemetryManager not initialized. Call init(application) first.")</ID>
+    <ID>VariableNaming:TelemetryManager.kt$TelemetryManager$private val PRE_INIT_QUEUE_MAX_SIZE = 50</ID>
+    <ID>WildcardImport:BackendCompatibilityTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:BatchProcessingServiceTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:BatchProcessingServiceTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:CrashBatchEnvelopeTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:CrashReporterIntegrationTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:CrashReportingServiceTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:CrashReportingServiceTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:CrashRetryManager.kt$import androidx.work.*</ID>
+    <ID>WildcardImport:CrashRetryManager.kt$import okhttp3.*</ID>
+    <ID>WildcardImport:CrashRetryManagerTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:CrashScenarioIntegrationTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:EventPayloadValidatorTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:EventTrackingServiceTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:ExampleUnitTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:IdConsistencyTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:IdConsistencyTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:IdGeneratorTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:IdGeneratorTest.kt$import org.mockito.Mockito.*</ID>
+    <ID>WildcardImport:IpLocationProviderTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:JsonEventTracker.kt$import kotlinx.coroutines.*</ID>
+    <ID>WildcardImport:LocationIntegrationTest.kt$import com.androidtel.telemetry_library.core.models.*</ID>
+    <ID>WildcardImport:LocationIntegrationTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:NavigationEventTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:NavigationMethodTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:NavigationStackTrackerTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:PayloadStructureValidationTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:SessionServiceTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:SessionServiceTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:StandardAttributesIntegrationTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:TelemetryHttpClientTest.kt$import com.androidtel.telemetry_library.core.models.*</ID>
+    <ID>WildcardImport:TelemetryHttpClientTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:TelemetryIdValidationTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:TelemetryIdValidationTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:TelemetryManagerIntegrationTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:TelemetryManagerIntegrationTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:TelemetryManagerTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:TelemetryManagerTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:TrackComposeScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:UserProfileManagerTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:UserProfileServiceTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:UserProfileServiceTest.kt$import org.junit.Assert.*</ID>
+  </CurrentIssues>
+</SmellBaseline>

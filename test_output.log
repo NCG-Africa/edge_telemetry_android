@@ -1,0 +1,22 @@
+> Task :telemetry_library:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :telemetry_library:preBuild UP-TO-DATE
+> Task :telemetry_library:preDebugBuild UP-TO-DATE
+> Task :telemetry_library:generateDebugResValues UP-TO-DATE
+> Task :telemetry_library:generateDebugResources UP-TO-DATE
+> Task :telemetry_library:packageDebugResources UP-TO-DATE
+> Task :telemetry_library:parseDebugLocalResources UP-TO-DATE
+> Task :telemetry_library:generateDebugRFile UP-TO-DATE
+> Task :telemetry_library:compileDebugKotlin UP-TO-DATE
+> Task :telemetry_library:javaPreCompileDebug UP-TO-DATE
+> Task :telemetry_library:compileDebugJavaWithJavac NO-SOURCE
+> Task :telemetry_library:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :telemetry_library:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :telemetry_library:preDebugUnitTestBuild UP-TO-DATE
+> Task :telemetry_library:generateDebugUnitTestStubRFile UP-TO-DATE
+> Task :telemetry_library:compileDebugUnitTestKotlin UP-TO-DATE
+> Task :telemetry_library:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :telemetry_library:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :telemetry_library:processDebugJavaRes UP-TO-DATE
+> Task :telemetry_library:processDebugUnitTestJavaRes UP-TO-DATE
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+> Task :telemetry_library:testDebugUnitTest

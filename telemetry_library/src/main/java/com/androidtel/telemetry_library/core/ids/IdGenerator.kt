@@ -9,7 +9,7 @@ class IdGenerator {
     companion object {
         private const val PREFS_NAME = "edge_telemetry_ids"
         private const val KEY_DEVICE_ID = "device_id"
-        private const val KEY_USER_ID = "user_id"
+        private const val KEY_USER_ID = "edge_rum_user_id"
         private const val CHARS = "abcdefghijklmnopqrstuvwxyz0123456789"
         private const val RANDOM_LENGTH = 8
         
@@ -49,10 +49,6 @@ class IdGenerator {
         return generateId()
     }
     
-    fun generateUserId(): String {
-        return generateId()
-    }
-    
     fun getUserId(): String {
         val sharedPrefs = prefs ?: throw IllegalStateException("IdGenerator not initialized")
         
@@ -62,20 +58,6 @@ class IdGenerator {
                 sharedPrefs.edit().putString(KEY_USER_ID, userId).apply()
                 userId
             }
-        }
-    }
-    
-    fun setUserId(userId: String) {
-        val sharedPrefs = prefs ?: throw IllegalStateException("IdGenerator not initialized")
-        synchronized(lock) {
-            sharedPrefs.edit().putString(KEY_USER_ID, userId).apply()
-        }
-    }
-    
-    fun clearUserId() {
-        val sharedPrefs = prefs ?: throw IllegalStateException("IdGenerator not initialized")
-        synchronized(lock) {
-            sharedPrefs.edit().remove(KEY_USER_ID).apply()
         }
     }
     

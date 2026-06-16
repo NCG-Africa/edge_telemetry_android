@@ -70,11 +70,7 @@ object EdgeTelemetryTester {
             edgeTelemetry.setUserProfile(
                 name = "Test User",
                 email = "test@example.com",
-                phone = "+1234567890",
-                customAttributes = mapOf(
-                    "role" to "tester",
-                    "plan" to "premium"
-                )
+                phone = "+1234567890"
             )
             
             Log.i(TAG, "👤 User profile test completed")

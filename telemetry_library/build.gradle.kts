@@ -4,6 +4,23 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose") // ⬅️ required in Kotlin 2.0+
     id("maven-publish")
+    alias(libs.plugins.detekt)
+    alias(libs.plugins.metalava)
+}
+
+// Single source of truth for the SDK version. Surfaces in BuildConfig.SDK_VERSION (used by the
+// network transport for the User-Agent and X-SDK-Version headers) and the JitPack publication.
+val sdkVersion = "2.1.13"
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(files())          // default rules only, no custom config
+    baseline = file("$rootDir/detekt-baseline.xml")
+}
+
+metalava {
+    filename.set("api/current.api")
+    sourcePaths.setFrom("src/main")
 }
 
 android {
@@ -15,6 +32,7 @@ android {
         targetSdk = libs.versions.targetSdk.get().toInt()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
+        buildConfigField("String", "SDK_VERSION", "\"$sdkVersion\"")
     }
 
     buildTypes {
@@ -40,6 +58,7 @@ android {
     buildFeatures {
         // ✅ leave compose enabled, but don’t pin compiler version here
         compose = true
+        buildConfig = true
     }
 
     // ❌ Don’t set composeOptions.kotlinCompilerExtensionVersion
@@ -50,6 +69,16 @@ android {
         checkReleaseBuilds = false
         warningsAsErrors = false
         disable.add("NullSafeMutableLiveData")
+    }
+
+    testOptions {
+        unitTests {
+            // Allow JVM unit tests to call `android.util.Log` etc. without crashing — returns
+            // default values instead of the "Method not mocked" RuntimeException. Tests that need
+            // real Android behavior should use Robolectric explicitly.
+            isReturnDefaultValues = true
+            isIncludeAndroidResources = true
+        }
     }
 
     publishing {
@@ -125,7 +154,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.NCG-Africa"
                 artifactId = "edge_telemetry_android"
-                version = "2.0.2"
+                version = sdkVersion
             }
         }
     }

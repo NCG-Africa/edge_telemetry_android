@@ -9,6 +9,15 @@ import kotlin.concurrent.read
 import kotlin.concurrent.write
 
 /**
+ * User Profile data class
+ */
+data class UserProfile(
+    val name: String? = null,
+    val email: String? = null,
+    val phone: String? = null
+)
+
+/**
  * User Profile Manager that handles user profile lifecycle and persistence
  */
 class UserProfileManager(
@@ -19,85 +28,49 @@ class UserProfileManager(
     companion object {
         private const val TAG = "UserProfileManager"
         private const val PREFS_NAME = "edge_telemetry_user"
-        private const val KEY_USER_ID = "user_id"
-        private const val KEY_USER_NAME = "user_name"
-        private const val KEY_USER_EMAIL = "user_email"
-        private const val KEY_USER_PHONE = "user_phone"
-        private const val KEY_PROFILE_VERSION = "profile_version"
+        private const val KEY_NAME = "display_name"
+        private const val KEY_EMAIL = "email"
+        private const val KEY_PHONE = "phone"
     }
     
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val lock = ReentrantReadWriteLock()
     
-    // Current user profile state
-    private var profileVersion = 0
-    private val userProfile = mutableMapOf<String, String?>()
+    // Current user profile state - starts empty
+    private var currentProfile = UserProfile()
     
     init {
+        // Load persisted profile if exists
         loadUserProfile()
     }
     
     /**
      * Set user profile information
+     * Can be called before or after SDK.init()
+     * Fully replaces previous values (no merge)
+     * Passing null for a field clears it
      */
-    fun setUserProfile(
-        name: String? = null,
-        email: String? = null,
-        phone: String? = null,
-        customAttributes: Map<String, String>? = null
-    ) {
+    fun setUserProfile(name: String?, email: String?, phone: String? = null) {
         lock.write {
-            // Get or auto-generate user ID (never null)
-            val userId = getUserId()
-            
-            // Update profile
-            name?.let { userProfile["name"] = it }
-            email?.let { userProfile["email"] = it }
-            phone?.let { userProfile["phone"] = it }
-            
-            // Handle custom attributes
-            customAttributes?.forEach { (key, value) ->
-                userProfile[key] = value
-            }
-            
-            // Increment version
-            profileVersion++
+            // Update profile - full replacement
+            currentProfile = UserProfile(
+                name = name,
+                email = email,
+                phone = phone
+            )
             
             // Persist to SharedPreferences
             saveUserProfile()
             
-            Log.i(TAG, "👤 User profile updated: $userId (version: $profileVersion)")
-            
-            // Send profile updated event
-            sendProfileUpdatedEvent(userId)
-            sendProfileSetEvent(userId)
+            Log.i(TAG, "User profile updated: name=$name, email=$email, phone=$phone")
         }
     }
     
     /**
-     * Clear user profile
+     * Clear user profile (sets all fields to null)
      */
     fun clearUserProfile() {
-        lock.write {
-            val userId = getUserId()
-            
-            // Clear profile data but keep user ID and increment version
-            userProfile.clear()
-            profileVersion++
-            
-            // Clear from SharedPreferences
-            prefs.edit()
-                .remove(KEY_USER_NAME)
-                .remove(KEY_USER_EMAIL)
-                .remove(KEY_USER_PHONE)
-                .putInt(KEY_PROFILE_VERSION, profileVersion)
-                .apply()
-            
-            Log.i(TAG, "🧹 User profile cleared: $userId (version: $profileVersion)")
-            
-            // Send profile updated event with only user.id and version
-            sendProfileUpdatedEvent(userId)
-        }
+        setUserProfile(null, null, null)
     }
     
     /**
@@ -108,49 +81,43 @@ class UserProfileManager(
     }
     
     /**
-     * Get user profile attributes for telemetry events
+     * Get user profile for telemetry events
+     * Returns current profile with name and email (may be null)
      */
-    fun getUserAttributes(): Map<String, String> {
+    fun getUserProfile(): UserProfile {
         return lock.read {
-            val attributes = mutableMapOf<String, String>()
-            
-            getUserId()?.let { attributes["user.id"] = it }
-            userProfile["name"]?.let { attributes["user.name"] = it }
-            userProfile["email"]?.let { attributes["user.email"] = it }
-            userProfile["phone"]?.let { attributes["user.phone"] = it }
-            
-            if (profileVersion > 0) {
-                attributes["user.profile_version"] = profileVersion.toString()
-            }
-            
-            // Add custom attributes
-            userProfile.forEach { (key, value) ->
-                if (key !in listOf("name", "email", "phone") && value != null) {
-                    attributes["user.$key"] = value
-                }
-            }
-            
-            attributes
+            currentProfile
         }
     }
     
     /**
-     * Get current profile version
+     * Get user attributes as a map for event enrichment
      */
-    fun getProfileVersion(): Int {
-        return lock.read { profileVersion }
+    fun getUserAttributes(): Map<String, String> {
+        return lock.read {
+            buildMap {
+                currentProfile.name?.let { put("user_display_name", it) }
+                currentProfile.email?.let { put("user_email", it) }
+                currentProfile.phone?.let { put("user_phone", it) }
+            }
+        }
     }
+    
     
     /**
      * Load user profile from SharedPreferences
      */
     private fun loadUserProfile() {
         lock.write {
-            profileVersion = prefs.getInt(KEY_PROFILE_VERSION, 0)
+            val name = prefs.getString(KEY_NAME, null)
+            val email = prefs.getString(KEY_EMAIL, null)
+            val phone = prefs.getString(KEY_PHONE, null)
             
-            prefs.getString(KEY_USER_NAME, null)?.let { userProfile["name"] = it }
-            prefs.getString(KEY_USER_EMAIL, null)?.let { userProfile["email"] = it }
-            prefs.getString(KEY_USER_PHONE, null)?.let { userProfile["phone"] = it }
+            currentProfile = UserProfile(
+                name = name,
+                email = email,
+                phone = phone
+            )
         }
     }
     
@@ -160,27 +127,28 @@ class UserProfileManager(
     private fun saveUserProfile() {
         val editor = prefs.edit()
         
-        userProfile["name"]?.let { editor.putString(KEY_USER_NAME, it) }
-        userProfile["email"]?.let { editor.putString(KEY_USER_EMAIL, it) }
-        userProfile["phone"]?.let { editor.putString(KEY_USER_PHONE, it) }
+        // Save or remove name
+        if (currentProfile.name != null) {
+            editor.putString(KEY_NAME, currentProfile.name)
+        } else {
+            editor.remove(KEY_NAME)
+        }
         
-        editor.putInt(KEY_PROFILE_VERSION, profileVersion)
+        // Save or remove email
+        if (currentProfile.email != null) {
+            editor.putString(KEY_EMAIL, currentProfile.email)
+        } else {
+            editor.remove(KEY_EMAIL)
+        }
+        
+        // Save or remove phone
+        if (currentProfile.phone != null) {
+            editor.putString(KEY_PHONE, currentProfile.phone)
+        } else {
+            editor.remove(KEY_PHONE)
+        }
+        
         editor.apply()
     }
     
-    /**
-     * Send user.profile_updated event for backend persistence
-     */
-    private fun sendProfileUpdatedEvent(userId: String) {
-        // This will be implemented when integrating with the event tracker
-        Log.d(TAG, "📤 Sending user.profile_updated event for $userId")
-    }
-    
-    /**
-     * Send user.profile_set event for analytics
-     */
-    private fun sendProfileSetEvent(userId: String) {
-        // This will be implemented when integrating with the event tracker
-        Log.d(TAG, "📤 Sending user.profile_set event for $userId")
-    }
 }

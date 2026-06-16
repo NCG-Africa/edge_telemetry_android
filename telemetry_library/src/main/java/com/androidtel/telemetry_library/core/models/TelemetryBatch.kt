@@ -85,8 +85,7 @@ data class UserInfo(
     val userId: String,  // Non-nullable - always required
     val name: String? = null,
     val email: String? = null,
-    val phone: String? = null,
-    val profileVersion: Int? = null
+    val phone: String? = null
 )
 
 data class SessionInfo(
