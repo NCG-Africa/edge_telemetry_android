@@ -197,11 +197,11 @@ For complete event schemas, validation rules, and JSON examples, see:
 
 | Feature | **Java 11+ Version** | **Java 8 Version** |
 |---------|---------------------|--------------------|
-| **Latest Version** | `2.0.0` | `1.2.3-java8` |
+| **Latest Version** | `2.1.13` | `1.2.3-java8` |
 | **Java Requirement** | Java 11+ | Java 8+ |
 | **Gradle** | 8.4+ | 7.5.1+ |
-| **AGP** | 8.0+ | 7.2.2+ |
-| **Kotlin** | 1.9.0+ | 1.8.22+ |
+| **AGP** | 8.7.1+ | 7.2.2+ |
+| **Kotlin** | 2.1.0+ | 1.8.22+ |
 | **Jetpack Compose** | ✅ Full Support | ❌ Not Supported |
 | **All Core Features** | ✅ | ✅ |
 | **Use Case** | Modern projects | Legacy/Enterprise |
@@ -253,15 +253,15 @@ Add the dependency to your app's `build.gradle`:
 
 ```kotlin
 dependencies {
-    implementation 'com.github.NCG-Africa:edge_telemetry_android:2.0.0'
+    implementation 'com.github.NCG-Africa:edge_telemetry_android:2.1.13'
 }
 ```
 
 **Requirements:**
 - **Java**: 11+
 - **Gradle**: 8.4+
-- **AGP**: 8.0+
-- **Kotlin**: 1.9.0+ (for Kotlin projects)
+- **AGP**: 8.7.1+
+- **Kotlin**: 2.1.0+ (for Kotlin projects)
 - **Features**: ✅ Full Compose support
 
 #### **Java 8 Projects (Legacy/Enterprise)**
