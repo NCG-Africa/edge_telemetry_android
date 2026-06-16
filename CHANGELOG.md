@@ -5,6 +5,74 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.13] - 2026-06-16
+
+Backend-alignment hotfix release. The SDK was silently misaligned with the EdgeTelemetryProcessor
+backend on several event types; data was either being dropped to a fallback bucket or never sent
+at all. This release brings the wire format back in line with `event_processor.py`.
+
+### 🐛 Wire-format Fixes (Data Loss)
+
+- **Screen duration**: events were sent as `metricName = "performance.screen_duration"` (a metric).
+  Backend expects `eventName = "screen.duration"` (an event) and routes those to
+  `rum_screen_durations`. Before: all screen-duration data fell through to the generic
+  `rum_performance_events` bucket and lost its structured columns. After: lands in the correct
+  table with `screen.name`, `screen.duration_ms`, `screen.exit_method`, `screen.timestamp`.
+- **Metric type field**: `EventTrackingService.recordMetric()` was emitting the literal string
+  `"metric|event"` as the `type` discriminator (pipe character was real). Backend dispatch
+  (`event_processor.py:96`) checks `event.type == "metric"`. Now emits `"metric"` cleanly.
+- **Session lifecycle event names**: `"session_end"` (legacy) was being sent on session timeout.
+  Backend recognizes `"session.finalized"`. Renamed; both `endCurrentSession()` and the timeout
+  path now emit `session.finalized`.
+
+### ✨ Missing Events Now Emitted
+
+- **`session.started`**: emitted when a session opens (initial init, timeout-triggered rotation,
+  and explicit `startNewSession()`). Backend marks the corresponding `rum_sessions` row active.
+- **`user.profile.update`**: emitted by `setUserProfile()` and `clearUserProfile()`. Backend
+  upserts `rum_users` directly instead of relying solely on opportunistic backfill from event
+  attributes.
+
+### 🔧 SDK Identity & Headers
+
+- `User-Agent` now reads the real SDK version (was hardcoded to `1.0.0`).
+- New `X-SDK-Version` and `X-SDK-Platform: android` headers on every outbound batch (including
+  crash retry path). Surfaces SDK identity to backend ops/analytics dashboards.
+- `BuildConfig.SDK_VERSION` exposed; single source of truth in `build.gradle.kts`.
+
+### 📈 Richer Data Collection
+
+- Memory tracking now wired into the lifecycle (`onStart`, session boundaries). The
+  `MemoryTracker` factory was never being invoked previously; defaults were on but no emitter ran.
+- Frame, memory, storage, and user-interaction tracking remain on by default — backend now
+  processes them via the metric type or the performance-events fallback.
+
+### 🔧 Attribution Correctness
+
+- Removed lazy user-profile overwrite at HTTP-send time. Previously, events recorded before a
+  `setUserProfile()` call would be retroactively re-attributed at flush time, distorting
+  historical attribution. Backend now backfills `rum_users` from any event with `user.*` keys
+  (commit `e6ab501` in processor), making the SDK-side override unnecessary and incorrect.
+
+### 🛡️ Concurrency Hardening
+
+- Init-flag registration guards converted to `AtomicBoolean` (`activityObserverRegistered`,
+  `processObserverRegistered`, `crashHandlerInstalled`). Prevents double-install of lifecycle
+  observers / crash handler under concurrent `initialize()` calls.
+- Persisted crash file (`telemetry_pending_crash.json`) reads/writes/deletes now serialized via
+  an intra-process mutex — eliminates a race that could corrupt the JSON when multiple
+  `recordCrash()` calls overlap.
+- `BatchProcessingService.idsInitialized` marked `@Volatile` so the flush coroutine sees writes
+  from the init thread without external locks.
+
+### ✅ No Breaking Changes
+
+Public API surface unchanged; the new `recordScreenDuration()` helper and the additional outbound
+events are additive. Consumers should see strictly more data flowing to the backend after
+upgrading, into the correct tables.
+
+---
+
 ## [2.1.12] - 2026-03-24
 
 ### 🐛 Bug Fixes

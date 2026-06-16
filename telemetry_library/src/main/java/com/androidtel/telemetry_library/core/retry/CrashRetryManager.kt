@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.util.Log
 import androidx.work.*
+import com.androidtel.telemetry_library.BuildConfig
 import com.androidtel.telemetry_library.core.interceptors.ApiKeyRedactionInterceptor
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
@@ -135,8 +136,10 @@ class CrashRetryManager(
             .url(telemetryEndpoint)
             .post(requestBody)
             .addHeader("Content-Type", "application/json")
-            .addHeader("User-Agent", "EdgeTelemetry-Android/1.2.0")
+            .addHeader("User-Agent", "EdgeTelemetryAndroid/${BuildConfig.SDK_VERSION}")
             .addHeader("X-API-Key", apiKey)
+            .addHeader("X-SDK-Version", BuildConfig.SDK_VERSION)
+            .addHeader("X-SDK-Platform", "android")
             .build()
         
         httpClient.newCall(request).execute().use { response ->

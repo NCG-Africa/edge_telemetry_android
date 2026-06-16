@@ -79,17 +79,8 @@ fun TrackComposeScreen(
                 data = exitData
             )
             
-            // Track screen duration metric with proper structure
-            telemetryManager.recordMetric(
-                metricName = "performance.screen_duration",
-                value = duration.toDouble(),
-                attributes = mapOf(
-                    "screen.name" to finalScreenName,
-                    "screen.duration_ms" to duration,
-                    "screen.exit_method" to "navigation",
-                    "screen.timestamp" to java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).format(java.util.Date())
-                )
-            )
+            // Track screen duration event with proper structure
+            telemetryManager.recordScreenDuration(finalScreenName, duration, "navigation")
             
             lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
         }

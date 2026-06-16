@@ -46,17 +46,7 @@ class TelemetryFragmentLifecycleObserver(private val telemetryManager: Telemetry
         // End the screen timing and record the screen duration
         val durationMs = screenTimingTracker.endScreen(fragmentName)
         if (durationMs != null) {
-            telemetryManager.recordMetric(
-                metricName = "performance.screen_duration",
-                value = durationMs.toDouble(),
-                attributes = mapOf(
-                    "screen.name" to fragmentName,
-                    "screen.duration_ms" to durationMs,
-                    "screen.exit_method" to "paused",
-                    "screen.timestamp" to java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).format(java.util.Date()),
-                    "metric.unit" to "milliseconds"
-                )
-            )
+            telemetryManager.recordScreenDuration(fragmentName, durationMs, "paused")
         }
     }
 }

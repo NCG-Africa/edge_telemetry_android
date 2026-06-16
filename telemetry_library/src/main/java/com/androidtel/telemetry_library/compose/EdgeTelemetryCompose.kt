@@ -115,7 +115,7 @@ fun TrackComposeScreen(
                 "duration_ms" to duration.toString(),
                 "timestamp" to Instant.now().toString()
             )
-            
+
             // Add exit breadcrumb
             EdgeTelemetry.getInstance().addBreadcrumb(
                 message = "Exited $finalScreenName",
@@ -123,9 +123,9 @@ fun TrackComposeScreen(
                 level = "info",
                 data = exitData
             )
-            
-            // Track screen duration metric
-            EdgeTelemetry.getInstance().recordEvent("performance.screen_duration", exitData)
+
+            // Track screen duration event in the wire format the backend expects (eventName=screen.duration)
+            EdgeTelemetry.getInstance().recordScreenDuration(finalScreenName, duration, "navigation")
             
             lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
         }

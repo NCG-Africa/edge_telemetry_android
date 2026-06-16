@@ -184,10 +184,10 @@ object EventPayloadValidator {
         val errors = mutableListOf<String>()
         
         // Validate event name
-        if (eventName != "performance.screen_duration") {
-            errors.add("Event name must be 'performance.screen_duration', got '$eventName'")
+        if (eventName != "screen.duration") {
+            errors.add("Event name must be 'screen.duration', got '$eventName'")
         }
-        
+
         // Validate required attributes
         val requiredAttrs = mapOf(
             "screen.name" to String::class.java,
@@ -195,14 +195,15 @@ object EventPayloadValidator {
             "screen.exit_method" to String::class.java,
             "screen.timestamp" to String::class.java
         )
-        
+
         requiredAttrs.forEach { (attr, expectedType) ->
             validateAttribute(attributes, attr, expectedType, errors)
         }
-        
-        // Validate exit method values
+
+        // Validate exit method values (backend stores whatever string is provided; this list documents
+        // the values the SDK currently emits across its lifecycle hooks)
         attributes["screen.exit_method"]?.let { method ->
-            val validMethods = setOf("navigation", "paused", "closed", "destroyed", "saved_state")
+            val validMethods = setOf("navigation", "paused", "closed", "destroyed", "saved_state", "disposed")
             if (method !is String || method !in validMethods) {
                 errors.add("screen.exit_method must be one of $validMethods, got '$method'")
             }
@@ -317,10 +318,27 @@ object EventPayloadValidator {
         errors: MutableList<String>
     ) {
         val value = attributes[attrName]
-        
+
+        // Callers pass Int::class.java / Long::class.java / Boolean::class.java etc., which in
+        // Kotlin resolve to the primitive Class objects (int.class, long.class, …). Values stored
+        // in Map<String, Any?> are autoboxed wrappers (java.lang.Integer, …) and e.g.
+        // int.class.isInstance(Integer) returns false. Resolve primitive → wrapper before the
+        // isInstance check so the validator actually accepts numeric and boolean attributes.
+        val checkType: Class<*> = when (expectedType) {
+            Int::class.javaPrimitiveType -> Int::class.javaObjectType
+            Long::class.javaPrimitiveType -> Long::class.javaObjectType
+            Boolean::class.javaPrimitiveType -> Boolean::class.javaObjectType
+            Double::class.javaPrimitiveType -> Double::class.javaObjectType
+            Float::class.javaPrimitiveType -> Float::class.javaObjectType
+            Short::class.javaPrimitiveType -> Short::class.javaObjectType
+            Byte::class.javaPrimitiveType -> Byte::class.javaObjectType
+            Char::class.javaPrimitiveType -> Char::class.javaObjectType
+            else -> expectedType
+        }
+
         when {
             value == null -> errors.add("Required attribute '$attrName' is missing")
-            !expectedType.isInstance(value) -> {
+            !checkType.isInstance(value) -> {
                 errors.add("Attribute '$attrName' must be ${expectedType.simpleName}, got ${value::class.java.simpleName}")
             }
         }

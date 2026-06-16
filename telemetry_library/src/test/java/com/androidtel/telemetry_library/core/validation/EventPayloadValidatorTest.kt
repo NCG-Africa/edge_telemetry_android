@@ -326,7 +326,7 @@ class EventPayloadValidatorTest {
         )
         
         val result = EventPayloadValidator.validateScreenDurationEvent(
-            eventName = "performance.screen_duration",
+            eventName = "screen.duration",
             attributes = attributes,
             timestamp = validTimestamp
         )
@@ -344,7 +344,7 @@ class EventPayloadValidatorTest {
         )
         
         val result = EventPayloadValidator.validateScreenDurationEvent(
-            eventName = "performance.screen_duration",
+            eventName = "screen.duration",
             attributes = attributes,
             timestamp = validTimestamp
         )
@@ -366,7 +366,7 @@ class EventPayloadValidatorTest {
         )
         
         val result = EventPayloadValidator.validateScreenDurationEvent(
-            eventName = "performance.screen_duration",
+            eventName = "screen.duration",
             attributes = attributes,
             timestamp = validTimestamp
         )

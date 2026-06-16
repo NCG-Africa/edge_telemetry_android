@@ -11,7 +11,6 @@ import com.androidtel.telemetry_library.core.ids.IdGenerator
 import com.androidtel.telemetry_library.core.models.EventAttributes
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.androidtel.telemetry_library.core.models.TelemetryEvent
-import com.androidtel.telemetry_library.core.models.UserInfo
 import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -48,16 +47,22 @@ internal class CrashReportingService(
     
     private var crashReporter: CrashReporter? = null
     private var breadcrumbManager: BreadcrumbManager? = null
-    private var crashHandlerInstalled = false
-    
+    // Atomic so concurrent CrashReportingService.initialize() calls can't double-install the
+    // Thread.UncaughtExceptionHandler (which would chain twice and double-report).
+    private val crashHandlerInstalled = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    // Synchronizes access to the persisted-crash file so concurrent recordCrash() / read paths
+    // can't corrupt the JSON. App's private storage = single-process, so a local lock suffices.
+    private val persistedCrashFileLock = Any()
+
     private val persistedCrashFileName = "telemetry_pending_crash.json"
     private val persistedCrashFile: File
         get() = File(context.cacheDir, persistedCrashFileName)
-    
+
     fun initialize() {
         breadcrumbManager = BreadcrumbManager()
-        
-        if (config.enableCrashReporting && !crashHandlerInstalled) {
+
+        if (config.enableCrashReporting && crashHandlerInstalled.compareAndSet(false, true)) {
             crashReporter = CrashReporter(
                 context = context,
                 telemetryManager = null,
@@ -69,10 +74,9 @@ internal class CrashReportingService(
                 debugMode = false
             )
             // Note: installGlobalExceptionHandler() is already called in CrashReporter.init when enabled=true
-            crashHandlerInstalled = true
             Log.d(TAG, "Crash handler installed")
         }
-        
+
         Log.d(TAG, "CrashReportingService initialized")
     }
     
@@ -222,52 +226,64 @@ internal class CrashReportingService(
     fun getCrashReporter(): CrashReporter? = crashReporter
     
     /**
-     * Persist batch synchronously
+     * Persist batch synchronously.
+     *
+     * Single intra-process mutex (`persistedCrashFileLock`) serializes all access to the persisted
+     * crash file so concurrent recordCrash() / send / delete paths cannot race and corrupt the
+     * JSON file. Sufficient because the file lives in app-private storage (single OS process).
      */
     private fun persistBatchSync(batch: TelemetryBatch) {
-        try {
-            val json = gson.toJson(batch)
-            persistedCrashFile.parentFile?.mkdirs()
-            persistedCrashFile.writeText(json)
-            Log.i(TAG, "Persisted crash batch to ${persistedCrashFile.absolutePath}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to persist crash batch: ${e.localizedMessage}", e)
+        synchronized(persistedCrashFileLock) {
+            try {
+                val json = gson.toJson(batch)
+                persistedCrashFile.parentFile?.mkdirs()
+                persistedCrashFile.writeText(json)
+                Log.i(TAG, "Persisted crash batch to ${persistedCrashFile.absolutePath}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to persist crash batch: ${e.localizedMessage}", e)
+            }
         }
     }
-    
+
     /**
-     * Read persisted crash batch
+     * Read persisted crash batch.
      */
     fun readPersistedBatch(): TelemetryBatch? {
-        return try {
-            if (!persistedCrashFile.exists()) return null
-            val text = persistedCrashFile.readText()
-            gson.fromJson(text, TelemetryBatch::class.java)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to read persisted crash batch: ${e.localizedMessage}", e)
-            null
+        synchronized(persistedCrashFileLock) {
+            return try {
+                if (!persistedCrashFile.exists()) return null
+                val text = persistedCrashFile.readText()
+                gson.fromJson(text, TelemetryBatch::class.java)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to read persisted crash batch: ${e.localizedMessage}", e)
+                null
+            }
         }
     }
-    
+
     /**
-     * Delete persisted batch
+     * Delete persisted batch.
      */
     fun deletePersistedBatch() {
-        try {
-            if (persistedCrashFile.exists()) {
-                persistedCrashFile.delete()
-                Log.i(TAG, "Deleted persisted crash file.")
+        synchronized(persistedCrashFileLock) {
+            try {
+                if (persistedCrashFile.exists()) {
+                    persistedCrashFile.delete()
+                    Log.i(TAG, "Deleted persisted crash file.")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to delete persisted crash file: ${e.localizedMessage}", e)
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to delete persisted crash file: ${e.localizedMessage}", e)
         }
     }
     
     /**
-     * Send persisted crash if any
-     * currentUserInfo: latest user profile for lazy enrichment at serialization time
+     * Send persisted crash if any.
+     *
+     * User profile is snapshotted into each event at recordCrash() time. Backend backfills
+     * rum_users from event attributes, so no per-batch override is needed.
      */
-    suspend fun sendPersistedCrashIfAny(currentUserInfo: UserInfo? = null) {
+    suspend fun sendPersistedCrashIfAny() {
         val batch = readPersistedBatch()
         if (batch == null) {
             return
@@ -275,7 +291,7 @@ internal class CrashReportingService(
 
         Log.i(TAG, "Found persisted crash batch; attempting to send.")
         try {
-            val result = httpClient.sendBatch(batch, currentUserInfo)
+            val result = httpClient.sendBatch(batch)
             if (result.isSuccess) {
                 Log.i(TAG, "Successfully sent persisted crash batch.")
                 deletePersistedBatch()
@@ -290,11 +306,11 @@ internal class CrashReportingService(
     }
 
     /**
-     * Send batch asynchronously
+     * Send batch asynchronously.
      */
-    private suspend fun sendBatchAsync(currentUserInfo: UserInfo? = null) {
+    private suspend fun sendBatchAsync() {
         val batch = readPersistedBatch() ?: return
-        val result = httpClient.sendBatch(batch, currentUserInfo)
+        val result = httpClient.sendBatch(batch)
         if (result.isSuccess) {
             deletePersistedBatch()
         }

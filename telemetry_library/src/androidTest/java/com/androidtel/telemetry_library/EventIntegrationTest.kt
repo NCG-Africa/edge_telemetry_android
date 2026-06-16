@@ -181,7 +181,7 @@ class EventIntegrationTest {
             "http.request" to "network.request",           // Correct vs Legacy
             "session.finalized" to "session_end",          // Correct vs Legacy
             "navigation" to "navigation.route_change",     // Correct vs Legacy
-            "performance.screen_duration" to "screen_view", // Correct vs Legacy
+            "screen.duration" to "screen_view", // Correct vs Legacy
             "app.crash" to "app.error"                     // Correct vs Legacy
         )
         
@@ -263,7 +263,7 @@ class EventIntegrationTest {
             )
             
             val result = EventPayloadValidator.validateScreenDurationEvent(
-                "performance.screen_duration", attributes, "2024-03-23T12:34:56.789Z"
+                "screen.duration", attributes, "2024-03-23T12:34:56.789Z"
             )
             
             assertTrue("Exit method $exitMethod should be valid", result.isValid)

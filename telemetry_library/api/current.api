@@ -297,8 +297,8 @@ package com.androidtel.telemetry_library.core {
   public final class TelemetryHttpClient {
     ctor public TelemetryHttpClient(String telemetryUrl, String apiKey, boolean debugMode);
     method public okhttp3.OkHttpClient getOkHttpClient();
-    method public suspend Object? sendBatch(com.androidtel.telemetry_library.core.models.TelemetryBatch batch, optional com.androidtel.telemetry_library.core.models.UserInfo? currentUserInfo, optional kotlin.coroutines.Continuation<? super kotlin.Result<? extends kotlin.Unit>>);
-    method public String toJson(com.androidtel.telemetry_library.core.models.TelemetryBatch, optional com.androidtel.telemetry_library.core.models.UserInfo? currentUserInfo);
+    method public suspend Object? sendBatch(com.androidtel.telemetry_library.core.models.TelemetryBatch batch, kotlin.coroutines.Continuation<? super kotlin.Result<? extends kotlin.Unit>>);
+    method public String toJson(com.androidtel.telemetry_library.core.models.TelemetryBatch);
   }
 
   public final class TelemetryInterceptor implements okhttp3.Interceptor {
@@ -325,6 +325,7 @@ package com.androidtel.telemetry_library.core {
     method public void recordEvent(String eventName, optional java.util.Map<java.lang.String,?> attributes);
     method public void recordMetric(String metricName, double value, optional java.util.Map<java.lang.String,?> attributes);
     method public void recordNetworkRequest(String url, String method, int statusCode, long durationMs, optional long requestBodySize, optional long responseBodySize, optional String? error, optional java.util.Map<java.lang.String,?> attributes);
+    method public void recordScreenDuration(String screenName, long durationMs, String exitMethod);
     method @Deprecated public void recordScreenView(String screenName);
     method public void setLastUserAction(String action);
     method public void setProductContext(String productId);

@@ -168,7 +168,7 @@ class EventTrackingServiceTest {
         val event = service.recordMetric(metricName, value, emptyMap(), userInfo, sessionInfo)
         
         assertNotNull(event)
-        assertEquals("metric|event", event?.type)
+        assertEquals("metric", event?.type)
         assertEquals(metricName, event?.metricName)
         assertEquals(value, event?.value!!, 0.001)
         assertEquals(1, service.getMetricCount())

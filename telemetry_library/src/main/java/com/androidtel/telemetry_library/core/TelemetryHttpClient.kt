@@ -1,6 +1,7 @@
 package com.androidtel.telemetry_library.core
 
 import android.util.Log
+import com.androidtel.telemetry_library.BuildConfig
 import com.androidtel.telemetry_library.core.interceptors.ApiKeyRedactionInterceptor
 import com.androidtel.telemetry_library.core.models.EventAttributes
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
@@ -50,17 +51,19 @@ class TelemetryHttpClient(
     fun getOkHttpClient(): OkHttpClient = okHttpClient
 
     // Public method to send a batch with built-in retry logic.
-    // currentUserInfo: if provided, overrides name/email/phone in all events at serialization time (lazy enrichment)
-    suspend fun sendBatch(batch: TelemetryBatch, currentUserInfo: com.androidtel.telemetry_library.core.models.UserInfo? = null): Result<Unit> {
-        return sendWithRetry(batch, maxRetries = 3, currentUserInfo = currentUserInfo)
+    //
+    // User profile is snapshotted into each event at recordEvent() time; the backend backfills
+    // rum_users from event attributes so there's no need to override at serialization.
+    suspend fun sendBatch(batch: TelemetryBatch): Result<Unit> {
+        return sendWithRetry(batch, maxRetries = 3)
     }
 
 
     // Implementation of the retry strategy with exponential backoff.
-    private suspend fun sendWithRetry(batch: TelemetryBatch, maxRetries: Int, currentUserInfo: com.androidtel.telemetry_library.core.models.UserInfo? = null): Result<Unit> {
+    private suspend fun sendWithRetry(batch: TelemetryBatch, maxRetries: Int): Result<Unit> {
         repeat(maxRetries) { attempt ->
             try {
-                val jsonPayload = batch.toJson(currentUserInfo)
+                val jsonPayload = batch.toJson()
                 makeHttpRequest(jsonPayload, telemetryUrl).use { response ->
                     when (response.code) {
                         in 200..299 -> return Result.success(Unit)
@@ -116,16 +119,17 @@ class TelemetryHttpClient(
             .url(telemetryUrl)
             .post(jsonPayload.toRequestBody("application/json".toMediaType()))
             .addHeader("Content-Type", "application/json")
-            .addHeader("User-Agent", "EdgeTelemetryAndroid/1.0.0")
+            .addHeader("User-Agent", "EdgeTelemetryAndroid/${BuildConfig.SDK_VERSION}")
             .addHeader("X-API-Key", apiKey)
+            .addHeader("X-SDK-Version", BuildConfig.SDK_VERSION)
+            .addHeader("X-SDK-Platform", "android")
             .build()
         return okHttpClient.newCall(request).execute()
     }
 
 
     // --- Extension: Convert Batch -> Outgoing JSON ---
-    // currentUserInfo: if provided, overrides user.name/email/phone in all events (lazy enrichment)
-    fun TelemetryBatch.toJson(currentUserInfo: com.androidtel.telemetry_library.core.models.UserInfo? = null): String {
+    fun TelemetryBatch.toJson(): String {
         // Extract device_id from the first event's attributes
         val deviceId = this.events.firstOrNull()?.attributes?.device?.deviceId
         
@@ -149,7 +153,7 @@ class TelemetryHttpClient(
                     metricName = event.metricName,
                     value = event.value,
                     timestamp = event.timestamp,
-                    attributes = flattenAttributes(event.attributes, currentUserInfo)
+                    attributes = flattenAttributes(event.attributes)
                 )
             },
             batch_size = this.batchSize,
@@ -163,8 +167,7 @@ class TelemetryHttpClient(
     }
 
     // ---- Helper: Flatten attributes into map ----
-    // currentUserInfo: if provided, overrides user.name/email/phone with latest values (lazy enrichment)
-    private fun flattenAttributes(attrs: EventAttributes, currentUserInfo: com.androidtel.telemetry_library.core.models.UserInfo? = null): Map<String, Any?> {
+    private fun flattenAttributes(attrs: EventAttributes): Map<String, Any?> {
         val flat = mutableMapOf<String, Any?>()
 
         // App
@@ -203,14 +206,12 @@ class TelemetryHttpClient(
         }
         flat["user.id"] = attrs.user.userId
 
-        // Lazy enrichment: use currentUserInfo (latest profile) if available,
-        // otherwise fall back to the profile baked into the event at creation time.
-        // This ensures user.name/email/phone reflect the latest setUserProfile() call,
-        // even for events recorded before the profile was set.
-        val resolvedUser = currentUserInfo ?: attrs.user
-        resolvedUser.name?.let { flat["user.name"] = it }
-        resolvedUser.email?.let { flat["user.email"] = it }
-        resolvedUser.phone?.let { flat["user.phone"] = it }
+        // User profile is snapshotted at recordEvent() time. Backend backfills rum_users from event
+        // attributes (see event_processor.py commit e6ab501 — profile persists on every event with
+        // user.* keys), so the SDK no longer needs to overwrite at serialization.
+        attrs.user.name?.let { flat["user.name"] = it }
+        attrs.user.email?.let { flat["user.email"] = it }
+        attrs.user.phone?.let { flat["user.phone"] = it }
 
         // Session (extended)
         flat["session.id"] = attrs.session.sessionId

@@ -128,7 +128,7 @@ class StandardAttributesIntegrationTest {
         
         // Validate event-specific attributes
         val eventResult = EventPayloadValidator.validateScreenDurationEvent(
-            eventName = "performance.screen_duration",
+            eventName = "screen.duration",
             attributes = eventAttributes,
             timestamp = validTimestamp
         )

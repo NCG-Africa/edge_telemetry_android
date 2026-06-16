@@ -6,7 +6,6 @@ import com.androidtel.telemetry_library.core.TelemetryConfig
 import com.androidtel.telemetry_library.core.TelemetryHttpClient
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.androidtel.telemetry_library.core.models.TelemetryEvent
-import com.androidtel.telemetry_library.core.models.UserInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -39,6 +38,9 @@ internal class BatchProcessingService(
     private var flushTimer: ScheduledExecutorService? = null
     private var batchSendJob: Job? = null
     
+    // Volatile so readers on the background flush coroutine see writes from the init thread without
+    // a happens-before via an external lock.
+    @Volatile
     private var idsInitialized: Boolean = false
     
     fun initialize() {
@@ -61,15 +63,17 @@ internal class BatchProcessingService(
     }
     
     /**
-     * Send batch of events
-     * currentUserInfo: latest user profile for lazy enrichment at serialization time
+     * Send batch of events.
+     *
+     * User profile is snapshotted at event-creation time into each event's attributes; the
+     * backend backfills `rum_users` from any event with user.* keys, so no per-batch override is
+     * required.
      */
     suspend fun sendBatch(
         eventQueue: ConcurrentLinkedQueue<TelemetryEvent>,
         forceSend: Boolean = false,
         flushOffline: Boolean = true,
-        location: String? = null,
-        currentUserInfo: UserInfo? = null
+        location: String? = null
     ) {
         if (!idsInitialized) {
             Log.w(TAG, "Skipping batch send - IDs not properly initialized. Events remain queued (${eventQueue.size} events).")
@@ -96,7 +100,7 @@ internal class BatchProcessingService(
         )
         
         Log.i(TAG, "Attempting to send a batch of ${batch.batchSize} events with location: $location")
-        val result = httpClient.sendBatch(batch, currentUserInfo)
+        val result = httpClient.sendBatch(batch)
 
         if (result.isSuccess) {
             Log.i(TAG, "Successfully sent batch.")
@@ -109,16 +113,15 @@ internal class BatchProcessingService(
     }
     
     /**
-     * Send stored batches from offline storage
-     * currentUserInfo: latest user profile for lazy enrichment at serialization time
+     * Send stored batches from offline storage.
      */
-    suspend fun sendStoredBatches(currentUserInfo: UserInfo? = null) {
+    suspend fun sendStoredBatches() {
         Log.i(TAG, "Checking for stored batches to send.")
         val storedBatches = offlineStorage.getStoredBatches()
         if (storedBatches.isNotEmpty()) {
             Log.i(TAG, "Found ${storedBatches.size} stored batches. Attempting to send.")
             storedBatches.forEach { batch ->
-                val result = httpClient.sendBatch(batch, currentUserInfo)
+                val result = httpClient.sendBatch(batch)
                 if (result.isSuccess) {
                     Log.i(TAG, "Successfully re-sent stored batch.")
                     offlineStorage.removeBatch(batch.id)
@@ -130,16 +133,14 @@ internal class BatchProcessingService(
     }
     
     /**
-     * Trigger batch send asynchronously
-     * currentUserInfo: latest user profile for lazy enrichment at serialization time
+     * Trigger batch send asynchronously.
      */
     fun triggerBatchSend(
         eventQueue: ConcurrentLinkedQueue<TelemetryEvent>,
-        location: String? = null,
-        currentUserInfo: UserInfo? = null
+        location: String? = null
     ): Job {
         batchSendJob = scope.launch {
-            sendBatch(eventQueue, forceSend = false, flushOffline = true, location = location, currentUserInfo = currentUserInfo)
+            sendBatch(eventQueue, forceSend = false, flushOffline = true, location = location)
         }
         return batchSendJob!!
     }

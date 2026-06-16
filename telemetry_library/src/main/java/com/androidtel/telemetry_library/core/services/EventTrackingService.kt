@@ -83,7 +83,7 @@ internal class EventTrackingService(
         
         val event = buildAttributes(attributes, userInfo, sessionInfo)?.let {
             TelemetryEvent(
-                type = "metric|event",
+                type = "metric",
                 metricName = metricName,
                 value = value,
                 timestamp = dateFormat.format(Date()),

@@ -43,7 +43,7 @@ class RuntimeEventValidator(
                 attributes = flattenedAttributes,
                 timestamp = event.timestamp
             )
-            "performance.screen_duration" -> EventPayloadValidator.validateScreenDurationEvent(
+            "screen.duration" -> EventPayloadValidator.validateScreenDurationEvent(
                 eventName = event.eventName ?: "",
                 attributes = flattenedAttributes,
                 timestamp = event.timestamp

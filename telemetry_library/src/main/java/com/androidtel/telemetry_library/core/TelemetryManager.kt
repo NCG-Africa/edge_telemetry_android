@@ -82,9 +82,10 @@ class TelemetryManager private constructor(
     private val preInitQueue = ConcurrentLinkedQueue<() -> Unit>()
     private val PRE_INIT_QUEUE_MAX_SIZE = 50
 
-    // Registration guards
-    private var activityObserverRegistered = false
-    private var processObserverRegistered = false
+    // Registration guards — atomic to avoid double-registration if initialize() is called
+    // concurrently from multiple threads. compareAndSet ensures only one caller wins per flag.
+    private val activityObserverRegistered = AtomicBoolean(false)
+    private val processObserverRegistered = AtomicBoolean(false)
 
     // TelemetryInterceptor instance
     private var telemetryInterceptor: TelemetryInterceptor? = null
@@ -109,6 +110,9 @@ class TelemetryManager private constructor(
     // Location tracking components
     private var locationProvider: LocationProvider? = null
     private var currentLocation: String? = null
+
+    // Memory tracker — sampled on session boundaries and app-resume to keep traffic bounded
+    private var memoryTracker: MemoryTracker? = null
     
     // ID validation state
     @Volatile
@@ -289,6 +293,12 @@ class TelemetryManager private constructor(
             // Step 9: Initialize legacy components for backward compatibility
             deviceInfoCollector = DeviceInfoCollector(context, idGenerator)
             Log.d("TelemetryManager", "Step 9: Legacy components initialized")
+
+            // Step 9b: Initialize memory tracker so memory metrics flow when sampled
+            if (config.enableMemoryTracking) {
+                memoryTracker = MemoryTrackerFactory.createMemoryTracker(this)
+                Log.d("TelemetryManager", "Step 9b: MemoryTracker initialized")
+            }
             
             // Step 10: Mark as ready
             idsInitialized = true
@@ -301,22 +311,22 @@ class TelemetryManager private constructor(
             Log.d("TelemetryManager", "Step 11: Pre-init queue drained")
             
             // Step 12: Register activity lifecycle callbacks if enabled
-            if (config.enableScreenTracking && !activityObserverRegistered) {
+            if (config.enableScreenTracking && activityObserverRegistered.compareAndSet(false, true)) {
                 val app = context as? Application
                 if (app != null) {
                     val observer = TelemetryActivityLifecycleObserver(this)
                     app.registerActivityLifecycleCallbacks(observer)
-                    activityObserverRegistered = true
                     Log.d("TelemetryManager", "Step 12: Activity lifecycle observer registered")
                 } else {
+                    // Roll back the CAS so a later retry with a proper Application context succeeds
+                    activityObserverRegistered.set(false)
                     Log.w("TelemetryManager", "Step 12: Context is not Application, cannot register activity observer")
                 }
             }
-            
+
             // Step 13: Register ProcessLifecycleOwner observer if enabled
-            if (config.enableLifecycleTracking && !processObserverRegistered) {
+            if (config.enableLifecycleTracking && processObserverRegistered.compareAndSet(false, true)) {
                 ProcessLifecycleOwner.get().lifecycle.addObserver(this)
-                processObserverRegistered = true
                 Log.d("TelemetryManager", "Step 13: Process lifecycle observer registered")
             }
             
@@ -327,10 +337,55 @@ class TelemetryManager private constructor(
             }
             
             Log.i("TelemetryManager", "SDK initialization complete - All modules active")
-            
+
+            // Step 15: Emit session.started event for the initial session.
+            // Backend dispatch: `event_processor.py` matches eventName == "session.started" and marks
+            // the corresponding rum_sessions row as status=active.
+            emitSessionStartedEvent()
+
         } catch (e: Exception) {
             Log.e("TelemetryManager", "Failed to complete initialization sequence", e)
             throw e
+        }
+    }
+
+    /**
+     * Emit a session.started event with the current session info. Idempotently safe — call after
+     * each call to SessionService.startNewSession() or after initial session creation.
+     */
+    private fun emitSessionStartedEvent() {
+        if (!::sessionService.isInitialized || !::eventTrackingService.isInitialized) return
+        val sessionInfo = sessionService.getSessionInfo(
+            eventTrackingService.getEventCount(),
+            eventTrackingService.getMetricCount(),
+            getNetworkType(context)
+        )
+        recordEvent(
+            eventName = "session.started",
+            attributes = mapOf(
+                "session.id" to sessionInfo.sessionId,
+                "session.start_time" to (sessionInfo.startTime ?: ""),
+                "session.is_first_session" to (sessionInfo.isFirstSession ?: false),
+                "session.total_sessions" to (sessionInfo.totalSessions ?: 0),
+                "network.type" to (sessionInfo.networkType ?: "unknown")
+            )
+        )
+        // Sample memory once at session boundary — bounded traffic, useful baseline for the backend
+        sampleMemoryUsage()
+    }
+
+    /**
+     * Sample memory once via the configured MemoryTracker. Safe to call before the tracker is
+     * initialized (no-op). Frame metrics flow automatically via the activity lifecycle observer.
+     */
+    private fun sampleMemoryUsage() {
+        try {
+            memoryTracker?.recordMemoryUsage()
+            if (config.enableStorageTracking) {
+                memoryTracker?.recordStorageUsage()
+            }
+        } catch (e: Exception) {
+            Log.w("TelemetryManager", "Memory sample failed: ${e.localizedMessage}")
         }
     }
 
@@ -339,26 +394,27 @@ class TelemetryManager private constructor(
     override fun onStart(owner: LifecycleOwner) {
         super.onStart(owner)
         if (!config.enableLifecycleTracking) return
-        
+
         Log.i("TelemetryManager", "App moved to foreground")
-        
+
         // 1. Restore offline buffer back into in-memory event queue
         scope.launch {
             batchProcessingService.restoreOfflineBatches(eventTrackingService.getEventQueue())
         }
-        
+
         // 2. Check session timeout and start new session if needed
         if (sessionService.hasSessionTimedOut()) {
             val lastActive = sessionService.getLastActiveTimestamp()
             if (lastActive > 0) {
-                val oldSessionId = sessionService.getCurrentSessionId()
-                recordEvent("session_end", mapOf(
-                    "session.id" to oldSessionId,
+                // Emit session.finalized with full session stats (event/metric/screen counts +
+                // visited_screens + network.type) — these come from the standard session envelope.
+                recordEvent("session.finalized", mapOf(
                     "session.reason" to "timeout"
                 ))
             }
             sessionService.startNewSession()
             Log.i("TelemetryManager", "Started new session: ${sessionService.getCurrentSessionId()}")
+            emitSessionStartedEvent()
         } else {
             val elapsed = System.currentTimeMillis() - sessionService.getLastActiveTimestamp()
             Log.i("TelemetryManager", "Resuming existing session (elapsed: ${elapsed}ms)")
@@ -366,6 +422,9 @@ class TelemetryManager private constructor(
         
         // 3. Resume the flush timer
         batchProcessingService.resumeFlushTimer()
+
+        // 4. Sample memory on each foreground transition — bounded by user-engagement cadence
+        sampleMemoryUsage()
     }
 
     // This is called when the app goes into the background. We can track the session end here.
@@ -529,18 +588,27 @@ class TelemetryManager private constructor(
     fun recordComposeScreenEnd(screenRoute: String) {
         val durationMs = screenTimingTracker.endScreen(screenRoute)
         if (durationMs != null) {
-            recordMetric(
-                metricName = "performance.screen_duration",
-                value = durationMs.toDouble(),
-                attributes = mapOf(
-                    "screen.name" to screenRoute,
-                    "screen.duration_ms" to durationMs,
-                    "screen.exit_method" to "disposed",
-                    "screen.timestamp" to dateFormat.format(Date()),
-                    "metric.unit" to "milliseconds"
-                )
-            )
+            recordScreenDuration(screenRoute, durationMs, "disposed")
         }
+    }
+
+    /**
+     * Emit a screen.duration event matching the backend's expected wire format.
+     *
+     * Backend dispatch: `event_processor.py` matches `eventName == "screen.duration"` and routes to
+     * `rum_screen_durations` via `extract_screen_duration()`. Required attributes: `screen.name`,
+     * `screen.duration_ms`. Optional: `screen.exit_method`, `screen.timestamp`.
+     */
+    fun recordScreenDuration(screenName: String, durationMs: Long, exitMethod: String) {
+        recordEvent(
+            eventName = "screen.duration",
+            attributes = mapOf(
+                "screen.name" to screenName,
+                "screen.duration_ms" to durationMs,
+                "screen.exit_method" to exitMethod,
+                "screen.timestamp" to dateFormat.format(Date())
+            )
+        )
     }
 
 
@@ -573,7 +641,7 @@ class TelemetryManager private constructor(
             } else {
                 null
             }
-            batchProcessingService.triggerBatchSend(eventTrackingService.getEventQueue(), location, userProfileService.getUserInfo())
+            batchProcessingService.triggerBatchSend(eventTrackingService.getEventQueue(), location)
         }
     }
 
@@ -585,25 +653,24 @@ class TelemetryManager private constructor(
         } else {
             null
         }
-        
+
         batchProcessingService.sendBatch(
             eventTrackingService.getEventQueue(),
             forceSend,
             flushOffline,
-            location,
-            userProfileService.getUserInfo()
+            location
         )
     }
 
     // Method to send any batches stored in the offline queue.
     // Delegated to BatchProcessingService
     private suspend fun sendStoredBatches() {
-        batchProcessingService.sendStoredBatches(userProfileService.getUserInfo())
+        batchProcessingService.sendStoredBatches()
     }
 
     // Crash persistence methods delegated to CrashReportingService
     private suspend fun sendPersistedCrashIfAny() {
-        crashReportingService.sendPersistedCrashIfAny(userProfileService.getUserInfo())
+        crashReportingService.sendPersistedCrashIfAny()
     }
 
 
@@ -795,20 +862,40 @@ class TelemetryManager private constructor(
     // ================================
 
     /**
-     * Set user profile information
-     * Can be called before or after SDK.init()
-     * Fully replaces previous values (no merge)
-     * Passing null for a field clears it
+     * Set user profile information.
+     *
+     * Can be called before or after SDK.init(). Fully replaces previous values (no merge); passing
+     * null for a field clears it. After persisting locally, emits a `user.profile.update` event
+     * which the backend (`event_processor.py:219`) upserts into the `rum_users` table.
      */
     fun setUserProfile(name: String?, email: String?, phone: String? = null) {
         userProfileService.setUserProfile(name, email, phone)
+        emitUserProfileUpdateEvent(name, email, phone)
     }
 
     /**
-     * Clear user profile
+     * Clear user profile.
+     *
+     * Emits a `user.profile.update` event carrying null fields so the backend can reflect the
+     * clear in `rum_users`.
      */
     fun clearUserProfile() {
         userProfileService.clearUserProfile()
+        emitUserProfileUpdateEvent(null, null, null)
+    }
+
+    /**
+     * Emit a `user.profile.update` event matching the backend wire format. Defers to the pre-init
+     * queue if the SDK isn't ready yet.
+     */
+    private fun emitUserProfileUpdateEvent(name: String?, email: String?, phone: String?) {
+        val attributes = buildMap<String, Any> {
+            put("user.name", name ?: "")
+            put("user.email", email ?: "")
+            put("user.phone", phone ?: "")
+            put("user.profile_updated_at", dateFormat.format(Date()))
+        }
+        recordEvent(eventName = "user.profile.update", attributes = attributes)
     }
 
     /**
@@ -883,12 +970,23 @@ class TelemetryManager private constructor(
         sessionService.startNewSession()
         eventTrackingService.resetEventCount()
         eventTrackingService.resetMetricCount()
+        emitSessionStartedEvent()
     }
 
     /**
-     * End current session
+     * End current session.
+     *
+     * Emits a session.finalized event so the backend can mark the rum_sessions row as completed.
+     * The standard session envelope on every event already carries duration_ms, event_count,
+     * metric_count, screen_count, visited_screens, is_first_session, total_sessions, and
+     * network.type — that's the full set the schema requires.
      */
     fun endCurrentSession() {
+        if (::sessionService.isInitialized) {
+            recordEvent("session.finalized", mapOf(
+                "session.reason" to "manual"
+            ))
+        }
         sessionService.endCurrentSession()
     }
 

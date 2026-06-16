@@ -87,17 +87,7 @@ class TelemetryActivityLifecycleObserver(
         // End timing
         val durationMs = screenTimingTracker.endScreen(screenName)
         if (durationMs != null) {
-            telemetryManager.recordMetric(
-                metricName = "performance.screen_duration",
-                value = durationMs.toDouble(),
-                attributes = mapOf(
-                    "screen.name" to screenName,
-                    "screen.duration_ms" to durationMs,
-                    "screen.exit_method" to "closed",
-                    "screen.timestamp" to java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).format(java.util.Date()),
-                    "metric.unit" to "milliseconds"
-                )
-            )
+            telemetryManager.recordScreenDuration(screenName, durationMs, "closed")
         }
     }
 
@@ -109,17 +99,7 @@ class TelemetryActivityLifecycleObserver(
         // End timing
         val durationMs = screenTimingTracker.endScreen(screenName)
         if (durationMs != null) {
-            telemetryManager.recordMetric(
-                metricName = "performance.screen_duration",
-                value = durationMs.toDouble(),
-                attributes = mapOf(
-                    "screen.name" to screenName,
-                    "screen.duration_ms" to durationMs,
-                    "screen.exit_method" to "saved_state",
-                    "screen.timestamp" to java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).format(java.util.Date()),
-                    "metric.unit" to "milliseconds"
-                )
-            )
+            telemetryManager.recordScreenDuration(screenName, durationMs, "saved_state")
         }
     }
 
@@ -133,17 +113,7 @@ class TelemetryActivityLifecycleObserver(
         // End timing
         val durationMs = screenTimingTracker.endScreen(screenName)
         if (durationMs != null) {
-            telemetryManager.recordMetric(
-                metricName = "performance.screen_duration",
-                value = durationMs.toDouble(),
-                attributes = mapOf(
-                    "screen.name" to screenName,
-                    "screen.duration_ms" to durationMs,
-                    "screen.exit_method" to "destroyed",
-                    "screen.timestamp" to java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).format(java.util.Date()),
-                    "metric.unit" to "milliseconds"
-                )
-            )
+            telemetryManager.recordScreenDuration(screenName, durationMs, "destroyed")
         }
     }
 
