@@ -6,6 +6,9 @@ plugins {
     id("maven-publish")
 }
 
+// Single source of truth for the SDK version (surfaces in BuildConfig.SDK_VERSION headers).
+val sdkVersion = "1.2.5-java8"
+
 android {
     namespace = "com.androidtel.telemetry_library"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -15,6 +18,11 @@ android {
         targetSdk = libs.versions.targetSdk.get().toInt()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
+        buildConfigField("String", "SDK_VERSION", "\"$sdkVersion\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
@@ -126,7 +134,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.NCG-Africa"
                 artifactId = "edge_telemetry_android"
-                version = "2.0.0-java8"
+                version = sdkVersion
             }
         }
     }

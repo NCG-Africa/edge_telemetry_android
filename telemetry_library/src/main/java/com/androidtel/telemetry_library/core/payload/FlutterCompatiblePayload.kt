@@ -1,7 +1,7 @@
 package com.androidtel.telemetry_library.core.payload
 
 import com.google.gson.Gson
-import com.androidtel.telemetry_library.utils.DateTimeUtils
+import java.time.Instant
 
 /**
  * Payload structures that match the Flutter SDK exactly for backend compatibility
@@ -131,7 +131,7 @@ object FlutterPayloadFactory {
         attributes: Map<String, String>,
         deviceId: String
     ): CrashPayload {
-        val timestamp = DateTimeUtils.nowAsIso8601()
+        val timestamp = Instant.now().toString()
         
         return CrashPayload(
             timestamp = timestamp,
@@ -154,7 +154,7 @@ object FlutterPayloadFactory {
         deviceId: String,
         location: String? = null
     ): EventBatchPayload {
-        val timestamp = DateTimeUtils.nowAsIso8601()
+        val timestamp = Instant.now().toString()
         
         return EventBatchPayload(
             timestamp = timestamp,
@@ -183,7 +183,7 @@ object FlutterPayloadFactory {
             eventName = eventName,
             metricName = metricName,
             value = value,
-            timestamp = DateTimeUtils.nowAsIso8601(),
+            timestamp = Instant.now().toString(),
             attributes = attributes
         )
     }
@@ -230,7 +230,7 @@ object FlutterPayloadFactory {
         
         // Add crash-specific fields
         // Note: crash.fingerprint and crash.breadcrumb_count removed - backend generates crash_hash and counts breadcrumbs
-        crashAttributes["error.timestamp"] = DateTimeUtils.nowAsIso8601()
+        crashAttributes["error.timestamp"] = Instant.now().toString()
         crashAttributes["error.has_stack_trace"] = "true"
         crashAttributes["breadcrumbs"] = breadcrumbs
         
@@ -254,7 +254,7 @@ object FlutterPayloadFactory {
         errorCode: String? = null,
         additionalAttributes: Map<String, String> = emptyMap()
     ): CrashBatchEnvelope {
-        val timestamp = DateTimeUtils.nowAsIso8601()
+        val timestamp = Instant.now().toString()
         val stackTrace = generateStackTrace(throwable)
         
         // Extract crash fields with character limits
@@ -319,7 +319,7 @@ object FlutterPayloadFactory {
         errorCode: String? = null,
         additionalAttributes: Map<String, String> = emptyMap()
     ): CrashBatchEnvelope {
-        val timestamp = DateTimeUtils.nowAsIso8601()
+        val timestamp = Instant.now().toString()
         
         // Extract crash fields with character limits
         val truncatedMessage = message.take(1000)

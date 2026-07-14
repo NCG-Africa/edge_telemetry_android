@@ -77,6 +77,11 @@ class EnhancedMemoryTracker(
     }
     
     override fun recordMemoryUsage() {
+        // Check if memory tracking is enabled
+        if (!telemetryManager.isMemoryTrackingEnabled()) {
+            return
+        }
+        
         try {
             val memorySummary = memoryCapabilityTracker.getMemoryUsageSummary()
             val memoryInfo = memoryCapabilityTracker.getMemoryInfo()
@@ -115,6 +120,11 @@ class EnhancedMemoryTracker(
     }
     
     override fun recordStorageUsage() {
+        // Check if storage tracking is enabled
+        if (!telemetryManager.isStorageTrackingEnabled()) {
+            return
+        }
+        
         try {
             val storageInfo = memoryCapabilityTracker.getStorageInfo()
             
@@ -201,6 +211,11 @@ class BasicMemoryTracker(
     }
     
     override fun recordMemoryUsage() {
+        // Check if memory tracking is enabled
+        if (!telemetryManager.isMemoryTrackingEnabled()) {
+            return
+        }
+        
         try {
             val runtime = Runtime.getRuntime()
             val usedMb = (runtime.totalMemory() - runtime.freeMemory()) / (1024.0 * 1024.0)

@@ -46,15 +46,7 @@ class TelemetryFragmentLifecycleObserver(private val telemetryManager: Telemetry
         // End the screen timing and record the screen duration
         val durationMs = screenTimingTracker.endScreen(fragmentName)
         if (durationMs != null) {
-            telemetryManager.recordMetric(
-                metricName = "performance.screen_duration",
-                value = durationMs.toDouble(),
-                attributes = mapOf(
-                    "screen.name" to fragmentName,
-                    "navigation.exit_method" to "paused",
-                    "metric.unit" to "milliseconds"
-                )
-            )
+            telemetryManager.recordScreenDuration(fragmentName, durationMs, "paused")
         }
     }
 }

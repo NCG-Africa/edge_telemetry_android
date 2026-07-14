@@ -1,6 +1,7 @@
 package com.androidtel.telemetry_library.core
 
 import android.util.Log
+import com.androidtel.telemetry_library.BuildConfig
 import com.androidtel.telemetry_library.core.interceptors.ApiKeyRedactionInterceptor
 import com.androidtel.telemetry_library.core.models.EventAttributes
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
@@ -50,8 +51,11 @@ class TelemetryHttpClient(
     fun getOkHttpClient(): OkHttpClient = okHttpClient
 
     // Public method to send a batch with built-in retry logic.
+    //
+    // User profile is snapshotted into each event at recordEvent() time; the backend backfills
+    // rum_users from event attributes so there's no need to override at serialization.
     suspend fun sendBatch(batch: TelemetryBatch): Result<Unit> {
-        return sendWithRetry(batch , maxRetries = 3)
+        return sendWithRetry(batch, maxRetries = 3)
     }
 
 
@@ -60,34 +64,32 @@ class TelemetryHttpClient(
         repeat(maxRetries) { attempt ->
             try {
                 val jsonPayload = batch.toJson()
-                val response = makeHttpRequest(jsonPayload, telemetryUrl)
-
-                when (response.code) {
-                    in 200..299 -> return Result.success(Unit)
-                    in 400..499 -> {
-                        Log.e(
-                            "TelemetryHttpClient",
-                            "Client error ${response.code}: ${response.message}"
-                        )
-                        return Result.failure(ClientException(response.code, response.message))
-                    }
-
-                    in 500..599 -> {
-                        Log.e(
-                            "TelemetryHttpClient",
-                            "Server error ${response.code}: ${response.message}. Retrying..."
-                        )
-
-                        if (attempt < maxRetries - 1) {
-                            delay(calculateBackoffDelay(attempt))
-                            // Continue to next retry attempt
-                        } else {
-                            // Last attempt - return failure
-                            return Result.failure(ServerException(response.code, response.message))
+                makeHttpRequest(jsonPayload, telemetryUrl).use { response ->
+                    when (response.code) {
+                        in 200..299 -> return Result.success(Unit)
+                        in 400..499 -> {
+                            Log.e(
+                                "TelemetryHttpClient",
+                                "Client error ${response.code}: ${response.message}"
+                            )
+                            return Result.failure(ClientException(response.code, response.message))
                         }
-                    }
 
-                    else -> return Result.failure(UnknownException(response.code))
+                        in 500..599 -> {
+                            Log.e(
+                                "TelemetryHttpClient",
+                                "Server error ${response.code}: ${response.message}. Retrying..."
+                            )
+
+                            if (attempt < maxRetries - 1) {
+                                delay(calculateBackoffDelay(attempt))
+                            } else {
+                                return Result.failure(ServerException(response.code, response.message))
+                            }
+                        }
+
+                        else -> return Result.failure(UnknownException(response.code))
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(
@@ -117,8 +119,10 @@ class TelemetryHttpClient(
             .url(telemetryUrl)
             .post(jsonPayload.toRequestBody("application/json".toMediaType()))
             .addHeader("Content-Type", "application/json")
-            .addHeader("User-Agent", "EdgeTelemetryAndroid/1.0.0")
+            .addHeader("User-Agent", "EdgeTelemetryAndroid/${BuildConfig.SDK_VERSION}")
             .addHeader("X-API-Key", apiKey)
+            .addHeader("X-SDK-Version", BuildConfig.SDK_VERSION)
+            .addHeader("X-SDK-Platform", "android")
             .build()
         return okHttpClient.newCall(request).execute()
     }
@@ -142,9 +146,6 @@ class TelemetryHttpClient(
         
         val out = TelemetryDataOut(
             type = "batch",
-            device_id = safeDeviceId,
-            batch_size = this.batchSize,
-            timestamp = this.timestamp,
             events = this.events.map { event ->
                 TelemetryEventOut(
                     type = event.type,
@@ -155,17 +156,14 @@ class TelemetryHttpClient(
                     attributes = flattenAttributes(event.attributes)
                 )
             },
+            batch_size = this.batchSize,
+            timestamp = this.timestamp,
+            device_id = safeDeviceId,
             location = this.location
         )
         
-        // Wrap in TelemetryPayload with device_id at top level
-        val payload = TelemetryPayload(
-            timestamp = this.timestamp,
-            device_id = safeDeviceId,
-            data = out
-        )
-        
-        return Gson().toJson(payload)
+        // Send TelemetryDataOut directly (no wrapper) to match backend's expected format
+        return Gson().toJson(out)
     }
 
     // ---- Helper: Flatten attributes into map ----
@@ -207,10 +205,13 @@ class TelemetryHttpClient(
             )
         }
         flat["user.id"] = attrs.user.userId
-        flat["user.name"] = attrs.user.name
-        flat["user.email"] = attrs.user.email
-        flat["user.phone"] = attrs.user.phone
-        flat["user.profile_version"] = attrs.user.profileVersion
+
+        // User profile is snapshotted at recordEvent() time. Backend backfills rum_users from event
+        // attributes (see event_processor.py commit e6ab501 — profile persists on every event with
+        // user.* keys), so the SDK no longer needs to overwrite at serialization.
+        attrs.user.name?.let { flat["user.name"] = it }
+        attrs.user.email?.let { flat["user.email"] = it }
+        attrs.user.phone?.let { flat["user.phone"] = it }
 
         // Session (extended)
         flat["session.id"] = attrs.session.sessionId

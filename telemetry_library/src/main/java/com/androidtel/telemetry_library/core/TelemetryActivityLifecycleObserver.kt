@@ -65,16 +65,16 @@ class TelemetryActivityLifecycleObserver(
         // Stop performance tracking to prevent memory leaks
         performanceTracker.stop()
 
-        // End timing
+        // End timing and emit screen_view event
         val durationMs = screenTimingTracker.endScreen(screenName)
         if (durationMs != null) {
-            telemetryManager.recordMetric(
-                metricName = "performance.screen_duration",
-                value = durationMs.toDouble(),
+            telemetryManager.recordEvent(
+                eventName = "screen_view",
                 attributes = mapOf(
-                    "screen.name" to screenName,
-                    "navigation.exit_method" to "paused",
-                    "metric.unit" to "milliseconds"
+                    "screen_name" to screenName,
+                    "duration_ms" to durationMs,
+                    "session_id" to telemetryManager.getSessionId(),
+                    "timestamp" to System.currentTimeMillis()
                 )
             )
         }
@@ -87,15 +87,7 @@ class TelemetryActivityLifecycleObserver(
         // End timing
         val durationMs = screenTimingTracker.endScreen(screenName)
         if (durationMs != null) {
-            telemetryManager.recordMetric(
-                metricName = "performance.screen_duration",
-                value = durationMs.toDouble(),
-                attributes = mapOf(
-                    "screen.name" to screenName,
-                    "navigation.exit_method" to "closed",
-                    "metric.unit" to "milliseconds"
-                )
-            )
+            telemetryManager.recordScreenDuration(screenName, durationMs, "closed")
         }
     }
 
@@ -107,15 +99,7 @@ class TelemetryActivityLifecycleObserver(
         // End timing
         val durationMs = screenTimingTracker.endScreen(screenName)
         if (durationMs != null) {
-            telemetryManager.recordMetric(
-                metricName = "performance.screen_duration",
-                value = durationMs.toDouble(),
-                attributes = mapOf(
-                    "screen.name" to screenName,
-                    "navigation.exit_method" to "saved state",
-                    "metric.unit" to "milliseconds"
-                )
-            )
+            telemetryManager.recordScreenDuration(screenName, durationMs, "saved_state")
         }
     }
 
@@ -129,15 +113,7 @@ class TelemetryActivityLifecycleObserver(
         // End timing
         val durationMs = screenTimingTracker.endScreen(screenName)
         if (durationMs != null) {
-            telemetryManager.recordMetric(
-                metricName = "performance.screen_duration",
-                value = durationMs.toDouble(),
-                attributes = mapOf(
-                    "screen.name" to screenName,
-                    "navigation.exit_method" to "destroyed",
-                    "metric.unit" to "milliseconds"
-                )
-            )
+            telemetryManager.recordScreenDuration(screenName, durationMs, "destroyed")
         }
     }
 

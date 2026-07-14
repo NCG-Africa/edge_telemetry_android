@@ -1,6 +1,6 @@
 package com.androidtel.telemetry_library.core.breadcrumbs
 
-import com.androidtel.telemetry_library.utils.DateTimeUtils
+import java.time.Instant
 
 /**
  * Breadcrumb data structure matching Flutter SDK format
@@ -23,7 +23,7 @@ data class Breadcrumb(
                 message = message,
                 category = category,
                 level = level,
-                timestamp = DateTimeUtils.nowAsIso8601(),
+                timestamp = Instant.now().toString(),
                 data = data
             )
         }

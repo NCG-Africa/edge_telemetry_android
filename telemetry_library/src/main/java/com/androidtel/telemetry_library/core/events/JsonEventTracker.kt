@@ -9,7 +9,8 @@ import com.androidtel.telemetry_library.core.ids.IdGenerator
 import com.androidtel.telemetry_library.core.session.SessionManager
 import com.androidtel.telemetry_library.core.user.UserProfileManager
 import kotlinx.coroutines.*
-import com.androidtel.telemetry_library.utils.DateTimeUtils
+import java.time.Duration
+import java.time.Instant
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.locks.ReentrantReadWriteLock
@@ -27,7 +28,7 @@ class JsonEventTracker(
     private val breadcrumbManager: BreadcrumbManager,
     private val idGenerator: IdGenerator,
     private val batchSize: Int = 30,
-    private val batchTimeoutMs: Long = 5000L // 5 seconds
+    private val batchTimeout: Duration = Duration.ofSeconds(5)
 ) {
     
     companion object {
@@ -122,8 +123,7 @@ class JsonEventTracker(
     fun testConnectivity() {
         trackEvent("test.connectivity", mapOf(
             "test" to "true",
-            "timestamp" to DateTimeUtils.nowAsIso8601(),
-            "additional" to "info"
+            "timestamp" to Instant.now().toString()
         ))
         Log.i(TAG, "🧪 Connectivity test event sent")
     }
@@ -143,7 +143,7 @@ class JsonEventTracker(
             "eventName" to eventName,
             "metricName" to metricName,
             "value" to value,
-            "timestamp" to DateTimeUtils.nowAsIso8601(),
+            "timestamp" to Instant.now().toString(),
             "attributes" to getEnrichedAttributes(attributes)
         ).filterValues { it != null } as Map<String, Any>
     }
@@ -156,7 +156,7 @@ class JsonEventTracker(
         stackTrace: String,
         attributes: Map<String, String>? = null
     ): Map<String, Any> {
-        val timestamp = DateTimeUtils.nowAsIso8601()
+        val timestamp = Instant.now().toString()
         val fingerprint = generateCrashFingerprint(error, stackTrace)
         val breadcrumbs = breadcrumbManager.getBreadcrumbsAsJson()
         
@@ -211,7 +211,7 @@ class JsonEventTracker(
         
         // Add crash-specific attributes
         // Note: crash.fingerprint and crash.breadcrumb_count removed - backend generates crash_hash and counts breadcrumbs
-        attributes["error.timestamp"] = DateTimeUtils.nowAsIso8601()
+        attributes["error.timestamp"] = Instant.now().toString()
         attributes["error.has_stack_trace"] = "true"
         attributes["breadcrumbs"] = breadcrumbs
         
@@ -308,7 +308,7 @@ class JsonEventTracker(
                         sendBatch()
                     }
                 }
-            }, batchTimeoutMs)
+            }, batchTimeout.toMillis())
         }
     }
     
