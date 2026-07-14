@@ -197,14 +197,16 @@ For complete event schemas, validation rules, and JSON examples, see:
 
 | Feature | **Java 11+ Version** | **Java 8 Version** |
 |---------|---------------------|--------------------|
-| **Latest Version** | `2.1.13` | `1.2.3-java8` |
-| **Java Requirement** | Java 11+ | Java 8+ |
-| **Gradle** | 8.4+ | 7.5.1+ |
-| **AGP** | 8.7.1+ | 7.2.2+ |
-| **Kotlin** | 2.1.0+ | 1.8.22+ |
-| **Jetpack Compose** | ✅ Full Support | ❌ Not Supported |
+| **Latest Version** | `2.1.13` | `2.1.13-java8` |
+| **Java Requirement** | Java 11+ | Java 8+ (core-library desugaring) |
+| **Gradle** | 8.4+ | 8.4+ |
+| **AGP** | 8.7.1+ | 8.7.1+ |
+| **Kotlin** | 2.1.0+ | 2.1.0+ |
+| **Jetpack Compose** | ✅ Full Support | ✅ Full Support |
 | **All Core Features** | ✅ | ✅ |
-| **Use Case** | Modern projects | Legacy/Enterprise |
+| **Use Case** | Modern projects | Projects pinned to Java 8 bytecode |
+
+> The `-java8` build is byte-identical to the standard release — same source, same features (Compose included) — but compiled to Java 8 bytecode (`sourceCompatibility`/`targetCompatibility = 1.8`) with core-library desugaring backfilling `java.time.*`. Use it when your app's `compileOptions` are pinned to Java 8 and the standard AAR fails with "compiled by a more recent version of Java." It needs the same modern Gradle/AGP/Kotlin toolchain as the standard release. Truly legacy toolchains (AGP 7.x, Kotlin 1.8) should stay on `1.2.3-java8`.
 
 ### 🎯 **Choose Your Version**
 
@@ -213,10 +215,10 @@ For complete event schemas, validation rules, and JSON examples, see:
 - **Modern Toolchain**: Latest Gradle, AGP, and Kotlin
 - **Future-Proof**: Receives all new features first
 
-#### **Java 8 Version (Legacy Support)**
-- **Enterprise Ready**: Perfect for legacy codebases
-- **Dagger 2 Compatible**: Works with Dagger 2 + KAPT setups
-- **Core Functionality**: All telemetry features except Compose
+#### **Java 8 Version (Java 8 bytecode)**
+- **Full Parity**: Identical to the standard release, Compose included
+- **Java 8 Bytecode**: For apps whose `compileOptions` are pinned to Java 8
+- **Desugaring**: `java.time.*` backfilled onto minSdk 24 via core-library desugaring
 
 ### 📱 **Runtime Requirements (Both Versions)**
 - **Minimum SDK**: `24` (Android 7.0+)
@@ -270,25 +272,24 @@ Add JitPack repository (same as above), then:
 
 ```kotlin
 dependencies {
-    implementation 'com.github.NCG-Africa:edge_telemetry_android:1.2.3-java8'
+    implementation 'com.github.NCG-Africa:edge_telemetry_android:2.1.13-java8'
 }
 ```
 
 **Requirements:**
-- **Java**: 8+ (with desugaring enabled)
-- **Gradle**: 7.5.1+
-- **AGP**: 7.2.2+
-- **Kotlin**: 1.8.22+ (for Kotlin projects)
-- **Features**: ❌ No Compose support
+- **Java**: 8+ (core-library desugaring enabled in the SDK)
+- **Gradle**: 8.4+
+- **AGP**: 8.7.1+
+- **Kotlin**: 2.1.0+ (for Kotlin projects)
+- **Features**: ✅ Full Compose support (identical to the standard release)
 
 ### 🎯 **When to Use Each Version**
 
 | Use Java 11+ Version | Use Java 8 Version |
 |---------------------|--------------------|
-| ✅ New projects | ✅ Legacy codebases |
-| ✅ Compose apps | ✅ Dagger 2 + KAPT |
-| ✅ Modern toolchain | ✅ Enterprise constraints |
-| ✅ Latest features | ✅ Gradual migration |
+| ✅ Java 11+ bytecode OK | ✅ `compileOptions` pinned to Java 8 |
+| ✅ Standard setup | ✅ "compiled by a more recent Java" errors |
+| ✅ Same features | ✅ Same features (Compose included) |
 
 ## 🛠 Quick Setup
 
@@ -548,7 +549,7 @@ class ProfileFragment : Fragment() {
 }
 ```
 
-#### For Jetpack Compose Navigation (Java 11+ Version Only)
+#### For Jetpack Compose Navigation
 
 **Automatic Tracking**
 ```kotlin
@@ -627,7 +628,7 @@ composable(
 }
 ```
 
-> **Note**: Compose features are only available in the Java 11+ version. For Java 8 projects, use Activity/Fragment-based navigation.
+> **Note**: Compose is fully supported in both the standard and `-java8` builds.
 
 ## 📖 Usage Examples
 
@@ -690,7 +691,7 @@ if (telemetryManager != null) {
 }
 ```
 
-### Jetpack Compose Screen Tracking (Java 11+ Version Only)
+### Jetpack Compose Screen Tracking
 
 ```kotlin
 @Composable
@@ -708,7 +709,7 @@ fun ProfileScreen(navController: NavController) {
 }
 ```
 
-> **Note**: Compose screen tracking is only available in the Java 11+ version. Java 8 version users should use Activity/Fragment lifecycle tracking.
+> **Note**: Compose screen tracking is available in both the standard and `-java8` builds.
 
 ### Manual Screen Tracking
 
