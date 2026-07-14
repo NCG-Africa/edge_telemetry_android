@@ -46,13 +46,14 @@ android {
     }
 
     compileOptions {
-        // Java 11 is the safest for compatibility
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-//        isCoreLibraryDesugaringEnabled = true
+        // Java 8 bytecode so Java-8 consuming apps can use the AAR; desugaring backfills
+        // java.time.* (used throughout) onto minSdk 24.
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+        isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "1.8"
     }
 
     buildFeatures {
@@ -123,8 +124,8 @@ dependencies {
     api(libs.androidx.room.runtime)
     api(libs.androidx.room.ktx)
 
-    // Desugaring - removed since we no longer use Java 8 time APIs
-    // implementation("com.android.tools:desugar_jdk_libs:2.0.4")
+    // Desugaring - backfills java.time.* etc. onto older Android runtimes for Java 8 builds
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 
     // ❌ REMOVE kotlin-stdlib from compileOnly — let apps provide it
     // compileOnly("org.jetbrains.kotlin:kotlin-stdlib")
@@ -154,7 +155,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.NCG-Africa"
                 artifactId = "edge_telemetry_android"
-                version = sdkVersion
+                version = "$sdkVersion-java8"
             }
         }
     }
