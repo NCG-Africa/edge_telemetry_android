@@ -7,7 +7,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 /**
- * Phase 3 Test Suite: Payload Structure Validation
+ * Payload Structure Validation Tests
  * Validates crash payload structure against backend processor requirements
  */
 class PayloadStructureValidationTest {
