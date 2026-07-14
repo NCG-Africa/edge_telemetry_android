@@ -206,7 +206,7 @@ For complete event schemas, validation rules, and JSON examples, see:
 | **All Core Features** | ✅ | ✅ |
 | **Use Case** | Modern projects | Projects pinned to Java 8 bytecode |
 
-> The `-java8` build is byte-identical to the standard release — same source, same features (Compose included) — but compiled to Java 8 bytecode (`sourceCompatibility`/`targetCompatibility = 1.8`) with core-library desugaring backfilling `java.time.*`. Use it when your app's `compileOptions` are pinned to Java 8 and the standard AAR fails with "compiled by a more recent version of Java." It needs the same modern Gradle/AGP/Kotlin toolchain as the standard release. Truly legacy toolchains (AGP 7.x, Kotlin 1.8) should stay on `1.2.3-java8`.
+> The `-java8` build is byte-identical to the standard release — same source, same features (Compose included) — but compiled to Java 8 bytecode (`sourceCompatibility`/`targetCompatibility = 1.8`) with core-library desugaring backfilling `java.time.*`. Use it when your app's `compileOptions` are pinned to Java 8 and the standard AAR fails with "compiled by a more recent version of Java." It needs the same modern Gradle/AGP/Kotlin toolchain as the standard release. Truly legacy toolchains (AGP 7.x, Kotlin 1.8, Compose-free) should use `1.2.5-java8`, which backports the same 2.1.13 feature set onto that older toolchain.
 
 ### 🎯 **Choose Your Version**
 
