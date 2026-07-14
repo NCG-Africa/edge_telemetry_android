@@ -6,8 +6,8 @@ import org.junit.Assert.*
 import org.junit.Test
 
 /**
- * Unit tests for new crash batch envelope structure (v2.0.0)
- * Tests Phase 2A implementation requirements
+ * Unit tests for crash batch envelope structure (v2.0.0)
+ * Tests implementation requirements for batch envelope
  */
 class CrashBatchEnvelopeTest {
 

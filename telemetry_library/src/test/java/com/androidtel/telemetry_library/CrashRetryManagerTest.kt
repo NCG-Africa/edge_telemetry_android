@@ -35,7 +35,8 @@ class CrashRetryManagerTest {
             context = context,
             apiKey = testApiKey,
             telemetryEndpoint = mockWebServer.url("/telemetry").toString(),
-            debugMode = false
+            debugMode = false,
+            enableWorkManager = false  // Disable WorkManager to prevent hanging in tests
         )
     }
 
@@ -260,6 +261,45 @@ class CrashRetryManagerTest {
         assertTrue(body.contains("\"type\":\"crash\""))
         assertTrue(body.contains("\"error_type\":\"RuntimeException\""))
         assertTrue(body.contains("\"message\":\"Test crash\""))
+    }
+
+    @Test
+    fun `HTTP 429 stops retries immediately and stores offline`() = runBlocking {
+        mockWebServer.enqueue(MockResponse().setResponseCode(429))
+
+        val crashData = createTestCrashData()
+        crashRetryManager.sendCrashWithRetry(crashData)
+
+        // Should only make 1 request, not retry on 429
+        assertEquals(1, mockWebServer.requestCount)
+    }
+
+    @Test
+    fun `circuit breaker prevents subsequent requests after 429`() = runBlocking {
+        // First request gets 429
+        mockWebServer.enqueue(MockResponse().setResponseCode(429))
+        val crashData1 = createTestCrashData()
+        crashRetryManager.sendCrashWithRetry(crashData1)
+
+        // Second request should be blocked by circuit breaker
+        val crashData2 = createTestCrashData()
+        crashRetryManager.sendCrashWithRetry(crashData2)
+
+        // Only 1 HTTP request should have been made
+        assertEquals(1, mockWebServer.requestCount)
+    }
+
+    @Test
+    fun `regular errors still retry normally`() = runBlocking {
+        mockWebServer.enqueue(MockResponse().setResponseCode(500))
+        mockWebServer.enqueue(MockResponse().setResponseCode(503))
+        mockWebServer.enqueue(MockResponse().setResponseCode(200))
+
+        val crashData = createTestCrashData()
+        crashRetryManager.sendCrashWithRetry(crashData)
+
+        // Should retry 3 times for non-429 errors
+        assertEquals(3, mockWebServer.requestCount)
     }
 
     private fun createTestCrashData(): Map<String, Any> {

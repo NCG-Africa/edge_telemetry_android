@@ -87,34 +87,35 @@ class TelemetryManagerTest {
 
     @Test
     fun `initialize with TelemetryConfig and blank API key throws IllegalArgumentException`() {
-        val config = TelemetryConfig.builder(mockApplication, "")
-            .build()
-
         val exception = assertThrows(IllegalArgumentException::class.java) {
-            TelemetryManager.initialize(config)
+            TelemetryConfig(
+                apiKey = "",
+                endpoint = "https://telemetry.ncgafrica.com/telemetry"
+            )
         }
-        assertEquals("API key cannot be blank", exception.message)
+        assertTrue(exception.message?.contains("apiKey must not be blank") == true)
     }
 
     @Test
     fun `initialize with TelemetryConfig and invalid API key throws IllegalArgumentException`() {
-        val config = TelemetryConfig.builder(mockApplication, "invalid_format")
-            .build()
-
         val exception = assertThrows(IllegalArgumentException::class.java) {
-            TelemetryManager.initialize(config)
+            TelemetryConfig(
+                apiKey = "invalid_format",
+                endpoint = "https://telemetry.ncgafrica.com/telemetry"
+            )
         }
-        assertEquals("API key is invalid", exception.message)
+        assertTrue(exception.message?.contains("apiKey must start with") == true)
     }
 
     @Test
     fun `initialize with TelemetryConfig and valid API key succeeds`() {
-        val config = TelemetryConfig.builder(mockApplication, "edge_valid_key_123")
-            .debugMode(true)
-            .batchSize(50)
-            .build()
+        val config = TelemetryConfig(
+            apiKey = "edge_valid_key_123",
+            endpoint = "https://telemetry.ncgafrica.com/telemetry",
+            batchSize = 50
+        )
 
-        val manager = TelemetryManager.initialize(config)
+        val manager = TelemetryManager.initialize(mockApplication, config)
         assertNotNull(manager)
     }
 
@@ -173,9 +174,7 @@ class TelemetryManagerTest {
         val manager = TelemetryManager.initialize(
             application = mockApplication,
             apiKey = "edge_valid_key_abc123",
-            batchSize = 30,
-            debugMode = false,
-            enableCrashReporting = true
+            batchSize = 30
         )
         assertNotNull(manager)
     }

@@ -6,7 +6,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 /**
- * Phase 3 Test Suite: Backend Compatibility Validation
+ * Backend Compatibility Validation Tests
  * Ensures crash payloads are compatible with Kafka consumer processor
  */
 class BackendCompatibilityTest {

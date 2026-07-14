@@ -372,7 +372,7 @@ class IdConsistencyTest {
     @Test
     fun `IdGenerator is single source of truth for all ID types`() {
         val sessionId = idGenerator.generateSessionId()
-        val userId = idGenerator.generateUserId()
+        val userId = idGenerator.getUserId()
         val deviceId = idGenerator.getOrGenerateDeviceId()
         
         val idPattern = Regex("""\d{13}_[a-z0-9]{8}""")

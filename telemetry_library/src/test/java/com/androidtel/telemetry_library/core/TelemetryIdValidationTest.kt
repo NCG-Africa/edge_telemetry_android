@@ -83,11 +83,11 @@ class TelemetryIdValidationTest {
         every { mockPrefs.getString("user_id", null) } returns validUserId
 
         // When: TelemetryManager is initialized
-        val manager = TelemetryManager.initialize(
-            application = mockApplication,
+        val config = TelemetryConfig(
             apiKey = "edge_test_key_123",
-            debugMode = true
+            endpoint = "https://telemetry.ncgafrica.com/telemetry"
         )
+        val manager = TelemetryManager.initialize(mockApplication, config)
 
         // Then: IDs should be properly initialized
         val idsInitialized = getPrivateField(manager, "idsInitialized") as Boolean
@@ -101,11 +101,11 @@ class TelemetryIdValidationTest {
         every { mockPrefs.getString("user_id", null) } returns null
 
         // When: TelemetryManager is initialized
-        val manager = TelemetryManager.initialize(
-            application = mockApplication,
+        val config = TelemetryConfig(
             apiKey = "edge_test_key_123",
-            debugMode = true
+            endpoint = "https://telemetry.ncgafrica.com/telemetry"
         )
+        val manager = TelemetryManager.initialize(mockApplication, config)
 
         // Force idsInitialized to false to simulate initialization failure
         setPrivateField(manager, "idsInitialized", false)
@@ -204,11 +204,11 @@ class TelemetryIdValidationTest {
         every { mockPrefs.getString("user_id", null) } returns null
 
         // When: TelemetryManager is initialized
-        val manager = TelemetryManager.initialize(
-            application = mockApplication,
+        val config = TelemetryConfig(
             apiKey = "edge_test_key_123",
-            debugMode = true
+            endpoint = "https://telemetry.ncgafrica.com/telemetry"
         )
+        val manager = TelemetryManager.initialize(mockApplication, config)
 
         // Simulate emergency fallback by setting userId to emergency value
         setPrivateField(manager, "userId", "user_emergency_1234567890")
@@ -233,11 +233,11 @@ class TelemetryIdValidationTest {
         every { mockPrefs.getString("user_id", null) } returns validUserId
 
         // When: TelemetryManager is initialized
-        val manager = TelemetryManager.initialize(
-            application = mockApplication,
+        val config = TelemetryConfig(
             apiKey = "edge_test_key_123",
-            debugMode = true
+            endpoint = "https://telemetry.ncgafrica.com/telemetry"
         )
+        val manager = TelemetryManager.initialize(mockApplication, config)
 
         // Then: IDs should be initialized and valid
         val idsInitialized = getPrivateField(manager, "idsInitialized") as Boolean
@@ -273,10 +273,10 @@ class TelemetryIdValidationTest {
     @Test
     fun `IdGenerator generates and persists user ID on first use`() {
         // Given: No stored user ID
-        every { mockPrefs.getString("user_id", null) } returns null
+        every { mockPrefs.getString("edge_rum_user_id", null) } returns null
         
         val capturedUserId = slot<String>()
-        every { mockEditor.putString("user_id", capture(capturedUserId)) } returns mockEditor
+        every { mockEditor.putString("edge_rum_user_id", capture(capturedUserId)) } returns mockEditor
 
         // When: IdGenerator is initialized and user ID is requested
         val idGenerator = IdGenerator()
@@ -286,7 +286,7 @@ class TelemetryIdValidationTest {
         // Then: User ID should be generated and persisted
         assertNotNull("User ID should be generated", userId)
         assertTrue("User ID should match format", userId.matches(Regex("""\d{13}_[a-z0-9]{8}""")))
-        verify { mockEditor.putString("user_id", any()) }
+        verify { mockEditor.putString("edge_rum_user_id", any()) }
     }
 
     // Helper methods to access private fields and methods via reflection

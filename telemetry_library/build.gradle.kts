@@ -60,11 +60,33 @@ android {
         disable.add("NullSafeMutableLiveData")
     }
 
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+            isIncludeAndroidResources = true
+        }
+    }
+
     publishing {
         singleVariant("release") {
             withSourcesJar()
             withJavadocJar()
         }
+    }
+}
+
+// mockk 1.13.8's inline functions are compiled for JVM 11, so they can't inline into JVM-1.8
+// bytecode. Tests are never published, so compile only the unit-test source sets at target 11 —
+// the shipped library (main) stays Java 8 bytecode.
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    if (name.contains("UnitTest")) {
+        kotlinOptions.jvmTarget = "11"
+    }
+}
+tasks.withType<JavaCompile>().configureEach {
+    if (name.contains("UnitTest")) {
+        sourceCompatibility = JavaVersion.VERSION_11.toString()
+        targetCompatibility = JavaVersion.VERSION_11.toString()
     }
 }
 
