@@ -1,0 +1,466 @@
+repo: NCG-Africa/edge_telemetry_android
+component_type: sdk
+platform: android
+language: Kotlin
+current_version: 2.1.13   # telemetry_library/build.gradle.kts:13 (sdkVersion), flows to BuildConfig.SDK_VERSION and Maven publication version
+build_variants: >
+  Branch/tag-based, NOT a Gradle product-flavor scheme (one 'release' variant per branch).
+  Mainline = Java 11 (build.gradle.kts:50-55), published as bare version (2.1.13).
+  Java 8 backport lives on separate branches/tags (java8-compatible-v3, java8-legacy-1.2.5),
+  compiled to VERSION_1_8/jvmTarget 1.8 and published with a "-java8" version suffix
+  (e.g. 2.1.13-java8, 1.2.5-java8). Same groupId/artifactId; only the version string differs.
+registry: jitpack   # groupId com.github.NCG-Africa, artifactId edge_telemetry_android (build.gradle.kts:155-158); consumers add https://jitpack.io (settings.gradle.kts:20)
+
+# --- SDK sections 1-7 ---
+
+# 1. Events emitted
+# CRITICAL: this SDK has TWO independent wire formats.
+#   Path A (batch/event path): TelemetryBatch -> TelemetryHttpClient.toJson() -> TelemetryDataOut,
+#     sent UNWRAPPED. Flattened dotted-key attributes. Covers ALL events + manual recordCrash().
+#     Evidence: core/TelemetryHttpClient.kt:132-234
+#   Path B (crash path): CrashReporter (installed UncaughtExceptionHandler + all trackError())
+#     -> FlutterPayloadFactory.createCrashBatchEnvelope() -> CrashBatchEnvelope, serialized as a
+#     raw Map by CrashRetryManager. Different envelope + different attribute namespace, NO session/user.
+#     Evidence: core/crash/CrashReporter.kt, core/payload/FlutterCompatiblePayload.kt:100-369, core/retry/CrashRetryManager.kt:131-137
+#   NOTE: core/events/JsonEventTracker.kt send methods are DEAD (log only, never hit network) — ignored below.
+events:
+  # ----- Path A envelope (top-level object serialized on the wire) -----
+  # type:"batch", events[], batch_size(int), timestamp(string ISO), device_id(string), location(string|null, always null in practice)
+  # Evidence: core/TelemetryHttpClient.kt:148-162. Each events[] element: type("event"|"metric"), eventName?, metricName?, value?, timestamp, attributes(flattened).
+
+  - name: session.started
+    trigger: SDK init, startNewSession(), and session-timeout rotation on foreground
+    evidence: core/TelemetryManager.kt:356-375 (emitSessionStartedEvent)
+    payload_fields:
+      - {field: session.id, type: string, unit: none, always_present: true}
+      - {field: session.start_time, type: string, unit: none, always_present: true}
+      - {field: session.is_first_session, type: bool, unit: none, always_present: true}
+      - {field: session.total_sessions, type: int, unit: none, always_present: true}
+      - {field: network.type, type: string, unit: none, always_present: true}
+
+  - name: session.finalized
+    trigger: endCurrentSession() (reason "manual") or session timeout on onStart (reason "timeout")
+    evidence: core/TelemetryManager.kt:405-421, 986
+    payload_fields:
+      - {field: session.reason, type: string, unit: none, always_present: true}
+
+  - name: navigation
+    trigger: Activity onActivityResumed, Fragment onFragmentResumed, Compose recordComposeScreenView
+    evidence: core/TelemetryActivityLifecycleObserver.kt:48-58; TelemetryFragmentLifecycleObserver.kt:28-38; core/TelemetryManager.kt:575-585
+    payload_fields:
+      - {field: navigation.from_screen, type: string, unit: none, always_present: true}
+      - {field: navigation.to_screen, type: string, unit: none, always_present: true}
+      - {field: navigation.method, type: string, unit: none, always_present: true}
+      - {field: navigation.route_type, type: string, unit: none, always_present: true}
+      - {field: navigation.has_arguments, type: bool, unit: none, always_present: true}
+      - {field: navigation.timestamp, type: string, unit: none, always_present: unknown}  # DRIFT: Compose=ISO string; Activity/Fragment=navEvent.timestamp (type unknown)
+
+  - name: screen.duration
+    trigger: recordScreenDuration() — Compose screen end, Fragment paused, Activity screen-timing end
+    evidence: core/TelemetryManager.kt:602-611
+    payload_fields:
+      - {field: screen.name, type: string, unit: none, always_present: true}
+      - {field: screen.duration_ms, type: int, unit: ms, always_present: true}
+      - {field: screen.exit_method, type: string, unit: none, always_present: true}
+      - {field: screen.timestamp, type: string, unit: none, always_present: true}
+
+  - name: screen_view
+    trigger: recordScreenView() (gated by enableLegacyScreenEvents, default off) AND Activity onActivityPaused (NOT gated)
+    evidence: core/TelemetryManager.kt:556-568; core/TelemetryActivityLifecycleObserver.kt:71-79
+    payload_fields:  # DRIFT: two different shapes under one wire name
+      - {field: screen_name, type: string, unit: none, always_present: true}
+      - {field: duration_ms, type: int, unit: ms, always_present: false}       # Activity path only
+      - {field: session_id, type: string, unit: none, always_present: false}   # Activity path only
+      - {field: timestamp, type: int, unit: ms, always_present: false}         # Activity path only, epoch millis
+
+  - name: http_request
+    trigger: TelemetryInterceptor.intercept() (the interceptor returned by createNetworkInterceptor())
+    evidence: core/TelemetryInterceptor.kt:39-49
+    payload_fields:
+      - {field: url, type: string, unit: none, always_present: true}           # query string stripped
+      - {field: method, type: string, unit: none, always_present: true}
+      - {field: response_code, type: int, unit: none, always_present: true}
+      - {field: latency_ms, type: int, unit: ms, always_present: true}
+      - {field: request_size_bytes, type: int, unit: bytes, always_present: true}
+      - {field: response_size_bytes, type: int, unit: bytes, always_present: true}
+
+  - name: http.request
+    trigger: recordNetworkRequest() public API (rival network schema; different name AND keys from http_request)
+    evidence: core/services/EventTrackingService.kt:101-126
+    payload_fields:
+      - {field: http.url, type: string, unit: none, always_present: true}      # NOT sanitized (raw url)
+      - {field: http.method, type: string, unit: none, always_present: true}
+      - {field: http.status_code, type: int, unit: none, always_present: true}
+      - {field: http.duration_ms, type: int, unit: ms, always_present: true}
+      - {field: http.timestamp, type: string, unit: none, always_present: true}
+      - {field: http.success, type: bool, unit: none, always_present: true}
+      - {field: http.request_body_size, type: int, unit: bytes, always_present: true}
+      - {field: http.response_body_size, type: int, unit: bytes, always_present: true}
+      - {field: http.error, type: string, unit: none, always_present: true}    # "none" default
+
+  - name: memory_pressure
+    trigger: EnhancedMemoryTracker / BasicMemoryTracker recordMemoryUsage (gated enableMemoryTracking)
+    evidence: core/MemoryTracker.kt:97-100, 244-247, createStandardizedMemoryEvent 296-338
+    payload_fields:
+      - {field: memory.pressure_level, type: string, unit: none, always_present: true}
+      - {field: memory.under_system_pressure, type: bool, unit: none, always_present: true}
+      - {field: memory.api_level, type: int, unit: none, always_present: true}
+      - {field: memory.tracking_method, type: string, unit: none, always_present: true}
+      - {field: memory.timestamp, type: int, unit: ms, always_present: true}   # epoch millis
+      - {field: memory.heap_used_mb, type: int, unit: none, always_present: false}   # MB (name-encoded)
+      - {field: memory.heap_max_mb, type: int, unit: none, always_present: false}
+      - {field: memory.heap_free_mb, type: int, unit: none, always_present: false}
+      - {field: memory.system_available_mb, type: int, unit: none, always_present: false}
+      - {field: memory.system_low_memory, type: bool, unit: none, always_present: false}
+      - {field: memory.app_memory_class_mb, type: int, unit: none, always_present: false}
+      - {field: memory.large_memory_class_mb, type: int, unit: none, always_present: false}
+      - {field: memory.system_total_mb, type: int, unit: none, always_present: false}
+      - {field: memory.system_threshold_mb, type: int, unit: none, always_present: false}
+      - {field: memory.native_heap_kb, type: int, unit: bytes, always_present: false}   # KB
+      - {field: memory.total_pss_kb, type: int, unit: bytes, always_present: false}      # KB
+      - {field: memory.process_pss_kb, type: int, unit: bytes, always_present: false}    # KB
+
+  - name: storage_usage
+    trigger: recordStorageUsage (gated enableStorageTracking)
+    evidence: core/MemoryTracker.kt:147-150; core/TelemetryMemoryUsage.kt:251
+    payload_fields:
+      - {field: storage.api_level, type: int, unit: none, always_present: true}
+      - {field: storage.tracking_method, type: string, unit: none, always_present: true}
+      - {field: storage.internal_total_mb, type: int, unit: none, always_present: false}   # MB
+      - {field: storage.internal_free_mb, type: int, unit: none, always_present: false}
+      - {field: storage.internal_usable_mb, type: int, unit: none, always_present: false}
+
+  - name: frame_drop
+    trigger: TelemetryFrameDropCollector (FrameMetrics API, active path) / LegacyPerformanceTracker (dead path); gated enableFrameTracking
+    evidence: core/TelemetryFrameDropCollector.kt:59-68; core/LegacyPerformanceTracker.kt:199-211
+    payload_fields:
+      - {field: frame.build_duration_ms, type: float, unit: ms, always_present: true}
+      - {field: frame.raster_duration_ms, type: float, unit: ms, always_present: true}
+      - {field: frame.total_duration_ms, type: float, unit: ms, always_present: true}
+      - {field: frame.severity, type: string, unit: none, always_present: true}   # recorded even for "low" — no filter
+      - {field: frame.target_fps, type: int, unit: none, always_present: true}
+      - {field: frame.tracking_method, type: string, unit: none, always_present: false}  # legacy variant only
+      - {field: frame.api_level, type: int, unit: none, always_present: false}           # legacy variant only
+      - {field: screen.name, type: string, unit: none, always_present: false}            # legacy variant only
+
+  - name: performance.frame_summary
+    trigger: LegacyPerformanceTracker.generatePerformanceSummary (dead path — legacy tracker not instantiated by factory)
+    evidence: core/LegacyPerformanceTracker.kt:230-245
+    payload_fields:
+      - {field: performance.avg_frame_time_ms, type: float, unit: ms, always_present: true}
+      - {field: performance.max_frame_time_ms, type: float, unit: ms, always_present: true}
+      - {field: performance.total_frames, type: int, unit: none, always_present: true}
+      - {field: performance.slow_frame_count, type: int, unit: none, always_present: true}
+      - {field: performance.very_slow_frame_count, type: int, unit: none, always_present: true}
+      - {field: performance.slow_frame_percentage, type: float, unit: none, always_present: true}
+      - {field: performance.very_slow_frame_percentage, type: float, unit: none, always_present: true}
+      - {field: performance.tracking_method, type: string, unit: none, always_present: true}
+      - {field: performance.api_level, type: int, unit: none, always_present: true}
+      - {field: screen.name, type: string, unit: none, always_present: true}
+
+  - name: telemetry.capabilities_initialized
+    trigger: capability init during initialization sequence (gated enableCapabilityEvents)
+    evidence: core/TelemetryManager.kt:749-757
+    payload_fields:
+      - {field: device_capabilities, type: string, unit: none, always_present: true}   # summary object coerced to attr value
+      - {field: network_capabilities, type: string, unit: none, always_present: true}
+      - {field: memory_status, type: string, unit: none, always_present: true}
+      - {field: initialization_timestamp, type: int, unit: ms, always_present: true}    # epoch millis
+
+  - name: user.profile.update
+    trigger: setUserProfile() / clearUserProfile()
+    evidence: core/TelemetryManager.kt:891-899
+    payload_fields:
+      - {field: user.name, type: string, unit: none, always_present: true}    # "" on clear
+      - {field: user.email, type: string, unit: none, always_present: true}
+      - {field: user.phone, type: string, unit: none, always_present: true}
+      - {field: user.profile_updated_at, type: string, unit: none, always_present: true}
+
+  - name: app.crash   # PATH A variant — via manual recordCrash() only. type:"event".
+    trigger: recordCrash(throwable) -> queued into batch AND persisted to telemetry_pending_crash.json
+    evidence: core/services/CrashReportingService.kt:86-131
+    payload_fields:
+      - {field: error.message, type: string, unit: none, always_present: true}        # <=1000
+      - {field: error.stack_trace, type: string, unit: none, always_present: true}    # <=2000
+      - {field: error.exception_type, type: string, unit: none, always_present: true} # <=255
+      - {field: error.context, type: string, unit: none, always_present: true}        # <=500
+      - {field: error.cause, type: string, unit: none, always_present: true}          # <=255
+      - {field: error.severity_level, type: string, unit: none, always_present: true}
+      - {field: error.is_fatal, type: bool, unit: none, always_present: true}         # JSON bool true
+      - {field: error.breadcrumbs, type: string, unit: none, always_present: true}    # JSON string <=800
+      - {field: error.breadcrumb_count, type: int, unit: none, always_present: true}
+
+  - name: app.crash   # PATH B variant — real uncaught crashes + all trackError(). DIFFERENT envelope + keys.
+    trigger: installed UncaughtExceptionHandler and all trackError() overloads
+    evidence: core/crash/CrashReporter.kt:59-227; core/payload/FlutterCompatiblePayload.kt:268-288
+    payload_fields:  # envelope: {timestamp, device_id, data:{tenant_id, location, timestamp, batch_size, events[]}}
+      - {field: message, type: string, unit: none, always_present: true}          # <=1000, "ClassName: msg"
+      - {field: stacktrace, type: string, unit: none, always_present: true}        # <=2000 (lowercase key)
+      - {field: exception_type, type: string, unit: none, always_present: true}    # <=255
+      - {field: error_context, type: string, unit: none, always_present: false}    # <=500
+      - {field: cause, type: string, unit: none, always_present: false}            # <=255
+      - {field: is_fatal, type: string, unit: none, always_present: true}          # STRINGIFIED bool "true"/"false"
+      - {field: product_id, type: string, unit: none, always_present: false}       # <=255
+      - {field: user_action, type: string, unit: none, always_present: false}      # <=500
+      - {field: error_code, type: string, unit: none, always_present: false}       # <=100
+      - {field: breadcrumbs, type: string, unit: none, always_present: false}      # JSON string
+      - {field: crash.thread, type: string, unit: none, always_present: false}         # uncaught handler only
+      - {field: crash.is_main_thread, type: string, unit: none, always_present: false} # stringified bool, uncaught handler only
+      # NOTE: Path B carries device.* + app.* + network.type ONLY (DeviceInfoCollector.getCrashAttributes). NO session.*, NO user.*.
+
+# 2. Common attributes — attached to EVERY Path-A event.
+# Injected by flattenAttributes() in core/TelemetryHttpClient.kt:170-234 from EventAttributes.
+common_attributes:
+  - {field: app.name, type: string, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:174}
+  - {field: app.version, type: string, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:175}
+  - {field: app.build_number, type: string, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:176}
+  - {field: app.package_name, type: string, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:177}
+  - {field: device.id, type: string, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:187}
+  - {field: device.platform, type: string, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:188}  # "android"
+  - {field: device.platform_version, type: string, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:189}
+  - {field: device.model, type: string, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:190}
+  - {field: device.manufacturer, type: string, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:191}
+  - {field: device.brand, type: string, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:192}
+  - {field: device.android_sdk, type: string, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:193}   # SDK_INT as string
+  - {field: device.android_release, type: string, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:194}
+  - {field: device.fingerprint, type: string, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:195}
+  - {field: device.hardware, type: string, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:196}
+  - {field: device.product, type: string, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:197}
+  - {field: user.id, type: string, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:207}   # throws if blank
+  - {field: user.name, type: string, unit: none, always_present: false, evidence: TelemetryHttpClient.kt:212}
+  - {field: user.email, type: string, unit: none, always_present: false, evidence: TelemetryHttpClient.kt:213}
+  - {field: user.phone, type: string, unit: none, always_present: false, evidence: TelemetryHttpClient.kt:214}
+  - {field: session.id, type: string, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:217}
+  - {field: session.start_time, type: string, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:218}  # key always emitted, value may be null
+  - {field: session.duration_ms, type: int, unit: ms, always_present: true, evidence: TelemetryHttpClient.kt:219}
+  - {field: session.event_count, type: int, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:220}
+  - {field: session.metric_count, type: int, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:221}
+  - {field: session.screen_count, type: int, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:222}
+  - {field: session.visited_screens, type: string, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:223}  # comma-joined
+  - {field: session.is_first_session, type: bool, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:224}
+  - {field: session.total_sessions, type: int, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:225}
+  - {field: network.type, type: string, unit: none, always_present: true, evidence: TelemetryHttpClient.kt:226}  # wifi/cellular/ethernet/unknown
+  # Custom attributes merged LAST and CAN override the above (TelemetryHttpClient.kt:231).
+
+# 3. Session logic
+session:
+  start_rule: >
+    Auto-starts at init. SessionService.initialize() generates a session id and increments persisted
+    total_sessions in SharedPreferences (core/services/SessionService.kt:38-48). Init sequence step 15
+    emits session.started (core/TelemetryManager.kt:341-375). Nested SessionManager starts a session in
+    its init{} block only when enableSessionTracking=true (core/session/SessionManager.kt:32-34).
+  idle_timeout: >
+    30 min (sessionTimeoutMs = 1_800_000, core/TelemetryConfig.kt:8). Enforced ONLY on app foreground
+    (onStart): hasSessionTimedOut() compares now - last_active_timestamp >= timeout
+    (core/services/SessionService.kt:122-128). last_active_timestamp written on background in onStop
+    (core/TelemetryManager.kt:443). No background timer.
+  max_duration: none   # no max-session-duration cap in SessionManager.kt / SessionService.kt
+  background_behavior: >
+    onStop (core/TelemetryManager.kt:431-447): flushes in-memory queue to offline storage, writes
+    last_active_timestamp, stops flush timer. Session is NOT ended on background — resumed on next
+    foreground if within idle timeout. Gated on enableLifecycleTracking.
+  id_format: >
+    NOT UUID. IdGenerator.generateId() = "${System.currentTimeMillis()}_${8 random [a-z0-9] via SecureRandom}"
+    e.g. 1736899200000_a3k9zq1m. Same format for device, session, and user ids
+    (core/ids/IdGenerator.kt:13-16, 64-78). java.util.UUID is imported but unused for ids.
+
+# 4. Transport
+transport:
+  endpoint_path: >
+    The full configured TelemetryConfig.endpoint URL is POSTed verbatim — no path appended/derived
+    (core/TelemetryHttpClient.kt:117-128). Deprecated init overload defaults it to
+    https://edgetelemetry.ncgafrica.com/collector/telemetry (core/TelemetryManager.kt:190); the
+    non-deprecated init requires the caller to supply it. Crash path (Path B) POSTs to the same endpoint.
+  serialization: json   # Gson. Path A = TelemetryDataOut sent unwrapped (TelemetryHttpClient.kt:166). Path B = CrashBatchEnvelope as raw Map (CrashRetryManager.kt:131-137).
+  compression: none      # no gzip/deflate interceptor, no Content-Encoding header anywhere
+  # HTTP: POST. Headers: Content-Type application/json; User-Agent EdgeTelemetryAndroid/<ver>;
+  #   X-API-Key <apiKey>; X-SDK-Version <ver>; X-SDK-Platform android (TelemetryHttpClient.kt:120-125).
+  #   Timeouts: connect 10s, write 30s, read 30s.
+  batching:
+    flush_interval: >
+      config.flushIntervalMs default 30_000 ms (core/TelemetryConfig.kt:7). BUG/FINDING: the scheduled
+      flush Runnable body is EMPTY (core/services/BatchProcessingService.kt:196-205) — the periodic timer
+      fires but flushes nothing. Sends are triggered only by queue-size threshold (maybeSendBatch,
+      TelemetryManager.kt:637-646) and by lifecycle transitions.
+    max_batch_size: 50   # config.batchSize default 50; shouldSendBatch = queueSize >= batchSize (BatchProcessingService.kt:61-63)
+    flush_on_background: true   # onStop flushes queue to OFFLINE STORAGE (SharedPreferences), NOT to network (TelemetryManager.kt:431-447)
+  retry:
+    strategy: >
+      Batch path: exponential backoff with jitter = 1000ms * 2^attempt + random(0..1000)
+      (core/TelemetryHttpClient.kt:111-114); retries only on 5xx and network exceptions, 4xx = immediate
+      fail. Crash path: exponential backoff base 1 min = 60s * 2^(attempt-1) (CrashRetryManager.kt:275-278);
+      HTTP 429 trips a process-wide 60s circuit breaker + WorkManager reschedule (CrashRetryManager.kt:98-107).
+    max_attempts: 3   # both paths (TelemetryHttpClient maxRetries=3; CrashRetryManager MAX_RETRIES=3)
+    drop_policy: >
+      Batch: on final failure store to offline storage if flushOffline=true, else DROP (events already
+      polled off the queue) (BatchProcessingService.kt:88-112). Crash: after 3 failures store to
+      cacheDir/pending_crashes.json + WorkManager retry; after 3 STORAGE failures crashes are dropped to
+      avoid a loop (CrashRetryManager.kt:122-165).
+  offline:
+    persistence: >
+      SharedPreferences + file (NO Room/SQLite despite androidx.room being declared in build.gradle.kts:123-124;
+      zero @Dao/@Entity/@Database in src/main). Batches: core/OfflineBatchStorage.kt stores the whole batch
+      list as one Gson JSON string in SharedPreferences ("telemetry_batches"/"stored_batches"). Crashes:
+      plain JSON file cacheDir/pending_crashes.json guarded by a FileLock (CrashRetryManager.kt:66,172-180).
+    caps: >
+      Batches: NO cap, NO eviction, unbounded growth; read-modify-write not atomic across concurrent stores.
+      Crashes: no size cap on the list (only the 3-failure storage circuit breaker); cacheDir may be OS-evicted.
+      In-memory eventQueue (ConcurrentLinkedQueue) also has NO max cap.
+  sampling_or_throttling: >
+    Checked all three paths (create/queue/send). Event creation (EventTrackingService.recordEvent/
+    recordMetric, :51-96): NO sampling, throttling, or dedup — every call unconditionally enqueued.
+    Queue: only gate is size>=batchSize send trigger; no per-event dropping; queue unbounded. Send: no
+    sampling; only the crash 429 circuit breaker throttles (crashes only). Frame events on the ACTIVE path
+    (TelemetryFrameDropCollector) are recorded UNSAMPLED and UNFILTERED — even severity="low" fires
+    (TelemetryFrameDropCollector.kt:57-69); the 10% sampler (SAMPLING_RATE=0.1) exists only in
+    LegacyPerformanceTracker which the factory NEVER instantiates (dead code, so frame sampling is
+    effectively OFF). CrashFingerprinter computes a fingerprint but it is NOT used for any client-side
+    dedup/suppression (transmitted only; dedup, if any, is server-side). Breadcrumbs capped at 50
+    (BreadcrumbManager MAX_BREADCRUMBS, circular buffer). Pre-init queue capped at 50 with FIFO eviction
+    (TelemetryManager.kt:83,1053-1057) — startup buffer cap, not runtime sampling. No general-event
+    sampling/rate-limiting anywhere.
+
+# 5. Privacy & data handling
+privacy:
+  ip_handling: >
+    Client-side IP/geo code EXISTS but is DEAD/unwired. IpLocationProvider (core/location/IpLocationProvider.kt)
+    can call ipinfo.io / api.ipify.org, but it is never instantiated — locationProvider is always null, so
+    even with enableLocationTracking=true no IP or geolocation is collected or sent. The batch top-level
+    'location' field is always null in practice. (Server still sees transport source IP; SDK sends none.)
+  url_sanitization: >
+    Inconsistent. TelemetryInterceptor (the wired one via createNetworkInterceptor) strips query via
+    substringBefore('?') (core/TelemetryInterceptor.kt:39-49). EdgeTelemetryInterceptor (NOT wired, but
+    public) sends the FULL url incl. query into http.url and network breadcrumbs (core/http/EdgeTelemetryInterceptor.kt:28,98).
+    recordNetworkRequest() stores the raw url unmodified (EventTrackingService.kt:113). No path/PII redaction.
+  user_identifiers: >
+    device_id — auto, persisted (edge_telemetry_ids/device_id), sent as device.id on every event.
+    user_id — auto-generated on first access, persisted (edge_telemetry_ids/edge_rum_user_id), never null,
+    sent as user.id. No public setter for user_id. session_id — auto per session. Plus full device
+    fingerprint (Build.FINGERPRINT/MODEL/MANUFACTURER/BRAND/HARDWARE/PRODUCT) sent on every event —
+    high-entropy, always on. Location/IP = opt-in flag but dead (see ip_handling).
+  pii_risks: >
+    User profile name/email/phone (developer-supplied, persisted in SharedPreferences, sent raw as
+    user.name/email/phone + user.profile.update event; no hashing/redaction). Crash/error message +
+    stack_trace + cause sent raw (can contain PII/secrets). Breadcrumbs = arbitrary developer strings +
+    data maps attached to crashes; network breadcrumbs include full URLs. Screen names = Activity title
+    or class name. No PII scrubbing/allowlist layer exists (only ApiKeyRedactionInterceptor, which
+    redacts the API key in LOGS only).
+
+# 6. Public API surface
+api:
+  init_config_options:
+    - apiKey (required; non-blank; must start with "edge_")
+    - endpoint (required; non-blank)
+    - batchSize (default 50)
+    - flushIntervalMs (default 30_000)
+    - sessionTimeoutMs (default 1_800_000 / 30 min)
+    - enableScreenTracking (default true)
+    - enableCrashReporting (default true)
+    - enableNetworkTracking (default true)
+    - enableLifecycleTracking (default true)
+    - enableMemoryTracking (default true)
+    - enableStorageTracking (default true)
+    - enableFrameTracking (default true)
+    - enableLegacyScreenEvents (default false)
+    - enableUserInteractionEvents (default true)
+    - enableCapabilityEvents (default true)
+    - enableSessionTracking (default true)
+    - enableLocationTracking (default false)   # NOTE: has no effect — location provider is dead code
+  custom_event_api: >
+    recordEvent(eventName: String, attributes: Map<String, Any> = emptyMap()) (TelemetryManager.kt:472);
+    recordMetric(metricName: String, value: Double, attributes: Map<String, Any> = emptyMap()) (:450)
+  user_id_api: >
+    No setter for user_id (auto-generated only). getUserId(): String (:1004, never null). Identity set via
+    setUserProfile(name: String?, email: String?, phone: String? = null) (:871) and clearUserProfile() (:882)
+  other_public_methods:
+    - "Companion: initialize(application, config) (:153); initialize(application, apiKey, batchSize, endpoint) @Deprecated (:186); getInstance() (:203); createNetworkInterceptor(): TelemetryInterceptor (:213)"
+    - recordNetworkRequest(...) (:495)
+    - recordCrash(throwable) (:524)
+    - recordError(...) @Deprecated (:537)
+    - trackComposeScreens(navController) @Composable (:544)
+    - recordScreenView(name) @Deprecated (:556)
+    - recordComposeScreenView(route) (:573)
+    - recordComposeScreenEnd(route) (:588)
+    - recordScreenDuration(name, durationMs, exitMethod) (:602)
+    - addBreadcrumb(message, category, level, data) (:904)
+    - trackError(error, attributes) (:916)
+    - trackError(error, errorCode, productId, userAction, attributes) (:929)
+    - trackError(message, stackTrace, attributes) (:942)
+    - setProductContext(productId) (:952)
+    - setLastUserAction(action) (:962)
+    - startNewSession() (:969)
+    - endCurrentSession() (:984)
+    - getDeviceId() (:996)
+    - getUserId() (:1004)
+    - getSessionId() (:1011)
+    - testCrashReporting(customMessage) (:1018)
+    - testConnectivity() (:1025)
+    - getDeviceCapabilities() (:768)
+    - getMemoryCapabilityTracker() (:775)
+    - getInterceptor(): Interceptor (:1083)
+    - "EdgeTelemetry = deprecated typealias for TelemetryManager"
+
+# 7. Feature checklist
+features:
+  session-tracking: {status: done, evidence: "core/services/SessionService.kt, core/session/SessionManager.kt, TelemetryManager onStart/init", notes: "30min idle timeout evaluated on foreground only; no max duration"}
+  view-tracking: {status: done, evidence: "core/TelemetryActivityLifecycleObserver.kt, compose/EdgeTelemetryCompose.kt, core/ScreenTimingTracker.kt", notes: "Activity auto + Compose opt-in via trackComposeScreens()"}
+  error-capture: {status: done, evidence: "core/services/CrashReportingService.kt, core/crash/CrashReporter.kt", notes: "trackError() overloads with errorCode/productId/userAction"}
+  crash-capture: {status: done, evidence: "core/crash/CrashReporter.kt:59-79 (UncaughtExceptionHandler), persisted to cacheDir/pending_crashes.json", notes: "Chains original handler; breadcrumbs attached; separate Path-B wire format"}
+  network-capture: {status: partial, evidence: "core/TelemetryInterceptor.kt (wired via createNetworkInterceptor()), core/http/EdgeTelemetryInterceptor.kt (NOT wired)", notes: "Manual — consumer must add interceptor; two divergent impls; two rival wire schemas (http_request vs http.request)"}
+  custom-events: {status: done, evidence: "core/TelemetryManager.kt:472/450, core/services/EventTrackingService.kt", notes: ""}
+  web-vitals: {status: na, evidence: "grep: no LCP/FCP/CLS/TTFB", notes: "Native Android; not applicable"}
+  app-start: {status: planned, evidence: "grep: no cold/warm-start timing code", notes: "Not implemented"}
+  anr-detection: {status: planned, evidence: "grep: no ANR/watchdog/main-thread-block code", notes: "Not implemented"}
+  hang-detection: {status: planned, evidence: "grep: none", notes: "Not implemented"}
+  frame-stats: {status: done, evidence: "core/TelemetryFrameDropCollector.kt (FrameMetrics API 24+, emits frame_drop)", notes: "Per-frame drop severity, gated enableFrameTracking; recorded unsampled/unfiltered"}
+  batching: {status: done, evidence: "core/services/BatchProcessingService.kt (size threshold config.batchSize)", notes: "Flush timer body EMPTY — timer fires but does nothing; sends are size/lifecycle-triggered only"}
+  offline-persistence: {status: partial, evidence: "core/OfflineBatchStorage.kt (SharedPreferences, NOT Room), core/retry/CrashRetryManager.kt (file-based)", notes: "CLAUDE.md claims Room; code uses SharedPreferences JSON blob (unbounded) + cache-dir file"}
+  retry-backoff: {status: done, evidence: "core/TelemetryHttpClient.sendWithRetry():63-114 (3 retries, exp backoff+jitter); core/retry/CrashRetryManager.kt (3 retries, exp backoff base 1min, 429 circuit breaker, WorkManager)", notes: "Two separate retry systems (batch vs crash)"}
+  no-sampling-guarantee: {status: done, evidence: "No sampling logic found in config/services/send paths", notes: "Effectively 100% capture; not an explicit guarantee. Only bounds: pre-init queue max 50 (drops oldest); dead 10% frame sampler in unused LegacyPerformanceTracker"}
+
+# --- 9. All repos ---
+inconsistencies_and_surprises: >
+  TWO INCOMPATIBLE CRASH WIRE FORMATS under the same eventName "app.crash": real uncaught crashes +
+  trackError (Path B) send {message, stacktrace, exception_type, is_fatal:"true"} string-keyed with NO
+  session/user context; manual recordCrash() (Path A) sends {error.message, error.stack_trace,
+  error.is_fatal:true} bool-keyed WITH session/user. is_fatal is JSON bool in Path A but a stringified
+  "true" in Path B.
+  TWO NETWORK EVENTS with different names AND keys: live interceptor -> http_request {url, response_code,
+  latency_ms, ...}; recordNetworkRequest -> http.request {http.url, http.status_code, http.duration_ms, ...}.
+  screen_view has two shapes (legacy {screen_name} vs Activity {screen_name, duration_ms, session_id, timestamp}).
+  TIMESTAMP FORMAT/UNIT DRIFT: batch/event timestamps use SimpleDateFormat("...'Z'") — literal Z appended
+  but formatted in the DEVICE's default timezone (not true UTC); crash path uses Instant.now().toString()
+  (true UTC with nanos); several attribute timestamps (memory.timestamp, screen_view timestamp,
+  initialization_timestamp) are raw epoch-millis ints. Mixed units within one payload.
+  DEAD CODE: IpLocationProvider never instantiated (location always null; enableLocationTracking is a no-op);
+  JsonEventTracker send methods are log-only stubs; LegacyPerformanceTracker (incl. the only frame sampler)
+  never selected by the factory; TelemetryPayload/EventBatchPayload/EdgeTelemetryInterceptor defined but not
+  on the live wire.
+  Flush timer Runnable body is EMPTY — time-based flushing does not occur.
+  Room declared as a dependency but unused; offline persistence is SharedPreferences (unbounded) + cache file
+  (contradicts CLAUDE.md's "Room-based offline persistence").
+  IDs are timestamp_random8, not UUID v4 (UUID imported but unused).
+  In-memory event queue and offline batch store are unbounded (no event/byte caps, no eviction).
+  Full high-entropy device fingerprint (Build.FINGERPRINT etc.) sent on every event.
+  No compression on any transport.
+ci_cd:
+  what_exists: >
+    One GitHub Actions workflow .github/workflows/gradle.yml ("Build Library"): triggers on push/PR to
+    branch 'main'; checkout@v4 -> setup-java@v4 (Temurin JDK 17) -> ./gradlew clean assembleRelease -x lint.
+    Build-only — no tests, no lint (explicitly skipped), no publish/artifact step. NOTE: the active default
+    branch is 'master', but the workflow triggers only on 'main' (a stale branch) — so CI effectively does
+    not run on master pushes/PRs.
+  publishes_to: >
+    JitPack, built on-demand by JitPack's servers when a consumer requests
+    com.github.NCG-Africa:edge_telemetry_android:<tag>. Triggered by git tags, NOT by the GitHub workflow.
+    No jitpack.yml on master/mainline (JitPack uses its default Gradle build); a jitpack.yml exists only on
+    branch java8-legacy-1.2.5 and hardcodes a stale -Pversion=1.2.3-java8 (2-patch drift vs that branch's
+    sdkVersion 1.2.5-java8). JDK spread across the pipeline: mainline compiles Java 11, Actions uses JDK 17,
+    java8 jitpack.yml pins openjdk11, java8 artifacts target Java 8 — no single pinned toolchain.
+
+open_questions:
+  - "navigation.timestamp type for the Activity/Fragment emitters (navEvent.timestamp) — string vs long unknown"
+  - "Whether the server-side collector expects Path A or Path B crash keys (or both) — SDK sends divergent schemas"
+  - "Whether JitPack has successfully built each published tag (no in-repo build-status evidence)"
+  - "Whether origin/main is abandoned or intentionally retained for the (now non-firing) CI trigger"
+  - "Type of the capability summary attribute values (device_capabilities/network_capabilities/memory_status) on the wire — coerced from summary objects"
