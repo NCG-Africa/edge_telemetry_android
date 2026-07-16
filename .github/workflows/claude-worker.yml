@@ -1,0 +1,59 @@
+name: Claude Worker
+
+# Implements a ticket automatically when it is labeled "ready-to-work",
+# but only if none of its native GitHub blocking issues are still open.
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  # Gate: honor the issue's native GitHub blocking relationships (as created by
+  # /to-tickets). issue_dependencies_summary.blocked_by counts OPEN blockers only,
+  # so > 0 means a blocker is still open and we must not run.
+  gate:
+    if: github.event.label.name == 'ready-to-work'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: read
+    outputs:
+      should-run: ${{ steps.check.outputs.should-run }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          blocked=$(gh api "repos/$REPO/issues/$ISSUE" \
+            --jq '.issue_dependencies_summary.blocked_by')
+          echo "Issue #$ISSUE open blockers: $blocked"
+          if [ "${blocked:-0}" -gt 0 ]; then
+            echo "Still blocked by open issue(s):"
+            gh api "repos/$REPO/issues/$ISSUE/dependencies/blocked_by" \
+              --jq '.[] | select(.state=="open") | "  - #\(.number) \(.title)"'
+            echo "should-run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "No open blockers — clear to run."
+            echo "should-run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  implement:
+    needs: gate
+    if: needs.gate.outputs.should-run == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: "--max-turns 25 --model sonnet"
+          prompt: |
+            /implement ticket #${{ github.event.issue.number }}. Work only this
+            ticket's scope. Branch issue-${{ github.event.issue.number }}. Open a
+            PR linked with 'Closes #${{ github.event.issue.number }}'. Do not merge.
