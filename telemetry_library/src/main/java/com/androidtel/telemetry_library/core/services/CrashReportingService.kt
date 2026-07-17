@@ -17,9 +17,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.androidtel.telemetry_library.core.TelemetryTime
 
 /**
  * CrashReportingService - Handles crash and error reporting
@@ -43,7 +41,6 @@ internal class CrashReportingService(
     private val telemetryEndpoint: String
 ) {
     private val gson = Gson()
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
     
     private var crashReporter: CrashReporter? = null
     private var breadcrumbManager: BreadcrumbManager? = null
@@ -111,7 +108,7 @@ internal class CrashReportingService(
             TelemetryEvent(
                 type = "event",
                 eventName = "app.crash",
-                timestamp = dateFormat.format(Date()),
+                timestamp = TelemetryTime.now(),
                 attributes = it
             )
         }
@@ -121,7 +118,7 @@ internal class CrashReportingService(
             
             val batch = TelemetryBatch(
                 batchSize = 1,
-                timestamp = dateFormat.format(Date()),
+                timestamp = TelemetryTime.now(),
                 events = listOf(it)
             )
             persistBatchSync(batch)

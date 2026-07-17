@@ -6,9 +6,7 @@ import com.androidtel.telemetry_library.core.TelemetryConfig
 import com.androidtel.telemetry_library.core.ids.IdGenerator
 import com.androidtel.telemetry_library.core.models.SessionInfo
 import com.androidtel.telemetry_library.core.session.SessionManager
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.androidtel.telemetry_library.core.TelemetryTime
 
 /**
  * SessionService - Handles session lifecycle and tracking
@@ -25,7 +23,6 @@ internal class SessionService(
     private val config: TelemetryConfig,
     private val idGenerator: IdGenerator
 ) {
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
     private val prefs = context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE)
     
     private lateinit var sessionId: String
@@ -97,7 +94,7 @@ internal class SessionService(
         
         return SessionInfo(
             sessionId = getCurrentSessionId(),
-            startTime = dateFormat.format(Date(sessionStartTime)),
+            startTime = TelemetryTime.isoOf(sessionStartTime),
             durationMs = duration,
             eventCount = eventCount,
             metricCount = metricCount,

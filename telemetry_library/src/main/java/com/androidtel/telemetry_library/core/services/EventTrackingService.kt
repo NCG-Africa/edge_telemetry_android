@@ -9,9 +9,7 @@ import com.androidtel.telemetry_library.core.models.EventAttributes
 import com.androidtel.telemetry_library.core.models.TelemetryEvent
 import com.androidtel.telemetry_library.core.models.UserInfo
 import com.androidtel.telemetry_library.core.models.SessionInfo
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.androidtel.telemetry_library.core.TelemetryTime
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -31,7 +29,6 @@ internal class EventTrackingService(
     private val config: TelemetryConfig
 ) {
     private val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
     private val eventCount = AtomicInteger(0)
     private val metricCount = AtomicInteger(0)
     
@@ -60,7 +57,7 @@ internal class EventTrackingService(
             TelemetryEvent(
                 type = "event",
                 eventName = eventName,
-                timestamp = dateFormat.format(Date()),
+                timestamp = TelemetryTime.now(),
                 attributes = it
             )
         }
@@ -86,7 +83,7 @@ internal class EventTrackingService(
                 type = "metric",
                 metricName = metricName,
                 value = value,
-                timestamp = dateFormat.format(Date()),
+                timestamp = TelemetryTime.now(),
                 attributes = it
             )
         }
@@ -115,7 +112,7 @@ internal class EventTrackingService(
             "http.method" to method,
             "http.status_code" to statusCode,
             "http.duration_ms" to durationMs,
-            "http.timestamp" to dateFormat.format(Date()),
+            "http.timestamp" to TelemetryTime.now(),
             "http.success" to (statusCode < 400),
             "http.request_body_size" to requestBodySize,
             "http.response_body_size" to responseBodySize,
@@ -198,7 +195,7 @@ internal class EventTrackingService(
     /**
      * Get current timestamp in ISO format
      */
-    fun getCurrentTimestamp(): String = dateFormat.format(Date())
+    fun getCurrentTimestamp(): String = TelemetryTime.now()
     
     companion object {
         private const val TAG = "EventTrackingService"
