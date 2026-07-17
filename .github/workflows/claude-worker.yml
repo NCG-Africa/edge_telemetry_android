@@ -1,6 +1,6 @@
 name: Claude Worker
 
-# Implements a ticket automatically when it is labeled "ready-to-work",
+# Implements a ticket automatically when it is labeled "ready-for-agent",
 # but only if none of its native GitHub blocking issues are still open.
 on:
   issues:
@@ -11,7 +11,7 @@ jobs:
   # /to-tickets). issue_dependencies_summary.blocked_by counts OPEN blockers only,
   # so > 0 means a blocker is still open and we must not run.
   gate:
-    if: github.event.label.name == 'ready-to-work'
+    if: github.event.label.name == 'ready-for-agent'
     runs-on: ubuntu-latest
     permissions:
       issues: read
