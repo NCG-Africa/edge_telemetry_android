@@ -10,9 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.androidtel.telemetry_library.core.TelemetryTime
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
@@ -34,7 +32,6 @@ internal class BatchProcessingService(
     private val offlineStorage: OfflineBatchStorage,
     private val scope: CoroutineScope
 ) {
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
     private var flushTimer: ScheduledExecutorService? = null
     private var batchSendJob: Job? = null
     
@@ -94,7 +91,7 @@ internal class BatchProcessingService(
         
         val batch = TelemetryBatch(
             batchSize = eventsToSend.size,
-            timestamp = dateFormat.format(Date()),
+            timestamp = TelemetryTime.now(),
             events = eventsToSend,
             location = location
         )
@@ -178,7 +175,7 @@ internal class BatchProcessingService(
             if (eventsToStore.isNotEmpty()) {
                 val batch = TelemetryBatch(
                     batchSize = eventsToStore.size,
-                    timestamp = dateFormat.format(Date()),
+                    timestamp = TelemetryTime.now(),
                     events = eventsToStore
                 )
                 offlineStorage.storeBatch(batch)

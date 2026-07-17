@@ -2,7 +2,6 @@ package com.androidtel.telemetry_library.core
 
 import android.os.Build
 import android.util.Log
-import java.util.Date
 
 /**
  * Enhanced memory usage tracking with API-level appropriate methods.
@@ -54,7 +53,7 @@ class TelemetryMemoryUsage(private val telemetryManager: TelemetryManager = Tele
             
             // Calculate enhanced pressure level
             val pressureLevel = calculateEnhancedPressureLevel(memorySummary, isUnderPressure)
-            val timestamp = telemetryManager.dateFormat.format(Date())
+            val timestamp = TelemetryTime.now()
             
             // Record comprehensive memory event
             val memoryAttributes = mutableMapOf<String, Any>(
@@ -148,7 +147,7 @@ class TelemetryMemoryUsage(private val telemetryManager: TelemetryManager = Tele
                 else -> "high"
             }
             
-            val timestamp = telemetryManager.dateFormat.format(Date())
+            val timestamp = TelemetryTime.now()
             
             // Record basic memory event (only if enabled)
             if (telemetryManager.isMemoryTrackingEnabled()) {
@@ -221,7 +220,7 @@ class TelemetryMemoryUsage(private val telemetryManager: TelemetryManager = Tele
         memoryCapabilityTracker?.let { tracker ->
             try {
                 val storageInfo = tracker.getStorageInfo()
-                val timestamp = telemetryManager.dateFormat.format(Date())
+                val timestamp = TelemetryTime.now()
                 
                 val storageAttributes = mutableMapOf<String, Any>(
                     "storage.timestamp" to timestamp,

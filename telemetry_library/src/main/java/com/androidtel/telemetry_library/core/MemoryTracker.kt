@@ -307,7 +307,7 @@ private fun createStandardizedMemoryEvent(
         "memory.under_system_pressure" to isUnderPressure,
         "memory.api_level" to Build.VERSION.SDK_INT,
         "memory.tracking_method" to trackingMethod,
-        "memory.timestamp" to System.currentTimeMillis()
+        "memory.timestamp" to TelemetryTime.now()
     )
     
     // Basic heap memory (available in all implementations)
