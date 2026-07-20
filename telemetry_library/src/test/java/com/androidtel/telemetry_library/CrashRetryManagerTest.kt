@@ -1,3 +1,4 @@
+
 package com.androidtel.telemetry_library
 
 import android.content.Context
@@ -39,12 +40,16 @@ class CrashRetryManagerTest {
             apiKey = testApiKey,
             telemetryEndpoint = mockWebServer.url("/telemetry").toString(),
             debugMode = false,
-            enableWorkManager = false  // Disable WorkManager to prevent hanging in tests
+            enableWorkManager = false,  // Disable WorkManager to prevent hanging in tests
+            baseRetryDelayMs = 1L  // Shrink real backoff so retry tests don't sleep minutes
         )
     }
 
     @After
     fun tearDown() {
+        // Release OkHttp's non-daemon threads so the forked test JVM exits promptly (otherwise the
+        // dispatcher thread pool lingers on keep-alive and Gradle blocks waiting for the worker).
+        crashRetryManager.shutdownForTesting()
         mockWebServer.shutdown()
         unmockkAll()
     }
