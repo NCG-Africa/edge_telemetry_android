@@ -66,7 +66,7 @@ class CrashRetryManagerTest {
 
         val request = mockWebServer.takeRequest()
         assertNotNull(request.getHeader("User-Agent"))
-        assertTrue(request.getHeader("User-Agent")?.contains("EdgeTelemetry-Android") == true)
+        assertTrue(request.getHeader("User-Agent")?.contains("EdgeTelemetryAndroid") == true)
     }
 
     @Test

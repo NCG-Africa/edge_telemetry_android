@@ -1,0 +1,939 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 8.7.1" type="baseline" client="gradle" dependencies="false" name="AGP (8.7.1)" variant="all" version="8.7.1">
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Duration#ofMinutes`"
+        errorLine1="    private val baseRetryDelay = Duration.ofMinutes(1)"
+        errorLine2="                                          ~~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/retry/CrashRetryManager.kt"
+            line="65"
+            column="43"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Duration#toMillis`"
+        errorLine1="                    Log.d(TAG, &quot;⏳ Retrying in ${delay.toMillis()}ms...&quot;)"
+        errorLine2="                                                      ~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/retry/CrashRetryManager.kt"
+            line="116"
+            column="55"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Duration#toMillis`"
+        errorLine1="                    delay(delay.toMillis())"
+        errorLine2="                                ~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/retry/CrashRetryManager.kt"
+            line="117"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Duration#toMinutes`"
+        errorLine1="            .setInitialDelay(baseRetryDelay.toMinutes(), TimeUnit.MINUTES)"
+        errorLine2="                                            ~~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/retry/CrashRetryManager.kt"
+            line="257"
+            column="45"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Duration#toMinutes`"
+        errorLine1="        Log.d(TAG, &quot;📅 Retry scheduled for ${baseRetryDelay.toMinutes()} minutes&quot;)"
+        errorLine2="                                                            ~~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/retry/CrashRetryManager.kt"
+            line="269"
+            column="61"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Duration#ofMillis`"
+        errorLine1="        return Duration.ofMillis(baseRetryDelay.toMillis() * multiplier)"
+        errorLine2="                        ~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/retry/CrashRetryManager.kt"
+            line="277"
+            column="25"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Duration#toMillis`"
+        errorLine1="        return Duration.ofMillis(baseRetryDelay.toMillis() * multiplier)"
+        errorLine2="                                                ~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/retry/CrashRetryManager.kt"
+            line="277"
+            column="49"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Instant#now`"
+        errorLine1="                &quot;timestamp&quot; to Instant.now().toString()"
+        errorLine2="                                       ~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/http/EdgeTelemetryInterceptor.kt"
+            line="41"
+            column="40"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Instant#parse`"
+        errorLine1="                    Instant.parse(timestamp)"
+        errorLine2="                            ~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/validation/EventPayloadValidator.kt"
+            line="360"
+            column="29"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Exception requires API level 26, or core library desugaring (current min is 24): `java.time.format.DateTimeParseException`"
+        errorLine1="                } catch (e: DateTimeParseException) {"
+        errorLine2="                            ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/validation/EventPayloadValidator.kt"
+            line="361"
+            column="29"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Instant#now`"
+        errorLine1="        val timestamp = Instant.now().toString()"
+        errorLine2="                                ~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/payload/FlutterCompatiblePayload.kt"
+            line="134"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Instant#now`"
+        errorLine1="        val timestamp = Instant.now().toString()"
+        errorLine2="                                ~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/payload/FlutterCompatiblePayload.kt"
+            line="157"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Instant#now`"
+        errorLine1="            timestamp = Instant.now().toString(),"
+        errorLine2="                                ~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/payload/FlutterCompatiblePayload.kt"
+            line="186"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Instant#now`"
+        errorLine1="        crashAttributes[&quot;error.timestamp&quot;] = Instant.now().toString()"
+        errorLine2="                                                     ~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/payload/FlutterCompatiblePayload.kt"
+            line="233"
+            column="54"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Instant#now`"
+        errorLine1="        val timestamp = Instant.now().toString()"
+        errorLine2="                                ~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/payload/FlutterCompatiblePayload.kt"
+            line="257"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Instant#now`"
+        errorLine1="        val timestamp = Instant.now().toString()"
+        errorLine2="                                ~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/payload/FlutterCompatiblePayload.kt"
+            line="322"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Duration#ofSeconds`"
+        errorLine1="    private val batchTimeout: Duration = Duration.ofSeconds(5)"
+        errorLine2="                                                  ~~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/events/JsonEventTracker.kt"
+            line="31"
+            column="51"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Duration#ofSeconds`"
+        errorLine1="    private val batchTimeout: Duration = Duration.ofSeconds(5)"
+        errorLine2="                                                  ~~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/events/JsonEventTracker.kt"
+            line="31"
+            column="51"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Instant#now`"
+        errorLine1="            &quot;timestamp&quot; to Instant.now().toString()"
+        errorLine2="                                   ~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/events/JsonEventTracker.kt"
+            line="126"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Instant#now`"
+        errorLine1="            &quot;timestamp&quot; to Instant.now().toString(),"
+        errorLine2="                                   ~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/events/JsonEventTracker.kt"
+            line="146"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Instant#now`"
+        errorLine1="        val timestamp = Instant.now().toString()"
+        errorLine2="                                ~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/events/JsonEventTracker.kt"
+            line="159"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Instant#now`"
+        errorLine1="        attributes[&quot;error.timestamp&quot;] = Instant.now().toString()"
+        errorLine2="                                                ~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/events/JsonEventTracker.kt"
+            line="214"
+            column="49"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Duration#toMillis`"
+        errorLine1="            }, batchTimeout.toMillis())"
+        errorLine2="                            ~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/events/JsonEventTracker.kt"
+            line="311"
+            column="29"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Instant#ofEpochMilli`"
+        errorLine1="                &quot;session.start_time&quot; to Instant.ofEpochMilli(sessionStartTime).toString(),"
+        errorLine2="                                                ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/session/SessionManager.kt"
+            line="112"
+            column="49"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26, or core library desugaring (current min is 24): `java.time.Instant#ofEpochMilli`"
+        errorLine1="                &quot;startTime&quot; to Instant.ofEpochMilli(sessionStartTime).toString(),"
+        errorLine2="                                       ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/session/SessionManager.kt"
+            line="133"
+            column="40"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 28 (current min is 24): `android.content.pm.PackageInfo#getLongVersionCode`"
+        errorLine1="                    packageInfo.longVersionCode.toString()"
+        errorLine2="                                ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/TelemetryManager.kt"
+            line="785"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="AndroidGradlePluginVersion"
+        message="A newer version of com.android.application than 8.7.1 is available: 9.3.0. (There is also a newer version of 8.7.𝑥 available, if upgrading to 9.3.0 is difficult: 8.7.3)"
+        errorLine1="agp = &quot;8.7.1&quot;"
+        errorLine2="      ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="2"
+            column="7"/>
+    </issue>
+
+    <issue
+        id="AndroidGradlePluginVersion"
+        message="A newer version of com.android.application than 8.7.1 is available: 9.3.0. (There is also a newer version of 8.7.𝑥 available, if upgrading to 9.3.0 is difficult: 8.7.3)"
+        errorLine1="agp = &quot;8.7.1&quot;"
+        errorLine2="      ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="2"
+            column="7"/>
+    </issue>
+
+    <issue
+        id="AndroidGradlePluginVersion"
+        message="A newer version of com.android.application than 8.7.1 is available: 9.3.0. (There is also a newer version of 8.7.𝑥 available, if upgrading to 9.3.0 is difficult: 8.7.3)"
+        errorLine1="agp = &quot;8.7.1&quot;"
+        errorLine2="      ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="2"
+            column="7"/>
+    </issue>
+
+    <issue
+        id="AndroidGradlePluginVersion"
+        message="A newer version of com.android.library than 8.7.1 is available: 9.3.0. (There is also a newer version of 8.7.𝑥 available, if upgrading to 9.3.0 is difficult: 8.7.3)"
+        errorLine1="agp = &quot;8.7.1&quot;"
+        errorLine2="      ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="2"
+            column="7"/>
+    </issue>
+
+    <issue
+        id="AndroidGradlePluginVersion"
+        message="A newer version of com.android.library than 8.7.1 is available: 9.3.0. (There is also a newer version of 8.7.𝑥 available, if upgrading to 9.3.0 is difficult: 8.7.3)"
+        errorLine1="agp = &quot;8.7.1&quot;"
+        errorLine2="      ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="2"
+            column="7"/>
+    </issue>
+
+    <issue
+        id="AndroidGradlePluginVersion"
+        message="A newer version of com.android.library than 8.7.1 is available: 9.3.0. (There is also a newer version of 8.7.𝑥 available, if upgrading to 9.3.0 is difficult: 8.7.3)"
+        errorLine1="agp = &quot;8.7.1&quot;"
+        errorLine2="      ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="2"
+            column="7"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.core:core-ktx than 1.16.0 is available: 1.19.0"
+        errorLine1="coreKtx = &quot;1.16.0&quot;"
+        errorLine2="          ~~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="4"
+            column="11"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.core:core-ktx than 1.16.0 is available: 1.19.0"
+        errorLine1="coreKtx = &quot;1.16.0&quot;"
+        errorLine2="          ~~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="4"
+            column="11"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.core:core-ktx than 1.16.0 is available: 1.19.0"
+        errorLine1="coreKtx = &quot;1.16.0&quot;"
+        errorLine2="          ~~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="4"
+            column="11"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.lifecycle:lifecycle-runtime-ktx than 2.9.2 is available: 2.11.0"
+        errorLine1="lifecycleRuntimeKtx = &quot;2.9.2&quot;"
+        errorLine2="                      ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="11"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.lifecycle:lifecycle-runtime-ktx than 2.9.2 is available: 2.11.0"
+        errorLine1="lifecycleRuntimeKtx = &quot;2.9.2&quot;"
+        errorLine2="                      ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="11"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.lifecycle:lifecycle-runtime-ktx than 2.9.2 is available: 2.11.0"
+        errorLine1="lifecycleRuntimeKtx = &quot;2.9.2&quot;"
+        errorLine2="                      ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="11"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.activity:activity-compose than 1.10.1 is available: 1.13.0"
+        errorLine1="activityCompose = &quot;1.10.1&quot;"
+        errorLine2="                  ~~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="12"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.activity:activity-compose than 1.10.1 is available: 1.13.0"
+        errorLine1="activityCompose = &quot;1.10.1&quot;"
+        errorLine2="                  ~~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="12"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.activity:activity-compose than 1.10.1 is available: 1.13.0"
+        errorLine1="activityCompose = &quot;1.10.1&quot;"
+        errorLine2="                  ~~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="12"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.compose:compose-bom than 2024.04.01 is available: 2026.06.01"
+        errorLine1="composeBom = &quot;2024.04.01&quot;"
+        errorLine2="             ~~~~~~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="13"
+            column="14"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.compose:compose-bom than 2024.04.01 is available: 2026.06.01"
+        errorLine1="composeBom = &quot;2024.04.01&quot;"
+        errorLine2="             ~~~~~~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="13"
+            column="14"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.compose:compose-bom than 2024.04.01 is available: 2026.06.01"
+        errorLine1="composeBom = &quot;2024.04.01&quot;"
+        errorLine2="             ~~~~~~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="13"
+            column="14"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of com.google.android.material:material than 1.12.0 is available: 1.14.0"
+        errorLine1="material = &quot;1.12.0&quot;"
+        errorLine2="           ~~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="15"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of com.google.android.material:material than 1.12.0 is available: 1.14.0"
+        errorLine1="material = &quot;1.12.0&quot;"
+        errorLine2="           ~~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="15"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of com.google.android.material:material than 1.12.0 is available: 1.14.0"
+        errorLine1="material = &quot;1.12.0&quot;"
+        errorLine2="           ~~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="15"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.lifecycle:lifecycle-process than 2.9.2 is available: 2.11.0"
+        errorLine1="lifecycleProcess = &quot;2.9.2&quot;"
+        errorLine2="                   ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="16"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.lifecycle:lifecycle-process than 2.9.2 is available: 2.11.0"
+        errorLine1="lifecycleProcess = &quot;2.9.2&quot;"
+        errorLine2="                   ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="16"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.lifecycle:lifecycle-process than 2.9.2 is available: 2.11.0"
+        errorLine1="lifecycleProcess = &quot;2.9.2&quot;"
+        errorLine2="                   ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="16"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.navigation:navigation-compose than 2.9.3 is available: 2.9.8"
+        errorLine1="navigationRuntimeAndroid = &quot;2.9.3&quot;"
+        errorLine2="                           ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="17"
+            column="28"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.navigation:navigation-compose than 2.9.3 is available: 2.9.8"
+        errorLine1="navigationRuntimeAndroid = &quot;2.9.3&quot;"
+        errorLine2="                           ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="17"
+            column="28"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.navigation:navigation-compose than 2.9.3 is available: 2.9.8"
+        errorLine1="navigationRuntimeAndroid = &quot;2.9.3&quot;"
+        errorLine2="                           ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="17"
+            column="28"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.navigation:navigation-runtime-android than 2.9.3 is available: 2.9.8"
+        errorLine1="navigationRuntimeAndroid = &quot;2.9.3&quot;"
+        errorLine2="                           ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="17"
+            column="28"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.navigation:navigation-runtime-android than 2.9.3 is available: 2.9.8"
+        errorLine1="navigationRuntimeAndroid = &quot;2.9.3&quot;"
+        errorLine2="                           ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="17"
+            column="28"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.navigation:navigation-runtime-android than 2.9.3 is available: 2.9.8"
+        errorLine1="navigationRuntimeAndroid = &quot;2.9.3&quot;"
+        errorLine2="                           ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="17"
+            column="28"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.work:work-runtime-ktx than 2.9.0 is available: 2.11.2"
+        errorLine1="androidx-work-runtime = { group = &quot;androidx.work&quot;, name = &quot;work-runtime-ktx&quot;, version = &quot;2.9.0&quot; }"
+        errorLine2="                                                                                        ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="39"
+            column="89"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.work:work-runtime-ktx than 2.9.0 is available: 2.11.2"
+        errorLine1="androidx-work-runtime = { group = &quot;androidx.work&quot;, name = &quot;work-runtime-ktx&quot;, version = &quot;2.9.0&quot; }"
+        errorLine2="                                                                                        ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="39"
+            column="89"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.work:work-runtime-ktx than 2.9.0 is available: 2.11.2"
+        errorLine1="androidx-work-runtime = { group = &quot;androidx.work&quot;, name = &quot;work-runtime-ktx&quot;, version = &quot;2.9.0&quot; }"
+        errorLine2="                                                                                        ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="39"
+            column="89"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.room:room-runtime than 2.6.1 is available: 2.8.4"
+        errorLine1="androidx-room-runtime = { group = &quot;androidx.room&quot;, name = &quot;room-runtime&quot;, version = &quot;2.6.1&quot; }"
+        errorLine2="                                                                                    ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="40"
+            column="85"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.room:room-runtime than 2.6.1 is available: 2.8.4"
+        errorLine1="androidx-room-runtime = { group = &quot;androidx.room&quot;, name = &quot;room-runtime&quot;, version = &quot;2.6.1&quot; }"
+        errorLine2="                                                                                    ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="40"
+            column="85"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.room:room-runtime than 2.6.1 is available: 2.8.4"
+        errorLine1="androidx-room-runtime = { group = &quot;androidx.room&quot;, name = &quot;room-runtime&quot;, version = &quot;2.6.1&quot; }"
+        errorLine2="                                                                                    ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="40"
+            column="85"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.room:room-ktx than 2.6.1 is available: 2.8.4"
+        errorLine1="androidx-room-ktx = { group = &quot;androidx.room&quot;, name = &quot;room-ktx&quot;, version = &quot;2.6.1&quot; }"
+        errorLine2="                                                                            ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="41"
+            column="77"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.room:room-ktx than 2.6.1 is available: 2.8.4"
+        errorLine1="androidx-room-ktx = { group = &quot;androidx.room&quot;, name = &quot;room-ktx&quot;, version = &quot;2.6.1&quot; }"
+        errorLine2="                                                                            ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="41"
+            column="77"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.room:room-ktx than 2.6.1 is available: 2.8.4"
+        errorLine1="androidx-room-ktx = { group = &quot;androidx.room&quot;, name = &quot;room-ktx&quot;, version = &quot;2.6.1&quot; }"
+        errorLine2="                                                                            ~~~~~~~">
+        <location
+            file="$HOME/Development/StudioProjects/edge_telemetry_android/gradle/libs.versions.toml"
+            line="41"
+            column="77"/>
+    </issue>
+
+    <issue
+        id="UnsupportedChromeOsCameraSystemFeature"
+        message="You should look for any camera available on the device, not just the rear"
+        errorLine1="        context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA)"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/DeviceCapabilities.kt"
+            line="72"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="ComposableNaming"
+        message="Composable functions that return Unit should start with an uppercase letter"
+        errorLine1="    fun trackComposeScreens(navController: NavController) {"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/TelemetryManager.kt"
+            line="541"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; SDK_INT is never &lt; 24"
+        errorLine1="        if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.JELLY_BEAN) {"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/LegacyPerformanceTracker.kt"
+            line="48"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; SDK_INT is always >= 24"
+        errorLine1="            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/MemoryCapabilityTracker.kt"
+            line="123"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; SDK_INT is always >= 24"
+        errorLine1="            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/MemoryCapabilityTracker.kt"
+            line="145"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; SDK_INT is always >= 24"
+        errorLine1="            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/MemoryCapabilityTracker.kt"
+            line="175"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; SDK_INT is always >= 23"
+        errorLine1="    @RequiresApi(Build.VERSION_CODES.M)"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/NetworkCapabilityDetector.kt"
+            line="162"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; SDK_INT is always >= 23"
+        errorLine1="    @RequiresApi(Build.VERSION_CODES.M)"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/NetworkCapabilityDetector.kt"
+            line="177"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="StaticFieldLeak"
+        message="Do not place Android context classes in static fields (static reference to `DeviceCapabilities` which has field `context` pointing to `Context`); this is a memory leak"
+        errorLine1="        @Volatile"
+        errorLine2="        ^">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/DeviceCapabilities.kt"
+            line="17"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="StaticFieldLeak"
+        message="Do not place Android context classes in static fields (static reference to `TelemetryManager` which has field `context` pointing to `Context`); this is a memory leak"
+        errorLine1="        @Volatile"
+        errorLine2="        ^">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/TelemetryManager.kt"
+            line="134"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UsableSpace"
+        message="Consider also using `StorageManager#getAllocatableBytes` and `allocateBytes` which will consider clearable cached data"
+        errorLine1="            file.usableSpace"
+        errorLine2="                 ~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/androidtel/telemetry_library/core/MemoryCapabilityTracker.kt"
+            line="248"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    api(&quot;com.google.code.gson:gson:2.10.1&quot;)"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="113"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    api(&quot;com.squareup.okhttp3:okhttp:4.12.0&quot;)"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="114"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    api(&quot;com.squareup.okhttp3:logging-interceptor:4.12.0&quot;)"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="115"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    testImplementation(&quot;io.mockk:mockk:1.13.8&quot;)"
+        errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="133"
+            column="24"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    testImplementation(&quot;io.mockk:mockk-android:1.13.8&quot;)"
+        errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="134"
+            column="24"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    testImplementation(&quot;org.robolectric:robolectric:4.11.1&quot;)"
+        errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="135"
+            column="24"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    testImplementation(&quot;org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3&quot;)"
+        errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="136"
+            column="24"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    testImplementation(&quot;com.squareup.okhttp3:mockwebserver:4.12.0&quot;)"
+        errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="137"
+            column="24"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    testImplementation(&quot;androidx.arch.core:core-testing:2.2.0&quot;)"
+        errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="138"
+            column="24"/>
+    </issue>
+
+</issues>

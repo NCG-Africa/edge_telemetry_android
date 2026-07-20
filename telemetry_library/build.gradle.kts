@@ -45,16 +45,6 @@ android {
         }
     }
 
-    compileOptions {
-        // Java 11 is the safest for compatibility
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-//        isCoreLibraryDesugaringEnabled = true
-    }
-    kotlinOptions {
-        jvmTarget = "11"
-    }
-
     buildFeatures {
         // ✅ leave compose enabled, but don’t pin compiler version here
         compose = true
@@ -65,7 +55,9 @@ android {
     // (the consuming app should control it)
 
     lint {
-        abortOnError = false
+        // Baseline grandfathers pre-existing violations so only NEW ones fail CI.
+        baseline = file("lint-baseline.xml")
+        abortOnError = true
         checkReleaseBuilds = false
         warningsAsErrors = false
         disable.add("NullSafeMutableLiveData")
@@ -87,6 +79,12 @@ android {
             withJavadocJar()
         }
     }
+}
+
+// Single source of truth for the compile target (bytecode 11), independent of the launcher JDK 17
+// that runs Gradle/AGP. Auto-provisioned via the foojay resolver in settings.gradle.kts.
+kotlin {
+    jvmToolchain(11)
 }
 
 dependencies {
