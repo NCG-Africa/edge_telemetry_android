@@ -99,7 +99,7 @@ internal class BatchProcessingService(
             location = location
         )
         
-        Log.i(TAG, "Attempting to send a batch of ${batch.batchSize} events with location: $location")
+        Log.i(TAG, "Attempting to send a batch of ${batch.batchSize} events")
         val result = httpClient.sendBatch(batch)
 
         if (result.isSuccess) {

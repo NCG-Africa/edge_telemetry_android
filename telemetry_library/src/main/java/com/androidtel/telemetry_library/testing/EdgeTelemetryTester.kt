@@ -30,18 +30,6 @@ object EdgeTelemetryTester {
     }
     
     /**
-     * Test connectivity by sending test events
-     */
-    fun testConnectivity() {
-        try {
-            EdgeTelemetry.getInstance().testConnectivity()
-            Log.i(TAG, "🌐 Connectivity test initiated")
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to test connectivity", e)
-        }
-    }
-    
-    /**
      * Test breadcrumb functionality
      */
     fun testBreadcrumbs() {
@@ -228,10 +216,7 @@ object EdgeTelemetryTester {
                 
                 kotlinx.coroutines.delay(500)
                 testErrorTracking()
-                
-                kotlinx.coroutines.delay(500)
-                testConnectivity()
-                
+
                 kotlinx.coroutines.delay(1000)
                 testCrashReporting("Comprehensive test crash")
                 

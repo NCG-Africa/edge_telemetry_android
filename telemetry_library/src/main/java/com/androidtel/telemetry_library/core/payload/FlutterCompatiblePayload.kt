@@ -31,40 +31,6 @@ data class CrashData(
 )
 
 /**
- * Event batch payload structure matching Flutter SDK
- */
-data class EventBatchPayload(
-    val timestamp: String,
-    val device_id: String,  // Device ID at top level for easy filtering/routing
-    val data: EventBatchData
-) {
-    fun toJson(): String = Gson().toJson(this)
-}
-
-/**
- * Event batch data structure matching Flutter SDK
- */
-data class EventBatchData(
-    val type: String = "batch",
-    val events: List<EventData>,
-    val batch_size: Int,
-    val timestamp: String,
-    val location: String? = null
-)
-
-/**
- * Individual event data structure matching Flutter SDK
- */
-data class EventData(
-    val type: String, // "event", "metric", "navigation", etc.
-    val eventName: String? = null,
-    val metricName: String? = null,
-    val value: Double? = null,
-    val timestamp: String,
-    val attributes: Map<String, String>
-)
-
-/**
  * Crash event attributes matching backend processor requirements
  * All fields have character limits enforced
  */
@@ -143,48 +109,6 @@ object FlutterPayloadFactory {
                 fingerprint = fingerprint,
                 attributes = attributes
             )
-        )
-    }
-    
-    /**
-     * Create event batch payload matching Flutter SDK structure
-     */
-    fun createEventBatchPayload(
-        events: List<EventData>,
-        deviceId: String,
-        location: String? = null
-    ): EventBatchPayload {
-        val timestamp = Instant.now().toString()
-        
-        return EventBatchPayload(
-            timestamp = timestamp,
-            device_id = deviceId,
-            data = EventBatchData(
-                events = events,
-                batch_size = events.size,
-                timestamp = timestamp,
-                location = location
-            )
-        )
-    }
-    
-    /**
-     * Create event data matching Flutter SDK structure
-     */
-    fun createEventData(
-        type: String,
-        eventName: String? = null,
-        metricName: String? = null,
-        value: Double? = null,
-        attributes: Map<String, String> = emptyMap()
-    ): EventData {
-        return EventData(
-            type = type,
-            eventName = eventName,
-            metricName = metricName,
-            value = value,
-            timestamp = Instant.now().toString(),
-            attributes = attributes
         )
     }
     
