@@ -15,7 +15,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
-import java.util.concurrent.ConcurrentLinkedQueue
+import com.androidtel.telemetry_library.core.CountedEventQueue
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -66,7 +66,7 @@ class BatchProcessingServiceTest {
         )
         fastService.setIdsInitialized(true)
 
-        val queue = ConcurrentLinkedQueue<TelemetryEvent>().apply { add(mockk(relaxed = true)) } // 1 < 50
+        val queue = CountedEventQueue().apply { enqueue(mockk(relaxed = true)) } // 1 < 50
         coEvery { httpClient.sendBatch(any()) } returns Result.success(Unit)
 
         val fired = CountDownLatch(1)
@@ -90,7 +90,7 @@ class BatchProcessingServiceTest {
 
         val fired = CountDownLatch(1)
         fastService.initialize(onFlush = {
-            runBlocking { fastService.sendBatch(ConcurrentLinkedQueue(), forceSend = true) }
+            runBlocking { fastService.sendBatch(CountedEventQueue(), forceSend = true) }
             fired.countDown()
         })
 
@@ -122,8 +122,8 @@ class BatchProcessingServiceTest {
 
     @Test
     fun `test sendBatch skips when IDs not initialized`() = runTest {
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-        repeat(50) { eventQueue.add(mockk(relaxed = true)) }
+        val eventQueue = CountedEventQueue()
+        repeat(50) { eventQueue.enqueue(mockk(relaxed = true)) }
         
         service.sendBatch(eventQueue)
         
@@ -135,8 +135,8 @@ class BatchProcessingServiceTest {
     fun `test sendBatch sends when IDs initialized and batch size met`() = runTest {
         service.setIdsInitialized(true)
         
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-        repeat(50) { eventQueue.add(mockk(relaxed = true)) }
+        val eventQueue = CountedEventQueue()
+        repeat(50) { eventQueue.enqueue(mockk(relaxed = true)) }
         
         coEvery { httpClient.sendBatch(any()) } returns Result.success(Unit)
         
@@ -150,8 +150,8 @@ class BatchProcessingServiceTest {
     fun `test sendBatch with forceSend ignores batch size`() = runTest {
         service.setIdsInitialized(true)
         
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-        repeat(10) { eventQueue.add(mockk(relaxed = true)) }
+        val eventQueue = CountedEventQueue()
+        repeat(10) { eventQueue.enqueue(mockk(relaxed = true)) }
         
         coEvery { httpClient.sendBatch(any()) } returns Result.success(Unit)
         
@@ -165,8 +165,8 @@ class BatchProcessingServiceTest {
     fun `test sendBatch does not send when below batch size and not forced`() = runTest {
         service.setIdsInitialized(true)
         
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-        repeat(25) { eventQueue.add(mockk(relaxed = true)) }
+        val eventQueue = CountedEventQueue()
+        repeat(25) { eventQueue.enqueue(mockk(relaxed = true)) }
         
         service.sendBatch(eventQueue, forceSend = false)
         
@@ -178,8 +178,8 @@ class BatchProcessingServiceTest {
     fun `test sendBatch stores offline on failure`() = runTest {
         service.setIdsInitialized(true)
         
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-        repeat(50) { eventQueue.add(mockk(relaxed = true)) }
+        val eventQueue = CountedEventQueue()
+        repeat(50) { eventQueue.enqueue(mockk(relaxed = true)) }
         
         coEvery { httpClient.sendBatch(any()) } returns Result.failure(Exception("Network error"))
         
@@ -193,8 +193,8 @@ class BatchProcessingServiceTest {
     fun `test sendBatch does not store offline when flushOffline is false`() = runTest {
         service.setIdsInitialized(true)
         
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-        repeat(50) { eventQueue.add(mockk(relaxed = true)) }
+        val eventQueue = CountedEventQueue()
+        repeat(50) { eventQueue.enqueue(mockk(relaxed = true)) }
         
         coEvery { httpClient.sendBatch(any()) } returns Result.failure(Exception("Network error"))
         
@@ -208,8 +208,8 @@ class BatchProcessingServiceTest {
     fun `test sendBatch includes location when provided`() = runTest {
         service.setIdsInitialized(true)
         
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-        repeat(50) { eventQueue.add(mockk(relaxed = true)) }
+        val eventQueue = CountedEventQueue()
+        repeat(50) { eventQueue.enqueue(mockk(relaxed = true)) }
         
         val location = "37.7749,-122.4194"
         var capturedBatch: TelemetryBatch? = null
@@ -228,7 +228,7 @@ class BatchProcessingServiceTest {
     fun `test sendBatch with empty queue does nothing`() = runTest {
         service.setIdsInitialized(true)
         
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
+        val eventQueue = CountedEventQueue()
         
         service.sendBatch(eventQueue, forceSend = true)
         
@@ -287,8 +287,8 @@ class BatchProcessingServiceTest {
     fun `test triggerBatchSend launches coroutine`() {
         service.setIdsInitialized(true)
         
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-        repeat(50) { eventQueue.add(mockk(relaxed = true)) }
+        val eventQueue = CountedEventQueue()
+        repeat(50) { eventQueue.enqueue(mockk(relaxed = true)) }
         
         coEvery { httpClient.sendBatch(any()) } returns Result.success(Unit)
         
@@ -301,8 +301,8 @@ class BatchProcessingServiceTest {
     fun `test triggerBatchSend with location`() {
         service.setIdsInitialized(true)
         
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-        repeat(50) { eventQueue.add(mockk(relaxed = true)) }
+        val eventQueue = CountedEventQueue()
+        repeat(50) { eventQueue.enqueue(mockk(relaxed = true)) }
         
         coEvery { httpClient.sendBatch(any()) } returns Result.success(Unit)
         
@@ -312,48 +312,41 @@ class BatchProcessingServiceTest {
     }
 
     @Test
-    fun `test restoreOfflineBatches adds events to queue`() = runTest {
-        val event1 = mockk<TelemetryEvent>(relaxed = true)
-        val event2 = mockk<TelemetryEvent>(relaxed = true)
-        val event3 = mockk<TelemetryEvent>(relaxed = true)
-        
-        val batch1 = mockk<TelemetryBatch>(relaxed = true)
-        val batch2 = mockk<TelemetryBatch>(relaxed = true)
-        
-        every { batch1.id } returns "batch-1"
-        every { batch1.events } returns listOf(event1, event2)
-        every { batch2.id } returns "batch-2"
-        every { batch2.events } returns listOf(event3)
-        
-        coEvery { offlineStorage.getStoredBatches() } returns listOf(batch1, batch2)
-        
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-        service.restoreOfflineBatches(eventQueue)
-        
-        assertEquals(3, eventQueue.size)
+    fun `sendStoredBatches replays at most REPLAY_BATCH_LIMIT oldest per cycle`() = runTest {
+        // 25 stored envelopes, oldest-first.
+        val batches = (1..25).map { i ->
+            mockk<TelemetryBatch>(relaxed = true).also { every { it.id } returns "batch-$i" }
+        }
+        coEvery { offlineStorage.getStoredBatches() } returns batches
+        coEvery { httpClient.sendBatch(any()) } returns Result.success(Unit)
+
+        service.sendStoredBatches()
+
+        // Only the 10 oldest are sent + removed this cycle; the timer paces the rest.
+        coVerify(exactly = 10) { httpClient.sendBatch(any()) }
+        coVerify { offlineStorage.removeBatch("batch-1") }
+        coVerify { offlineStorage.removeBatch("batch-10") }
+        coVerify(exactly = 0) { offlineStorage.removeBatch("batch-11") }
+    }
+
+    @Test
+    fun `sendStoredBatches stops on first failure`() = runTest {
+        val batches = (1..25).map { i ->
+            mockk<TelemetryBatch>(relaxed = true).also { every { it.id } returns "batch-$i" }
+        }
+        coEvery { offlineStorage.getStoredBatches() } returns batches
+        // Fail on the 3rd send.
+        coEvery { httpClient.sendBatch(batches[0]) } returns Result.success(Unit)
+        coEvery { httpClient.sendBatch(batches[1]) } returns Result.success(Unit)
+        coEvery { httpClient.sendBatch(batches[2]) } returns Result.failure(Exception("collector down"))
+
+        service.sendStoredBatches()
+
+        // Sends 1, 2, then 3 (which fails) → stop. 23 remain.
+        coVerify(exactly = 3) { httpClient.sendBatch(any()) }
         coVerify { offlineStorage.removeBatch("batch-1") }
         coVerify { offlineStorage.removeBatch("batch-2") }
-    }
-
-    @Test
-    fun `test restoreOfflineBatches with no stored batches`() = runTest {
-        coEvery { offlineStorage.getStoredBatches() } returns emptyList()
-        
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-        service.restoreOfflineBatches(eventQueue)
-        
-        assertTrue(eventQueue.isEmpty())
-    }
-
-    @Test
-    fun `test restoreOfflineBatches handles errors gracefully`() = runTest {
-        coEvery { offlineStorage.getStoredBatches() } throws Exception("Storage error")
-        
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-        service.restoreOfflineBatches(eventQueue)
-        
-        // Should not throw exception
-        assertTrue(eventQueue.isEmpty())
+        coVerify(exactly = 0) { offlineStorage.removeBatch("batch-3") }
     }
 
     @Test
@@ -362,10 +355,10 @@ class BatchProcessingServiceTest {
         val event2 = mockk<TelemetryEvent>(relaxed = true)
         val event3 = mockk<TelemetryEvent>(relaxed = true)
         
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-        eventQueue.add(event1)
-        eventQueue.add(event2)
-        eventQueue.add(event3)
+        val eventQueue = CountedEventQueue()
+        eventQueue.enqueue(event1)
+        eventQueue.enqueue(event2)
+        eventQueue.enqueue(event3)
         
         service.flushToOfflineStorage(eventQueue)
         
@@ -375,7 +368,7 @@ class BatchProcessingServiceTest {
 
     @Test
     fun `test flushToOfflineStorage with empty queue does nothing`() = runTest {
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
+        val eventQueue = CountedEventQueue()
         
         service.flushToOfflineStorage(eventQueue)
         
@@ -384,8 +377,8 @@ class BatchProcessingServiceTest {
 
     @Test
     fun `test flushToOfflineStorage handles errors gracefully`() = runTest {
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-        eventQueue.add(mockk(relaxed = true))
+        val eventQueue = CountedEventQueue()
+        eventQueue.enqueue(mockk(relaxed = true))
         
         coEvery { offlineStorage.storeBatch(any()) } throws Exception("Storage error")
         
@@ -437,8 +430,8 @@ class BatchProcessingServiceTest {
     fun `test sendBatch creates batch with correct size`() = runTest {
         service.setIdsInitialized(true)
         
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-        repeat(75) { eventQueue.add(mockk(relaxed = true)) }
+        val eventQueue = CountedEventQueue()
+        repeat(75) { eventQueue.enqueue(mockk(relaxed = true)) }
         
         var capturedBatch: TelemetryBatch? = null
         coEvery { httpClient.sendBatch(any()) } answers {
@@ -456,8 +449,8 @@ class BatchProcessingServiceTest {
     fun `test sendBatch creates batch with timestamp`() = runTest {
         service.setIdsInitialized(true)
         
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-        repeat(50) { eventQueue.add(mockk(relaxed = true)) }
+        val eventQueue = CountedEventQueue()
+        repeat(50) { eventQueue.enqueue(mockk(relaxed = true)) }
         
         var capturedBatch: TelemetryBatch? = null
         coEvery { httpClient.sendBatch(any()) } answers {
@@ -480,8 +473,8 @@ class BatchProcessingServiceTest {
         
         val jobs = (1..5).map { threadNum ->
             testScope.launch {
-                val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-                repeat(50) { eventQueue.add(mockk(relaxed = true)) }
+                val eventQueue = CountedEventQueue()
+                repeat(50) { eventQueue.enqueue(mockk(relaxed = true)) }
                 service.sendBatch(eventQueue)
             }
         }
@@ -495,11 +488,11 @@ class BatchProcessingServiceTest {
     fun `test batch processing with mixed success and failure`() = runTest {
         service.setIdsInitialized(true)
         
-        val eventQueue1 = ConcurrentLinkedQueue<TelemetryEvent>()
-        val eventQueue2 = ConcurrentLinkedQueue<TelemetryEvent>()
+        val eventQueue1 = CountedEventQueue()
+        val eventQueue2 = CountedEventQueue()
         repeat(50) { 
-            eventQueue1.add(mockk(relaxed = true))
-            eventQueue2.add(mockk(relaxed = true))
+            eventQueue1.enqueue(mockk(relaxed = true))
+            eventQueue2.enqueue(mockk(relaxed = true))
         }
         
         coEvery { httpClient.sendBatch(any()) } returnsMany listOf(
@@ -518,8 +511,8 @@ class BatchProcessingServiceTest {
     fun `test sendBatch logs appropriate messages`() = runTest {
         service.setIdsInitialized(true)
         
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-        repeat(50) { eventQueue.add(mockk(relaxed = true)) }
+        val eventQueue = CountedEventQueue()
+        repeat(50) { eventQueue.enqueue(mockk(relaxed = true)) }
         
         coEvery { httpClient.sendBatch(any()) } returns Result.success(Unit)
         
@@ -529,17 +522,19 @@ class BatchProcessingServiceTest {
     }
 
     @Test
-    fun `test large batch processing`() = runTest {
+    fun `test large burst is capped at MAX_EVENTS drop-oldest`() = runTest {
         service.setIdsInitialized(true)
-        
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-        repeat(1000) { eventQueue.add(mockk(relaxed = true)) }
-        
+
+        // A 1000-event burst is bounded to MAX_EVENTS (500) by drop-oldest before it ever sends.
+        val eventQueue = CountedEventQueue()
+        repeat(1000) { eventQueue.enqueue(mockk(relaxed = true)) }
+        assertEquals(CountedEventQueue.MAX_EVENTS, eventQueue.size)
+
         coEvery { httpClient.sendBatch(any()) } returns Result.success(Unit)
-        
+
         service.sendBatch(eventQueue, forceSend = true)
-        
-        coVerify { httpClient.sendBatch(match { it.batchSize == 1000 }) }
+
+        coVerify { httpClient.sendBatch(match { it.batchSize == CountedEventQueue.MAX_EVENTS }) }
         assertTrue(eventQueue.isEmpty())
     }
 
@@ -547,8 +542,8 @@ class BatchProcessingServiceTest {
     fun `test batch with location and forced send`() = runTest {
         service.setIdsInitialized(true)
         
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-        repeat(10) { eventQueue.add(mockk(relaxed = true)) }
+        val eventQueue = CountedEventQueue()
+        repeat(10) { eventQueue.enqueue(mockk(relaxed = true)) }
         
         var capturedBatch: TelemetryBatch? = null
         coEvery { httpClient.sendBatch(any()) } answers {
@@ -584,22 +579,12 @@ class BatchProcessingServiceTest {
     }
 
     @Test
-    fun `test restore and flush operations maintain data integrity`() = runTest {
-        val originalEvents = (1..10).map { mockk<TelemetryEvent>(relaxed = true) }
-        
-        val batch = mockk<TelemetryBatch>(relaxed = true)
-        every { batch.id } returns "test-batch"
-        every { batch.events } returns originalEvents
-        
-        coEvery { offlineStorage.getStoredBatches() } returns listOf(batch)
-        
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-        service.restoreOfflineBatches(eventQueue)
-        
-        assertEquals(10, eventQueue.size)
-        
+    fun `test flush drains the whole queue into one offline batch`() = runTest {
+        val eventQueue = CountedEventQueue()
+        repeat(10) { eventQueue.enqueue(mockk(relaxed = true)) }
+
         service.flushToOfflineStorage(eventQueue)
-        
+
         coVerify { offlineStorage.storeBatch(match { it.batchSize == 10 }) }
         assertTrue(eventQueue.isEmpty())
     }

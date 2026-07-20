@@ -116,10 +116,9 @@ dependencies {
     
     // WorkManager for retry scheduling
     api(libs.androidx.work.runtime)
-    
-    // Room for offline storage
-    api(libs.androidx.room.runtime)
-    api(libs.androidx.room.ktx)
+
+    // Offline storage is SharedPreferences-based (OfflineBatchStorage) — no Room. The Room runtime
+    // deps were dead weight (declared without a compiler/ksp plugin) and have been dropped.
 
     // Desugaring - removed since we no longer use Java 8 time APIs
     // implementation("com.android.tools:desugar_jdk_libs:2.0.4")

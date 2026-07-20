@@ -49,7 +49,7 @@ edge_telemetry_android/
 │           ├── TelemetryConfig.kt        # Configuration data class
 │           ├── TelemetryHttpClient.kt    # HTTP transport layer
 │           ├── TelemetryInterceptor.kt   # OkHttp interceptor for network tracking
-│           ├── OfflineBatchStorage.kt    # Room-based offline persistence
+│           ├── OfflineBatchStorage.kt    # SharedPreferences offline persistence (200-envelope cap)
 │           ├── ScreenTimingTracker.kt    # Screen duration measurement
 │           ├── MemoryTracker.kt          # Memory pressure monitoring
 │           ├── DeviceCapabilities.kt     # Runtime capability detection
@@ -190,7 +190,6 @@ tm.setLastUserAction("submit_payment")
 
 - **OkHttp3** 4.12.0 — HTTP transport + network interceptor
 - **Gson** 2.10.1 — JSON serialization
-- **AndroidX Room** 2.6.1 — offline batch persistence
 - **AndroidX Work** 2.9.0 — background retry scheduling
 - **AndroidX Lifecycle** 2.9.2 — process/activity lifecycle observation
 - **AndroidX Navigation** 2.9.3 — Compose navigation tracking
