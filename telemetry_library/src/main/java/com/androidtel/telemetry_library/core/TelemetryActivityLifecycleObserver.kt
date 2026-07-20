@@ -74,7 +74,7 @@ class TelemetryActivityLifecycleObserver(
                     "screen_name" to screenName,
                     "duration_ms" to durationMs,
                     "session_id" to telemetryManager.getSessionId(),
-                    "timestamp" to System.currentTimeMillis()
+                    "timestamp" to TelemetryTime.now()
                 )
             )
         }

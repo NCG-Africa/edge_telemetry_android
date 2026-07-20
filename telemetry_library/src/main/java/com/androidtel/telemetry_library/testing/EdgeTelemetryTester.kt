@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.util.Log
 import com.androidtel.telemetry_library.EdgeTelemetry
+import com.androidtel.telemetry_library.core.TelemetryTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -180,7 +181,7 @@ object EdgeTelemetryTester {
             // Test authenticated connectivity by sending a test event
             edgeTelemetry.recordEvent("api_key.validation_test", mapOf(
                 "test" to "api_key_validation",
-                "timestamp" to System.currentTimeMillis().toString()
+                "timestamp" to TelemetryTime.now()
             ))
             
             Log.i(TAG, "📡 Test event sent with API key authentication")
