@@ -14,6 +14,7 @@ class NavigationStackTracker {
         return lock.write {
             val fromScreen = navigationStack.peekLast()
             navigationStack.addLast(screenName)
+            sharedCurrentScreen = screenName
             NavigationEvent(
                 fromScreen = fromScreen,
                 toScreen = screenName,
@@ -28,6 +29,7 @@ class NavigationStackTracker {
             if (navigationStack.size < 2) return null
             val fromScreen = navigationStack.removeLast()
             val toScreen = navigationStack.peekLast() ?: return null
+            sharedCurrentScreen = toScreen
             NavigationEvent(
                 fromScreen = fromScreen,
                 toScreen = toScreen,
@@ -43,6 +45,7 @@ class NavigationStackTracker {
                 navigationStack.removeLast()
             } else null
             navigationStack.addLast(screenName)
+            sharedCurrentScreen = screenName
             NavigationEvent(
                 fromScreen = fromScreen,
                 toScreen = screenName,
@@ -54,8 +57,19 @@ class NavigationStackTracker {
     
     fun getCurrentScreen(): String? = lock.read { navigationStack.peekLast() }
     
-    fun getPreviousScreen(): String? = lock.read { 
+    fun getPreviousScreen(): String? = lock.read {
         if (navigationStack.size >= 2) navigationStack.elementAt(navigationStack.size - 2) else null
+    }
+
+    companion object {
+        // Process-wide latch of the most recently navigated screen, updated by every
+        // push/pop/replace on any tracker instance. Lets components without their own tracker
+        // (e.g. the frame collector, #54) read the current screen across both Activity and
+        // single-Activity Compose navigation.
+        @Volatile
+        private var sharedCurrentScreen: String? = null
+
+        fun currentScreen(): String? = sharedCurrentScreen
     }
 }
 

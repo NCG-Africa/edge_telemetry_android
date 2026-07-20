@@ -143,6 +143,21 @@ class NavigationStackTrackerTest {
     }
     
     @Test
+    fun `shared currentScreen latch follows push and pop across instances`() {
+        // The process-wide latch (issue #54) is updated by any instance's push/pop/replace.
+        tracker.push("ScreenA")
+        tracker.push("ScreenB")
+        assertEquals("ScreenB", NavigationStackTracker.currentScreen())
+
+        tracker.pop()
+        assertEquals("ScreenA", NavigationStackTracker.currentScreen())
+
+        // A different instance's navigation also moves the shared latch.
+        NavigationStackTracker().push("ScreenC")
+        assertEquals("ScreenC", NavigationStackTracker.currentScreen())
+    }
+
+    @Test
     fun `multiple push and pop operations maintain stack integrity`() {
         tracker.push("ScreenA")
         tracker.push("ScreenB")
