@@ -19,7 +19,6 @@ import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
 import java.nio.channels.FileLock
-import java.time.Duration
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -34,9 +33,10 @@ class CrashRetryManager(
     private val telemetryEndpoint: String,
     private val debugMode: Boolean = false,
     private val enableWorkManager: Boolean = true,
-    // Base backoff between in-process retries. Injectable so tests can shrink the real wall-clock
-    // delay (default is 1 minute; a retry test would otherwise sleep minutes).
-    private val baseRetryDelay: Duration = Duration.ofMinutes(1)
+    // Base backoff between in-process retries, in milliseconds. Injectable so tests can shrink the
+    // real wall-clock delay (default 1 minute; a retry test would otherwise sleep minutes). Kept as
+    // a Long rather than java.time.Duration — Duration needs API 26 and minSdk is 24.
+    private val baseRetryDelayMs: Long = 60_000L
 ) {
     
     companion object {
@@ -134,9 +134,9 @@ class CrashRetryManager(
                 Log.w(TAG, "❌ Crash send attempt $attempt failed: ${e.message}")
                 
                 if (attempt < MAX_RETRIES) {
-                    val delay = calculateRetryDelay(attempt)
-                    Log.d(TAG, "⏳ Retrying in ${delay.toMillis()}ms...")
-                    delay(delay.toMillis())
+                    val delayMs = calculateRetryDelay(attempt)
+                    Log.d(TAG, "⏳ Retrying in ${delayMs}ms...")
+                    delay(delayMs)
                 }
             }
         }
@@ -276,7 +276,7 @@ class CrashRetryManager(
         
         val retryWork = OneTimeWorkRequestBuilder<CrashRetryWorker>()
             .setConstraints(constraints)
-            .setInitialDelay(baseRetryDelay.toMinutes(), TimeUnit.MINUTES)
+            .setInitialDelay(baseRetryDelayMs, TimeUnit.MILLISECONDS)
             .setInputData(inputData)
             .addTag(WORK_TAG)
             .build()
@@ -288,15 +288,15 @@ class CrashRetryManager(
                 retryWork
             )
         
-        Log.d(TAG, "📅 Retry scheduled for ${baseRetryDelay.toMinutes()} minutes")
+        Log.d(TAG, "📅 Retry scheduled for ${baseRetryDelayMs}ms")
     }
-    
+
     /**
-     * Calculate exponential backoff delay
+     * Calculate exponential backoff delay, in milliseconds.
      */
-    private fun calculateRetryDelay(attempt: Int): Duration {
+    private fun calculateRetryDelay(attempt: Int): Long {
         val multiplier = Math.pow(2.0, (attempt - 1).toDouble()).toLong()
-        return Duration.ofMillis(baseRetryDelay.toMillis() * multiplier)
+        return baseRetryDelayMs * multiplier
     }
     
     /**

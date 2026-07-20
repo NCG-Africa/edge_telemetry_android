@@ -8,7 +8,6 @@ import io.mockk.unmockkAll
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
-import java.time.Duration
 import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.*
@@ -42,7 +41,7 @@ class CrashRetryManagerTest {
             telemetryEndpoint = mockWebServer.url("/telemetry").toString(),
             debugMode = false,
             enableWorkManager = false,  // Disable WorkManager to prevent hanging in tests
-            baseRetryDelay = Duration.ofMillis(1)  // Shrink real backoff so retry tests don't sleep minutes
+            baseRetryDelayMs = 1L  // Shrink real backoff so retry tests don't sleep minutes
         )
     }
 
