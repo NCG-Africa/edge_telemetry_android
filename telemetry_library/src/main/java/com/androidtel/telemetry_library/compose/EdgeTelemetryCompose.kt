@@ -4,9 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.androidtel.telemetry_library.EdgeTelemetry
@@ -32,8 +29,7 @@ fun TrackComposeScreen(
     additionalData: Map<String, String>? = null
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val lifecycleOwner = LocalLifecycleOwner.current
-    
+
     // Use remember to maintain tracker across recompositions
     val navigationTracker = remember { NavigationStackTracker() }
     
@@ -77,33 +73,6 @@ fun TrackComposeScreen(
         // Track navigation event
         EdgeTelemetry.getInstance().recordEvent("navigation", eventData)
         
-        // Set up lifecycle observer for screen duration tracking
-        val lifecycleObserver = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> {
-                    // Track screen resume (only if legacy screen events are enabled)
-                    if (EdgeTelemetry.getInstance().isLegacyScreenEventsEnabled()) {
-                        EdgeTelemetry.getInstance().recordEvent("navigation.screen_resume", mapOf(
-                            "screen" to finalScreenName,
-                            "route" to route
-                        ))
-                    }
-                }
-                Lifecycle.Event.ON_PAUSE -> {
-                    // Track screen pause (only if legacy screen events are enabled)
-                    if (EdgeTelemetry.getInstance().isLegacyScreenEventsEnabled()) {
-                        EdgeTelemetry.getInstance().recordEvent("navigation.screen_pause", mapOf(
-                            "screen" to finalScreenName,
-                            "route" to route
-                        ))
-                    }
-                }
-                else -> { /* No action needed */ }
-            }
-        }
-        
-        lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
-        
         onDispose {
             val duration = System.currentTimeMillis() - startTime
             
@@ -126,8 +95,6 @@ fun TrackComposeScreen(
 
             // Track screen duration event in the wire format the backend expects (eventName=screen.duration)
             EdgeTelemetry.getInstance().recordScreenDuration(finalScreenName, duration, "navigation")
-            
-            lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
         }
     }
 }
@@ -153,8 +120,6 @@ fun TrackScreen(
     category: String = "screen",
     attributes: Map<String, String>? = null
 ) {
-    val lifecycleOwner = LocalLifecycleOwner.current
-    
     DisposableEffect(screenName) {
         val startTime = System.currentTimeMillis()
         
@@ -175,39 +140,9 @@ fun TrackScreen(
             data = entryData
         )
         
-        // Track screen entry event (only if legacy screen events are enabled)
-        if (EdgeTelemetry.getInstance().isLegacyScreenEventsEnabled()) {
-            EdgeTelemetry.getInstance().recordEvent("screen.entry", entryData)
-        }
-        
-        // Set up lifecycle observer
-        val lifecycleObserver = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> {
-                    if (EdgeTelemetry.getInstance().isLegacyScreenEventsEnabled()) {
-                        EdgeTelemetry.getInstance().recordEvent("screen.resume", mapOf(
-                            "screen" to screenName,
-                            "category" to category
-                        ))
-                    }
-                }
-                Lifecycle.Event.ON_PAUSE -> {
-                    if (EdgeTelemetry.getInstance().isLegacyScreenEventsEnabled()) {
-                        EdgeTelemetry.getInstance().recordEvent("screen.pause", mapOf(
-                            "screen" to screenName,
-                            "category" to category
-                        ))
-                    }
-                }
-                else -> { /* No action needed */ }
-            }
-        }
-        
-        lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
-        
         onDispose {
             val duration = System.currentTimeMillis() - startTime
-            
+
             // Track screen exit
             val exitData = mutableMapOf<String, String>(
                 "screen" to screenName,
@@ -216,7 +151,7 @@ fun TrackScreen(
                 "timestamp" to TelemetryTime.now()
             )
             attributes?.let { exitData.putAll(it) }
-            
+
             // Add screen exit breadcrumb
             EdgeTelemetry.getInstance().addBreadcrumb(
                 message = "Exited screen: $screenName",
@@ -224,13 +159,6 @@ fun TrackScreen(
                 level = "info",
                 data = exitData
             )
-            
-            // Track screen exit and duration (only if legacy screen events are enabled)
-            if (EdgeTelemetry.getInstance().isLegacyScreenEventsEnabled()) {
-                EdgeTelemetry.getInstance().recordEvent("screen.exit", exitData)
-            }
-            
-            lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
         }
     }
 }
@@ -282,16 +210,8 @@ fun trackComposePerformance(
     unit: String,
     attributes: Map<String, String>? = null
 ) {
-    val performanceData = mutableMapOf<String, String>(
-        "metric" to metricName,
-        "value" to value.toString(),
-        "unit" to unit,
-        "timestamp" to TelemetryTime.now()
-    )
-    attributes?.let { performanceData.putAll(it) }
-    
-    // Track performance event (only if legacy screen events are enabled)
-    if (EdgeTelemetry.getInstance().isLegacyScreenEventsEnabled()) {
-        EdgeTelemetry.getInstance().recordEvent("performance.compose", performanceData)
-    }
+    // ponytail: no-op, kept for source compatibility. Its emission was gated behind the removed
+    // enableLegacyScreenEvents flag (default off = never emitted, issue #53). Left inert rather than
+    // introduce new telemetry outside the issue's scope — route to recordMetric() if perf metrics
+    // are later wanted.
 }

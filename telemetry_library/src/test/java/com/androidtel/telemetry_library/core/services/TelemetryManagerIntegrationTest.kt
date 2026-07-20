@@ -148,9 +148,9 @@ class TelemetryManagerIntegrationTest {
 
     @Test
     fun `test screen tracking workflow`() {
-        telemetryManager.recordScreenView("HomeScreen")
-        telemetryManager.recordScreenView("ProfileScreen")
-        telemetryManager.recordScreenView("SettingsScreen")
+        telemetryManager.recordScreenDuration("HomeScreen", 120, "closed")
+        telemetryManager.recordScreenDuration("ProfileScreen", 240, "closed")
+        telemetryManager.recordScreenDuration("SettingsScreen", 360, "closed")
 
         // Screens should be tracked
     }
@@ -351,8 +351,8 @@ class TelemetryManagerIntegrationTest {
         telemetryManager.setUserProfile("Journey User", "journey@example.com")
 
         // Track screens
-        telemetryManager.recordScreenView("SplashScreen")
-        telemetryManager.recordScreenView("LoginScreen")
+        telemetryManager.recordScreenDuration("SplashScreen", 100, "closed")
+        telemetryManager.recordScreenDuration("LoginScreen", 200, "closed")
 
         // Add breadcrumbs
         telemetryManager.addBreadcrumb("User entered email", "ui", "info")
@@ -373,7 +373,7 @@ class TelemetryManagerIntegrationTest {
         telemetryManager.recordEvent("login_success", emptyMap())
 
         // Track more screens
-        telemetryManager.recordScreenView("HomeScreen")
+        telemetryManager.recordScreenDuration("HomeScreen", 300, "closed")
 
         // Record metrics
         telemetryManager.recordMetric("session_duration", 1234.56, emptyMap())
@@ -425,10 +425,10 @@ class TelemetryManagerIntegrationTest {
 
     @Test
     fun `test screen tracking with duplicate screens`() {
-        telemetryManager.recordScreenView("HomeScreen")
-        telemetryManager.recordScreenView("HomeScreen")
-        telemetryManager.recordScreenView("ProfileScreen")
-        telemetryManager.recordScreenView("HomeScreen")
+        telemetryManager.recordScreenDuration("HomeScreen", 100, "closed")
+        telemetryManager.recordScreenDuration("HomeScreen", 150, "closed")
+        telemetryManager.recordScreenDuration("ProfileScreen", 200, "closed")
+        telemetryManager.recordScreenDuration("HomeScreen", 250, "closed")
 
         // Should handle duplicate screen tracking
     }

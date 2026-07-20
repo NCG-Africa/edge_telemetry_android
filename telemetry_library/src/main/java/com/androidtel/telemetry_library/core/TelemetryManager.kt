@@ -127,7 +127,6 @@ class TelemetryManager private constructor(
     internal fun isMemoryTrackingEnabled(): Boolean = config.enableMemoryTracking
     internal fun isStorageTrackingEnabled(): Boolean = config.enableStorageTracking
     internal fun isFrameTrackingEnabled(): Boolean = config.enableFrameTracking
-    internal fun isLegacyScreenEventsEnabled(): Boolean = config.enableLegacyScreenEvents
     internal fun isUserInteractionEventsEnabled(): Boolean = config.enableUserInteractionEvents
 
     companion object {
@@ -347,15 +346,40 @@ class TelemetryManager private constructor(
             
             Log.i("TelemetryManager", "SDK initialization complete - All modules active")
 
-            // Step 15: Emit session.started event for the initial session.
-            // Backend dispatch: `event_processor.py` matches eventName == "session.started" and marks
-            // the corresponding rum_sessions row as status=active.
-            emitSessionStartedEvent()
+            // Step 15: Session boundary emission (issue #53, load-then-decide).
+            // - Timed-out cold start: finalize the persisted (dead) session once, then start new.
+            // - Resume within timeout: emit nothing — session-id continuity is the signal.
+            // - Fresh/new session: emit session.started (backend marks rum_sessions status=active).
+            if (sessionService.timedOutOnInit()) {
+                emitTimedOutFinalize()
+            }
+            if (!sessionService.wasResumed()) {
+                emitSessionStartedEvent()
+            }
 
         } catch (e: Exception) {
             Log.e("TelemetryManager", "Failed to complete initialization sequence", e)
             throw e
         }
+    }
+
+    /**
+     * Emit a single session.finalized(reason=timeout) for a session that died in the background and
+     * timed out before this cold start (issue #53). The old id/duration come from persisted values;
+     * they override the auto-enriched (new) session block via custom attributes. Minimal stats only —
+     * in-memory counters died with the prior process; the backend reconstructs counts by session_id.
+     */
+    private fun emitTimedOutFinalize() {
+        if (!::sessionService.isInitialized) return
+        val oldId = sessionService.getFinalizedSessionId() ?: return
+        recordEvent(
+            eventName = "session.finalized",
+            attributes = mapOf(
+                "session.id" to oldId,
+                "session.duration_ms" to sessionService.getFinalizedDurationMs(),
+                "session.reason" to "timeout"
+            )
+        )
     }
 
     /**
@@ -445,8 +469,9 @@ class TelemetryManager private constructor(
             batchProcessingService.flushToOfflineStorage(eventTrackingService.getEventQueue())
         }
         
-        // 2. Persist lastActiveTimestamp
-        sessionService.updateLastActiveTimestamp()
+        // 2. Persist the session (id + start + last_active) so it can be resumed across process
+        //    death within the timeout window (issue #53).
+        sessionService.persistSession()
         
         // 3. Pause the flush timer
         batchProcessingService.stopFlushTimer()
@@ -550,28 +575,6 @@ class TelemetryManager private constructor(
     @Composable
     fun trackComposeScreens(navController: NavController) {
         TrackComposeScreen(navController, telemetryManager = this)
-    }
-
-
-    // --- Screen Navigation Tracking ---
-    @Deprecated(
-        message = "Legacy screen_view event is not supported by backend. Use navigation events instead.",
-        replaceWith = ReplaceWith("recordComposeScreenView(screenName)"),
-        level = DeprecationLevel.WARNING
-    )
-    fun recordScreenView(screenName: String) {
-        if (!config.enableLegacyScreenEvents) {
-            if (debugMode) {
-                Log.d("TelemetryManager", "Legacy screen events disabled - skipping screen_view for $screenName")
-            }
-            return
-        }
-        
-        sessionService.addVisitedScreen(screenName)
-        val attributes = mapOf(
-            "screen_name" to screenName
-        )
-        recordEvent(eventName = "screen_view", attributes = attributes)
     }
 
 

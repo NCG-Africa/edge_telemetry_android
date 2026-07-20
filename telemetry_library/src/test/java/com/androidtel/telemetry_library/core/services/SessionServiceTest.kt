@@ -275,10 +275,74 @@ class SessionServiceTest {
     }
 
     @Test
-    fun `test getLastActiveTimestamp returns 0 when not set`() {
+    fun `test initialize seeds last_active so first onStart is a no-op`() {
+        // initialize() writes last_active=now (load-then-decide seed), so an immediately
+        // following hasSessionTimedOut() check sees elapsed ~= 0 and does not rotate.
+        val before = System.currentTimeMillis()
         service.initialize()
-        
-        assertEquals(0L, service.getLastActiveTimestamp())
+
+        val seeded = service.getLastActiveTimestamp()
+        assertTrue(seeded >= before)
+        assertFalse(service.hasSessionTimedOut())
+    }
+
+    // --- Issue #53: cold-start session correctness (load-then-decide) ---
+
+    @Test
+    fun `cold start after timeout mints exactly one session and increments total once`() {
+        // Prior process persisted a session that then timed out in background.
+        sharedPrefs.edit()
+            .putString("session_id", "old-session")
+            .putLong("session_start", 1_000L)
+            .putLong("last_active_timestamp", System.currentTimeMillis() - config.sessionTimeoutMs - 1000)
+            .putInt("total_sessions", 3)
+            .apply()
+        every { idGenerator.generateSessionId() } returns "fresh-session"
+
+        service.initialize()
+
+        assertEquals("fresh-session", service.getCurrentSessionId())
+        assertEquals(4, service.getTotalSessions())          // incremented exactly once
+        assertTrue(service.timedOutOnInit())
+        assertFalse(service.wasResumed())
+    }
+
+    @Test
+    fun `cold start within timeout resumes persisted id, no total increment, no session_started`() {
+        sharedPrefs.edit()
+            .putString("session_id", "persisted-session")
+            .putLong("session_start", 5_000L)
+            .putLong("last_active_timestamp", System.currentTimeMillis() - 60_000) // 1 min ago
+            .putInt("total_sessions", 7)
+            .apply()
+
+        service.initialize()
+
+        assertEquals("persisted-session", service.getCurrentSessionId())
+        assertEquals(7, service.getTotalSessions())          // no increment
+        assertEquals(5_000L, service.getSessionStartTime())  // resumed start
+        assertTrue(service.wasResumed())                     // suppresses session.started
+        assertFalse(service.timedOutOnInit())
+    }
+
+    @Test
+    fun `timed-out cold start exposes old id and duration for finalize`() {
+        val now = System.currentTimeMillis()
+        val lastActive = now - config.sessionTimeoutMs - 1000
+        sharedPrefs.edit()
+            .putString("session_id", "old-session")
+            .putLong("session_start", lastActive - 100_000)     // ran 100s before going idle
+            .putLong("last_active_timestamp", lastActive)
+            .putInt("total_sessions", 2)
+            .apply()
+        every { idGenerator.generateSessionId() } returns "new-session"
+
+        service.initialize()
+
+        assertEquals("old-session", service.getFinalizedSessionId())
+        // duration = last_active - session_start, from persisted values
+        assertEquals(100_000L, service.getFinalizedDurationMs())
+        assertEquals("new-session", service.getCurrentSessionId())
     }
 
     @Test

@@ -13,7 +13,6 @@ data class TelemetryConfig(
     val enableMemoryTracking: Boolean = true,
     val enableStorageTracking: Boolean = true,
     val enableFrameTracking: Boolean = true,
-    val enableLegacyScreenEvents: Boolean = false,
     val enableUserInteractionEvents: Boolean = true,
     val enableCapabilityEvents: Boolean = true,
     val enableSessionTracking: Boolean = true,
