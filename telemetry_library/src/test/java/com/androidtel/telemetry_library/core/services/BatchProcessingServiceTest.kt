@@ -8,6 +8,7 @@ import com.androidtel.telemetry_library.core.models.TelemetryEvent
 import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -15,6 +16,8 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * Unit tests for BatchProcessingService
@@ -51,9 +54,50 @@ class BatchProcessingServiceTest {
 
     @Test
     fun `test service initialization starts flush timer`() {
-        service.initialize()
-        
+        service.initialize(onFlush = {})
+
         // Verify timer is started (no exception thrown)
+    }
+
+    @Test
+    fun `timed flush force-sends a partial batch`() {
+        val fastService = BatchProcessingService(
+            config.copy(flushIntervalMs = 50L), httpClient, offlineStorage, testScope
+        )
+        fastService.setIdsInitialized(true)
+
+        val queue = ConcurrentLinkedQueue<TelemetryEvent>().apply { add(mockk(relaxed = true)) } // 1 < 50
+        coEvery { httpClient.sendBatch(any()) } returns Result.success(Unit)
+
+        val fired = CountDownLatch(1)
+        fastService.initialize(onFlush = {
+            runBlocking { fastService.sendBatch(queue, forceSend = true) }
+            fired.countDown()
+        })
+
+        assertTrue("flush timer never fired", fired.await(2, TimeUnit.SECONDS))
+        fastService.stopFlushTimer()
+
+        coVerify { httpClient.sendBatch(match { it.batchSize == 1 }) }
+    }
+
+    @Test
+    fun `timed flush on an empty queue sends nothing`() {
+        val fastService = BatchProcessingService(
+            config.copy(flushIntervalMs = 50L), httpClient, offlineStorage, testScope
+        )
+        fastService.setIdsInitialized(true)
+
+        val fired = CountDownLatch(1)
+        fastService.initialize(onFlush = {
+            runBlocking { fastService.sendBatch(ConcurrentLinkedQueue(), forceSend = true) }
+            fired.countDown()
+        })
+
+        assertTrue("flush timer never fired", fired.await(2, TimeUnit.SECONDS))
+        fastService.stopFlushTimer()
+
+        coVerify(exactly = 0) { httpClient.sendBatch(any()) }
     }
 
     @Test
