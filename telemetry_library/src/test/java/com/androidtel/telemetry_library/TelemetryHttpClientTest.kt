@@ -31,6 +31,8 @@ class TelemetryHttpClientTest {
 
     @After
     fun tearDown() {
+        // Release OkHttp's non-daemon threads so the forked test JVM exits promptly (see release()).
+        httpClient.getOkHttpClient().release()
         mockWebServer.shutdown()
     }
 
@@ -176,6 +178,7 @@ class TelemetryHttpClientTest {
 
         val request = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
         assertEquals(customApiKey, request.getHeader("X-API-Key"))
+        customClient.getOkHttpClient().release()  // local client — release its threads too
     }
 
     @Test

@@ -33,7 +33,10 @@ class CrashRetryManager(
     private val apiKey: String,
     private val telemetryEndpoint: String,
     private val debugMode: Boolean = false,
-    private val enableWorkManager: Boolean = true
+    private val enableWorkManager: Boolean = true,
+    // Base backoff between in-process retries. Injectable so tests can shrink the real wall-clock
+    // delay (default is 1 minute; a retry test would otherwise sleep minutes).
+    private val baseRetryDelay: Duration = Duration.ofMinutes(1)
 ) {
     
     companion object {
@@ -59,6 +62,16 @@ class CrashRetryManager(
             rateLimitUntil.set(0L)
         }
     }
+
+    /**
+     * Releases the internal OkHttp client's non-daemon dispatcher threads + pooled connections so a
+     * forked unit-test JVM can exit promptly (otherwise Gradle blocks on the lingering thread pool).
+     * Test-only lifecycle hook — call from @After.
+     */
+    internal fun shutdownForTesting() {
+        httpClient.dispatcher.executorService.shutdown()
+        httpClient.connectionPool.evictAll()
+    }
     
     private val gson = Gson()
     private val httpClient = OkHttpClient.Builder()
@@ -72,7 +85,6 @@ class CrashRetryManager(
         })
         .build()
     
-    private val baseRetryDelay = Duration.ofMinutes(1)
     private val offlineStorageFile = File(context.cacheDir, OFFLINE_STORAGE_FILE)
     private val fileLock = Any()
     private val isStoringCrash = AtomicBoolean(false)
