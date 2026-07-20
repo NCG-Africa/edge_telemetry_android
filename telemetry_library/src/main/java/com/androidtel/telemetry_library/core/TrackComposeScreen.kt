@@ -49,7 +49,7 @@ fun TrackComposeScreen(
                 "navigation.method" to "push",
                 "navigation.route_type" to "compose_route",
                 "navigation.has_arguments" to (additionalData != null),
-                "navigation.timestamp" to java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).format(java.util.Date())
+                "navigation.timestamp" to TelemetryTime.now()
             )
         )
         

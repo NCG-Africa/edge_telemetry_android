@@ -48,9 +48,6 @@ import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.security.SecureRandom
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Executors
@@ -75,7 +72,6 @@ class TelemetryManager private constructor(
     val applicationContext: Context get() = context
 
     private val scope = CoroutineScope(Dispatchers.IO)
-    val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
 
     // Pre-init call queue
     private val isReady = AtomicBoolean(false)
@@ -585,7 +581,7 @@ class TelemetryManager private constructor(
                 "navigation.method" to "push",
                 "navigation.route_type" to "compose_route",
                 "navigation.has_arguments" to false,
-                "navigation.timestamp" to dateFormat.format(Date())
+                "navigation.timestamp" to TelemetryTime.now()
             )
         )
     }
@@ -611,7 +607,7 @@ class TelemetryManager private constructor(
                 "screen.name" to screenName,
                 "screen.duration_ms" to durationMs,
                 "screen.exit_method" to exitMethod,
-                "screen.timestamp" to dateFormat.format(Date())
+                "screen.timestamp" to TelemetryTime.now()
             )
         )
     }
@@ -757,7 +753,7 @@ class TelemetryManager private constructor(
                     "device_capabilities" to capabilitySummary,
                     "network_capabilities" to networkSummary,
                     "memory_status" to memorySummary,
-                    "initialization_timestamp" to System.currentTimeMillis()
+                    "initialization_timestamp" to TelemetryTime.now()
                 )
             )
             
@@ -821,7 +817,7 @@ class TelemetryManager private constructor(
     /*    private fun getSessionInfo(): SessionInfo {
             return SessionInfo(
                 sessionId = sessionId,
-                startTime = dateFormat.format(Date(sessionStartTime))
+                startTime = TelemetryTime.isoOf(sessionStartTime)
             )
         }*/
 
@@ -898,7 +894,7 @@ class TelemetryManager private constructor(
             put("user.name", name ?: "")
             put("user.email", email ?: "")
             put("user.phone", phone ?: "")
-            put("user.profile_updated_at", dateFormat.format(Date()))
+            put("user.profile_updated_at", TelemetryTime.now())
         }
         recordEvent(eventName = "user.profile.update", attributes = attributes)
     }

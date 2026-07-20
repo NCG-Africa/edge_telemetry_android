@@ -11,7 +11,7 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.androidtel.telemetry_library.EdgeTelemetry
 import com.androidtel.telemetry_library.core.navigation.NavigationStackTracker
-import java.time.Instant
+import com.androidtel.telemetry_library.core.TelemetryTime
 
 /**
  * Enhanced Compose integration for EdgeTelemetry that provides automatic navigation tracking
@@ -113,7 +113,7 @@ fun TrackComposeScreen(
                 "route" to route,
                 "exit_method" to "navigation",
                 "duration_ms" to duration.toString(),
-                "timestamp" to Instant.now().toString()
+                "timestamp" to TelemetryTime.now()
             )
 
             // Add exit breadcrumb
@@ -163,7 +163,7 @@ fun TrackScreen(
             "screen" to screenName,
             "category" to category,
             "type" to "screen_entry",
-            "timestamp" to Instant.now().toString()
+            "timestamp" to TelemetryTime.now()
         )
         attributes?.let { entryData.putAll(it) }
         
@@ -213,7 +213,7 @@ fun TrackScreen(
                 "screen" to screenName,
                 "category" to category,
                 "duration_ms" to duration.toString(),
-                "timestamp" to Instant.now().toString()
+                "timestamp" to TelemetryTime.now()
             )
             attributes?.let { exitData.putAll(it) }
             
@@ -250,7 +250,7 @@ fun trackUserInteraction(
     val interactionData = mutableMapOf<String, String>(
         "action" to action,
         "target" to target,
-        "timestamp" to Instant.now().toString()
+        "timestamp" to TelemetryTime.now()
     )
     attributes?.let { interactionData.putAll(it) }
     
@@ -286,7 +286,7 @@ fun trackComposePerformance(
         "metric" to metricName,
         "value" to value.toString(),
         "unit" to unit,
-        "timestamp" to Instant.now().toString()
+        "timestamp" to TelemetryTime.now()
     )
     attributes?.let { performanceData.putAll(it) }
     
