@@ -7,9 +7,11 @@ import com.androidtel.telemetry_library.core.ids.IdGenerator
 import com.google.gson.Gson
 import io.mockk.every
 import io.mockk.mockk
+import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
+import java.io.File
 
 /**
  * Integration tests for CrashReporter with new batch envelope structure
@@ -22,15 +24,33 @@ class CrashReporterIntegrationTest {
     private lateinit var idGenerator: IdGenerator
     private val gson = Gson()
 
+    private lateinit var tempCacheDir: File
+    // CrashReporter's constructor installs a global Thread.UncaughtExceptionHandler.
+    // Save it here and restore in tearDown so it doesn't leak into other test classes.
+    private var originalUncaughtHandler: Thread.UncaughtExceptionHandler? = null
+
     @Before
     fun setup() {
+        originalUncaughtHandler = Thread.getDefaultUncaughtExceptionHandler()
         context = mockk(relaxed = true)
         telemetryManager = mockk(relaxed = true)
         breadcrumbManager = BreadcrumbManager()
         idGenerator = mockk(relaxed = true)
-        
+
+        // Must be a real directory: CrashRetryManager does File(context.cacheDir, name),
+        // and java.io.File(parent, child) reads parent's internal path field directly — a
+        // relaxed mockk File has a null path and would NPE.
+        tempCacheDir = File(System.getProperty("java.io.tmpdir"), "crash_reporter_test_${System.nanoTime()}")
+            .apply { mkdirs() }
+
         every { idGenerator.getDeviceId() } returns "test_device_123"
-        every { context.cacheDir } returns mockk(relaxed = true)
+        every { context.cacheDir } returns tempCacheDir
+    }
+
+    @After
+    fun tearDown() {
+        Thread.setDefaultUncaughtExceptionHandler(originalUncaughtHandler)
+        tempCacheDir.deleteRecursively()
     }
 
     @Test

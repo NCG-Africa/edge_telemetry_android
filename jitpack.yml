@@ -1,0 +1,5 @@
+# Pin the JitPack launcher JDK so mainline builds are reproducible. AGP 8.7 requires JDK 17 to run;
+# the compile target is pinned to 11 by the Gradle toolchain (jvmToolchain(11)), auto-provisioned
+# via the foojay resolver.
+jdk:
+  - openjdk17

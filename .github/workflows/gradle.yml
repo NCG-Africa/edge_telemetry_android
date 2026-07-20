@@ -2,15 +2,14 @@ name: Build Library
 
 on:
   push:
-    branches:
-      - main
+    branches: [master]
   pull_request:
-    branches:
-      - main
+    branches: [master]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20   # safety net: kill a hung build fast instead of burning the default 6h
 
     steps:
       - name: Checkout repository
@@ -20,11 +19,11 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 17          # launcher; compile target is pinned to 11 by the Gradle toolchain
           cache: gradle
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build with Gradle (skip lint)
-        run: ./gradlew clean assembleRelease -x lint --stacktrace
+      - name: Test + lint + build
+        run: ./gradlew clean testDebugUnitTest lintDebug assembleRelease --stacktrace

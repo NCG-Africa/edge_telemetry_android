@@ -5,6 +5,7 @@ import com.androidtel.telemetry_library.core.models.*
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -40,7 +41,7 @@ class TelemetryHttpClientTest {
         val batch = createTestBatch()
         httpClient.sendBatch(batch)
 
-        val request = mockWebServer.takeRequest()
+        val request = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
         assertEquals(testApiKey, request.getHeader("X-API-Key"))
     }
 
@@ -51,7 +52,7 @@ class TelemetryHttpClientTest {
         val batch = createTestBatch()
         httpClient.sendBatch(batch)
 
-        val request = mockWebServer.takeRequest()
+        val request = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
         assertNotNull(request.getHeader("User-Agent"))
         assertTrue(request.getHeader("User-Agent")?.contains("EdgeTelemetryAndroid") == true)
     }
@@ -63,8 +64,9 @@ class TelemetryHttpClientTest {
         val batch = createTestBatch()
         httpClient.sendBatch(batch)
 
-        val request = mockWebServer.takeRequest()
-        assertEquals("application/json", request.getHeader("Content-Type"))
+        val request = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
+        // OkHttp's String.toRequestBody appends "; charset=utf-8" — match the media type, not the exact string.
+        assertTrue(request.getHeader("Content-Type")?.startsWith("application/json") == true)
     }
 
     @Test
@@ -74,7 +76,7 @@ class TelemetryHttpClientTest {
         val batch = createTestBatch()
         httpClient.sendBatch(batch)
 
-        val request = mockWebServer.takeRequest()
+        val request = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
         assertEquals("POST", request.method)
     }
 
@@ -151,7 +153,7 @@ class TelemetryHttpClientTest {
         val batch = createTestBatch()
         httpClient.sendBatch(batch)
 
-        val request = mockWebServer.takeRequest()
+        val request = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
         val apiKeyHeader = request.getHeader("X-API-Key")
         
         assertEquals(testApiKey, apiKeyHeader)
@@ -172,7 +174,7 @@ class TelemetryHttpClientTest {
         val batch = createTestBatch()
         customClient.sendBatch(batch)
 
-        val request = mockWebServer.takeRequest()
+        val request = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
         assertEquals(customApiKey, request.getHeader("X-API-Key"))
     }
 
@@ -183,7 +185,7 @@ class TelemetryHttpClientTest {
         val batch = createTestBatch()
         httpClient.sendBatch(batch)
 
-        val request = mockWebServer.takeRequest()
+        val request = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
         val body = request.body.readUtf8()
         
         assertNotNull(body)
@@ -199,7 +201,7 @@ class TelemetryHttpClientTest {
         val batch = createTestBatch()
         httpClient.sendBatch(batch)
 
-        val request = mockWebServer.takeRequest()
+        val request = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
         
         assertNotNull(request.getHeader("X-API-Key"))
         assertNotNull(request.getHeader("Content-Type"))

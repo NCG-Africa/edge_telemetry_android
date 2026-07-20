@@ -39,6 +39,7 @@ class IdConsistencyTest {
         every { mockEditor.remove(any()) } returns mockEditor
         every { mockEditor.apply() } just Runs
         every { mockPrefs.getString(any(), any()) } returns null
+        every { mockContext.cacheDir } returns File(System.getProperty("java.io.tmpdir"))
 
         idGenerator = IdGenerator()
         idGenerator.initialize(mockContext)
@@ -100,7 +101,7 @@ class IdConsistencyTest {
     @Test
     fun `UserProfileManager receives and uses IdGenerator instance`() {
         val persistedUserId = "1234567890123_user0001"
-        every { mockPrefs.getString("user_id", null) } returns persistedUserId
+        every { mockPrefs.getString("edge_rum_user_id", null) } returns persistedUserId
         
         val userProfileManager = UserProfileManager(mockContext, idGenerator)
         
@@ -154,7 +155,7 @@ class IdConsistencyTest {
     @Test
     fun `UserProfileManager user ID matches IdGenerator user ID`() {
         val persistedUserId = "1234567890123_testuser"
-        every { mockPrefs.getString("user_id", null) } returns persistedUserId
+        every { mockPrefs.getString("edge_rum_user_id", null) } returns persistedUserId
         
         val userProfileManager = UserProfileManager(mockContext, idGenerator)
         val directUserId = idGenerator.getUserId()
@@ -224,7 +225,7 @@ class IdConsistencyTest {
     @Test
     fun `user attributes contain valid user ID from IdGenerator`() {
         val persistedUserId = "1234567890123_attrtest"
-        every { mockPrefs.getString("user_id", null) } returns persistedUserId
+        every { mockPrefs.getString("edge_rum_user_id", null) } returns persistedUserId
         
         val userProfileManager = UserProfileManager(mockContext, idGenerator)
         
@@ -265,7 +266,7 @@ class IdConsistencyTest {
     @Test
     fun `multiple components using same IdGenerator produce consistent user IDs`() {
         val persistedUserId = "1234567890123_shared02"
-        every { mockPrefs.getString("user_id", null) } returns persistedUserId
+        every { mockPrefs.getString("edge_rum_user_id", null) } returns persistedUserId
         
         val userProfileManager1 = UserProfileManager(mockContext, idGenerator)
         val userProfileManager2 = UserProfileManager(mockContext, idGenerator)
@@ -388,7 +389,7 @@ class IdConsistencyTest {
         val persistedUserId = "1234567890123_nocache2"
         
         every { mockPrefs.getString("device_id", null) } returns persistedDeviceId
-        every { mockPrefs.getString("user_id", null) } returns persistedUserId
+        every { mockPrefs.getString("edge_rum_user_id", null) } returns persistedUserId
         
         val deviceInfoCollector = DeviceInfoCollector(mockContext, idGenerator)
         val userProfileManager = UserProfileManager(mockContext, idGenerator)

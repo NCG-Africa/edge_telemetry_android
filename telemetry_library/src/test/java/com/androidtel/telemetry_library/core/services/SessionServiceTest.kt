@@ -378,7 +378,8 @@ class SessionServiceTest {
         
         assertTrue(sessionInfo.startTime!!.contains("T"))
         assertTrue(sessionInfo.startTime!!.endsWith("Z"))
-        assertTrue(sessionInfo.startTime!!.matches(Regex("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z")))
+        // TelemetryTime.isoOf emits millisecond precision (yyyy-MM-dd'T'HH:mm:ss.SSS'Z'); millis optional.
+        assertTrue(sessionInfo.startTime!!.matches(Regex("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z")))
     }
 
     @Test

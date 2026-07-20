@@ -9,8 +9,13 @@ import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.util.concurrent.TimeUnit
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28], manifest = Config.NONE)
 class IpLocationProviderTest {
 
     private lateinit var mockWebServer: MockWebServer
@@ -130,12 +135,13 @@ class IpLocationProviderTest {
             httpClient = httpClient,
             apiEndpoint = mockWebServer.url("/json").toString(),
             cacheDuration = 3600000,
-            fallbackToIp = true
+            fallbackToIp = true,
+            ipEchoEndpoint = mockIpifyServer.url("/").toString()
         )
 
         val location = locationProvider.getLocation()
-        
-        assertTrue(location == "105.163.0.47" || location == "Unknown/Unknown")
+
+        assertEquals("105.163.0.47", location)
     }
 
     @Test

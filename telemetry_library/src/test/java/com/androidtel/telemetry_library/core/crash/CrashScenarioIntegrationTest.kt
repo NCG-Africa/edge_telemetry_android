@@ -397,16 +397,13 @@ class CrashScenarioIntegrationTest {
         assertEquals(breadcrumbs, attributes["breadcrumbs"])
     }
 
-    // Helper function to generate deep stack trace
+    // Helper function to generate a deeply-nested exception (long stack trace via cause chain).
+    // Must RETURN the exception, not throw it — the caller assigns the result to a variable.
     private fun generateDeepStackTrace(depth: Int): RuntimeException {
         return if (depth <= 0) {
             RuntimeException("Deep stack trace test")
         } else {
-            try {
-                throw generateDeepStackTrace(depth - 1)
-            } catch (e: RuntimeException) {
-                throw RuntimeException("Level $depth", e)
-            }
+            RuntimeException("Level $depth", generateDeepStackTrace(depth - 1))
         }
     }
 }

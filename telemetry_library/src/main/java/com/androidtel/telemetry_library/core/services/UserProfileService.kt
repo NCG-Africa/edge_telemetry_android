@@ -81,15 +81,19 @@ internal class UserProfileService(
      * Get user ID
      */
     fun getUserId(): String {
-        return if (::userProfileManager.isInitialized) {
+        val resolvedId = if (::userProfileManager.isInitialized) {
             userProfileManager.getUserId()
+        } else if (::userId.isInitialized) {
+            userId
         } else {
-            if (::userId.isInitialized && userId.isNotBlank()) {
-                userId
-            } else {
-                Log.w(TAG, "User ID not initialized, generating fallback")
-                "user_fallback_${System.currentTimeMillis()}"
-            }
+            ""
+        }
+
+        return if (resolvedId.isNotBlank()) {
+            resolvedId
+        } else {
+            Log.w(TAG, "User ID not initialized, generating fallback")
+            "user_fallback_${System.currentTimeMillis()}"
         }
     }
     

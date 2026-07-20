@@ -185,6 +185,11 @@ class TelemetryManager private constructor(
             batchSize: Int = 50,
             endpoint: String = "https://edgetelemetry.ncgafrica.com/collector/telemetry"
         ): TelemetryManager {
+            // Validate the API key up-front with user-friendly messages for this simple string API.
+            // Runs before TelemetryConfig construction so callers of the string overload get these
+            // messages rather than the config's internal require() text.
+            require(apiKey.isNotBlank()) { "API key cannot be blank" }
+            require(apiKey.startsWith("edge_")) { "API key is invalid" }
             val config = TelemetryConfig(
                 apiKey = apiKey,
                 endpoint = endpoint,
