@@ -24,7 +24,7 @@ class IdGeneratorTest {
     private lateinit var mockPrefs: SharedPreferences
     private lateinit var mockEditor: SharedPreferences.Editor
 
-    private val idFormatRegex = Regex("""^\d{13}_[a-z0-9]{8}$""")
+    private val idFormatRegex = Regex("""^(device|user|session)_\d+_[0-9a-f]{16}_android$""")
 
     @Before
     fun setup() {
@@ -86,18 +86,18 @@ class IdGeneratorTest {
     @Test
     fun `timestamp is 13 digits`() {
         val id = idGenerator.generateSessionId()
-        val timestamp = id.split("_")[0]
+        val timestamp = id.split("_")[1]
         assertEquals("Timestamp must be 13 digits", 13, timestamp.length)
         assertTrue("Timestamp must be numeric", timestamp.all { it.isDigit() })
     }
 
     @Test
-    fun `random string is 8 characters lowercase alphanumeric`() {
+    fun `random part is 16 lowercase hex characters`() {
         val id = idGenerator.generateSessionId()
-        val randomPart = id.split("_")[1]
-        assertEquals("Random part must be 8 characters", 8, randomPart.length)
-        assertTrue("Random part must be lowercase alphanumeric", 
-            randomPart.all { it in 'a'..'z' || it in '0'..'9' })
+        val randomPart = id.split("_")[2]
+        assertEquals("Random part must be 16 characters", 16, randomPart.length)
+        assertTrue("Random part must be lowercase hex",
+            randomPart.all { it in '0'..'9' || it in 'a'..'f' })
     }
 
     @Test
@@ -352,7 +352,7 @@ class IdGeneratorTest {
     // Test removed - clearUserId() method no longer exists
 
     @Test
-    fun `no prefix in generated IDs`() {
+    fun `kind prefix present per ID type`() {
         `when`(mockPrefs.getString("device_id", null)).thenReturn(null)
         `when`(mockPrefs.getString("edge_rum_user_id", null)).thenReturn(null)
 
@@ -360,13 +360,13 @@ class IdGeneratorTest {
         val userId = idGenerator.getUserId()
         val deviceId = idGenerator.getOrGenerateDeviceId()
 
-        assertFalse("Session ID must not have prefix", sessionId.contains("session"))
-        assertFalse("User ID must not have prefix", userId.contains("user"))
-        assertFalse("Device ID must not have prefix", deviceId.contains("device"))
+        assertTrue("Session ID must start with session_", sessionId.startsWith("session_"))
+        assertTrue("User ID must start with user_", userId.startsWith("user_"))
+        assertTrue("Device ID must start with device_", deviceId.startsWith("device_"))
     }
 
     @Test
-    fun `no suffix in generated IDs`() {
+    fun `android platform suffix present`() {
         `when`(mockPrefs.getString("device_id", null)).thenReturn(null)
         `when`(mockPrefs.getString("edge_rum_user_id", null)).thenReturn(null)
 
@@ -374,26 +374,28 @@ class IdGeneratorTest {
         val userId = idGenerator.getUserId()
         val deviceId = idGenerator.getOrGenerateDeviceId()
 
-        assertFalse("Session ID must not have suffix", sessionId.contains("android"))
-        assertFalse("User ID must not have suffix", userId.contains("android"))
-        assertFalse("Device ID must not have suffix", deviceId.contains("android"))
+        assertTrue("Session ID must end with _android", sessionId.endsWith("_android"))
+        assertTrue("User ID must end with _android", userId.endsWith("_android"))
+        assertTrue("Device ID must end with _android", deviceId.endsWith("_android"))
     }
 
     @Test
-    fun `ID contains exactly one underscore`() {
+    fun `ID contains exactly three underscores`() {
         val id = idGenerator.generateSessionId()
         val underscoreCount = id.count { it == '_' }
-        assertEquals("ID must contain exactly one underscore", 1, underscoreCount)
+        assertEquals("ID must contain exactly three underscores", 3, underscoreCount)
     }
 
     @Test
-    fun `ID parts are in correct order - timestamp first, random second`() {
+    fun `ID parts are in correct order - kind timestamp hex platform`() {
         val id = idGenerator.generateSessionId()
         val parts = id.split("_")
-        
-        assertEquals("ID must have exactly 2 parts", 2, parts.size)
-        assertTrue("First part must be numeric timestamp", parts[0].all { it.isDigit() })
-        assertTrue("Second part must be alphanumeric", parts[1].all { it in 'a'..'z' || it in '0'..'9' })
+
+        assertEquals("ID must have exactly 4 parts", 4, parts.size)
+        assertEquals("First part must be kind", "session", parts[0])
+        assertTrue("Second part must be numeric timestamp", parts[1].all { it.isDigit() })
+        assertTrue("Third part must be lowercase hex", parts[2].all { it in '0'..'9' || it in 'a'..'f' })
+        assertEquals("Fourth part must be platform", "android", parts[3])
     }
 
     @Test
@@ -402,8 +404,8 @@ class IdGeneratorTest {
         val id = idGenerator.generateSessionId()
         val afterGeneration = System.currentTimeMillis()
         
-        val timestamp = id.split("_")[0].toLong()
-        
+        val timestamp = id.split("_")[1].toLong()
+
         assertTrue("Timestamp must be >= time before generation", timestamp >= beforeGeneration)
         assertTrue("Timestamp must be <= time after generation", timestamp <= afterGeneration)
         
@@ -419,7 +421,7 @@ class IdGeneratorTest {
             Thread.sleep(1) // Small delay to ensure different timestamps
         }
         
-        val timestamps = ids.map { it.split("_")[0].toLong() }
+        val timestamps = ids.map { it.split("_")[1].toLong() }
         
         for (i in 1 until timestamps.size) {
             assertTrue(
@@ -567,9 +569,44 @@ class IdGeneratorTest {
         
         (sessionIds + listOf(userId) + deviceIds).forEach { id ->
             assertTrue(
-                "ID must match pattern \\d{13}_[a-z0-9]{8}: $id",
+                "ID must match pattern <kind>_<epochMs>_<16hex>_android: $id",
                 idFormatRegex.matches(id)
             )
         }
+    }
+
+    // --- Migration (#52): preserve persisted legacy IDs, new format only for newly-minted ---
+
+    @Test
+    fun `upgraded install - legacy device and user IDs preserved verbatim`() {
+        val legacyDeviceId = "1736899200000_a3k9zq1m"
+        val legacyUserId = "1736899200000_b7x2mq4p"
+        `when`(mockPrefs.getString("device_id", null)).thenReturn(legacyDeviceId)
+        `when`(mockPrefs.getString("edge_rum_user_id", null)).thenReturn(legacyUserId)
+
+        assertEquals("Legacy device ID must be returned unchanged", legacyDeviceId, idGenerator.getDeviceId())
+        assertEquals("Legacy user ID must be returned unchanged", legacyUserId, idGenerator.getUserId())
+        verify(mockEditor, never()).putString(eq("device_id"), anyString())
+        verify(mockEditor, never()).putString(eq("edge_rum_user_id"), anyString())
+    }
+
+    @Test
+    fun `upgraded install - session ID is still new format`() {
+        // Sessions are never persisted, so an upgraded install still mints new-format session IDs.
+        `when`(mockPrefs.getString("device_id", null)).thenReturn("1736899200000_a3k9zq1m")
+
+        val sessionId = idGenerator.generateSessionId()
+        assertTrue("Session ID must be new format: $sessionId", idFormatRegex.matches(sessionId))
+        assertTrue("Session ID must start with session_", sessionId.startsWith("session_"))
+    }
+
+    @Test
+    fun `fresh install - device user session all mint new format`() {
+        `when`(mockPrefs.getString("device_id", null)).thenReturn(null)
+        `when`(mockPrefs.getString("edge_rum_user_id", null)).thenReturn(null)
+
+        assertTrue(idGenerator.getOrGenerateDeviceId().matches(Regex("""^device_\d+_[0-9a-f]{16}_android$""")))
+        assertTrue(idGenerator.getUserId().matches(Regex("""^user_\d+_[0-9a-f]{16}_android$""")))
+        assertTrue(idGenerator.generateSessionId().matches(Regex("""^session_\d+_[0-9a-f]{16}_android$""")))
     }
 }

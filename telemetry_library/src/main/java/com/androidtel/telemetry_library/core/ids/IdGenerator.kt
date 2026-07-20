@@ -10,9 +10,7 @@ class IdGenerator {
         private const val PREFS_NAME = "edge_telemetry_ids"
         private const val KEY_DEVICE_ID = "device_id"
         private const val KEY_USER_ID = "edge_rum_user_id"
-        private const val CHARS = "abcdefghijklmnopqrstuvwxyz0123456789"
-        private const val RANDOM_LENGTH = 8
-        
+
         private val secureRandom = SecureRandom()
     }
     
@@ -34,7 +32,7 @@ class IdGenerator {
         
         return synchronized(lock) {
             sharedPrefs.getString(KEY_DEVICE_ID, null) ?: run {
-                val deviceId = generateId()
+                val deviceId = generateId("device")
                 sharedPrefs.edit().putString(KEY_DEVICE_ID, deviceId).apply()
                 deviceId
             }
@@ -46,7 +44,7 @@ class IdGenerator {
     }
     
     fun generateSessionId(): String {
-        return generateId()
+        return generateId("session")
     }
     
     fun getUserId(): String {
@@ -54,26 +52,28 @@ class IdGenerator {
         
         return synchronized(lock) {
             sharedPrefs.getString(KEY_USER_ID, null) ?: run {
-                val userId = generateId()
+                val userId = generateId("user")
                 sharedPrefs.edit().putString(KEY_USER_ID, userId).apply()
                 userId
             }
         }
     }
     
-    private fun generateId(): String {
-        val timestamp = System.currentTimeMillis()
-        val randomString = generateRandomString(RANDOM_LENGTH)
-        return "${timestamp}_${randomString}"
+    private fun generateId(kind: String): String {
+        return "${kind}_${System.currentTimeMillis()}_${hex16()}_android"
     }
-    
-    private fun generateRandomString(length: Int): String {
-        val chars = CharArray(length)
+
+    // 16 lowercase hex chars (64 bits) from crypto RNG.
+    private fun hex16(): String {
+        val bytes = ByteArray(8)
         synchronized(secureRandom) {
-            for (i in 0 until length) {
-                chars[i] = CHARS[secureRandom.nextInt(CHARS.length)]
-            }
+            secureRandom.nextBytes(bytes)
         }
-        return String(chars)
+        val sb = StringBuilder(16)
+        for (b in bytes) {
+            sb.append(Character.forDigit((b.toInt() shr 4) and 0xF, 16))
+            sb.append(Character.forDigit(b.toInt() and 0xF, 16))
+        }
+        return sb.toString()
     }
 }
