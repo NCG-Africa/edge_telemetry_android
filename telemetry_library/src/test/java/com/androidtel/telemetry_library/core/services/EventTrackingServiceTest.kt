@@ -298,8 +298,8 @@ class EventTrackingServiceTest {
         assertNotNull(timestamp)
         assertTrue(timestamp.contains("T"))
         assertTrue(timestamp.endsWith("Z"))
-        // Format: yyyy-MM-dd'T'HH:mm:ss'Z'
-        assertTrue(timestamp.matches(Regex("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z")))
+        // Format: yyyy-MM-dd'T'HH:mm:ss.SSS'Z' (TelemetryTime.now emits millis; millis optional)
+        assertTrue(timestamp.matches(Regex("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z")))
     }
 
     @Test

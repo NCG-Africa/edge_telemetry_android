@@ -35,6 +35,7 @@ internal class SessionService(
     
     fun initialize() {
         sessionId = idGenerator.generateSessionId()
+        sessionStartTime = System.currentTimeMillis()
         totalSessions = prefs.getInt("total_sessions", 0) + 1
         prefs.edit().putInt("total_sessions", totalSessions).apply()
         
