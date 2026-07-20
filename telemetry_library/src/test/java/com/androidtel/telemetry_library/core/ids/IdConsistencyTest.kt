@@ -58,7 +58,7 @@ class IdConsistencyTest {
         val sessionId2 = sessionManager.getCurrentSessionId()
         
         assertEquals("SessionManager must return same session ID", sessionId1, sessionId2)
-        assertTrue("Session ID must match format", sessionId1.matches(Regex("""\d{13}_[a-z0-9]{8}""")))
+        assertTrue("Session ID must match format", sessionId1.matches(Regex("""(device|user|session)_\d+_[0-9a-f]{16}_android""")))
     }
 
     @Test
@@ -132,9 +132,9 @@ class IdConsistencyTest {
         val directSessionId = idGenerator.generateSessionId()
         
         assertTrue("SessionManager session ID must match IdGenerator format", 
-            sessionId.matches(Regex("""\d{13}_[a-z0-9]{8}""")))
+            sessionId.matches(Regex("""(device|user|session)_\d+_[0-9a-f]{16}_android""")))
         assertTrue("Direct IdGenerator session ID must match format", 
-            directSessionId.matches(Regex("""\d{13}_[a-z0-9]{8}""")))
+            directSessionId.matches(Regex("""(device|user|session)_\d+_[0-9a-f]{16}_android""")))
     }
 
     @Test
@@ -176,9 +176,9 @@ class IdConsistencyTest {
         
         assertNotEquals("New session must have different ID", sessionId1, sessionId2)
         assertTrue("First session ID must match format", 
-            sessionId1.matches(Regex("""\d{13}_[a-z0-9]{8}""")))
+            sessionId1.matches(Regex("""(device|user|session)_\d+_[0-9a-f]{16}_android""")))
         assertTrue("Second session ID must match format", 
-            sessionId2.matches(Regex("""\d{13}_[a-z0-9]{8}""")))
+            sessionId2.matches(Regex("""(device|user|session)_\d+_[0-9a-f]{16}_android""")))
     }
 
     @Test
@@ -192,7 +192,7 @@ class IdConsistencyTest {
         val deviceId = deviceInfo["device.id"]
         val userId = userProfileManager.getUserId()
         
-        val idFormatRegex = Regex("""\d{13}_[a-z0-9]{8}""")
+        val idFormatRegex = Regex("""(device|user|session)_\d+_[0-9a-f]{16}_android""")
         
         assertTrue("Session ID must match format: $sessionId", idFormatRegex.matches(sessionId))
         assertTrue("Device ID must match format: $deviceId", deviceId?.let { idFormatRegex.matches(it) } ?: false)
@@ -219,7 +219,7 @@ class IdConsistencyTest {
         
         assertNotNull("Session attributes must contain session.id", sessionId)
         assertTrue("Session ID in attributes must match format", 
-            sessionId!!.matches(Regex("""\d{13}_[a-z0-9]{8}""")))
+            sessionId!!.matches(Regex("""(device|user|session)_\d+_[0-9a-f]{16}_android""")))
     }
 
     @Test
@@ -364,7 +364,7 @@ class IdConsistencyTest {
         assertNotNull("Device ID must be generated", deviceId)
         assertNotNull("User ID must be generated", userId)
         
-        val idPattern = Regex("""\d{13}_[a-z0-9]{8}""")
+        val idPattern = Regex("""(device|user|session)_\d+_[0-9a-f]{16}_android""")
         assertTrue("All IDs must come from IdGenerator format", idPattern.matches(sessionId))
         assertTrue("All IDs must come from IdGenerator format", deviceId?.let { idPattern.matches(it) } ?: false)
         assertTrue("All IDs must come from IdGenerator format", idPattern.matches(userId))
@@ -376,7 +376,7 @@ class IdConsistencyTest {
         val userId = idGenerator.getUserId()
         val deviceId = idGenerator.getOrGenerateDeviceId()
         
-        val idPattern = Regex("""\d{13}_[a-z0-9]{8}""")
+        val idPattern = Regex("""(device|user|session)_\d+_[0-9a-f]{16}_android""")
         
         assertTrue("Session ID from IdGenerator must match format", idPattern.matches(sessionId))
         assertTrue("User ID from IdGenerator must match format", idPattern.matches(userId))

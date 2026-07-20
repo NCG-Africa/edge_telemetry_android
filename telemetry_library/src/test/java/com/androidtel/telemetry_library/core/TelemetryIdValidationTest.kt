@@ -242,7 +242,7 @@ class TelemetryIdValidationTest {
 
         // Then: Device ID should be generated and persisted
         assertNotNull("Device ID should be generated", deviceId)
-        assertTrue("Device ID should match format", deviceId.matches(Regex("""\d{13}_[a-z0-9]{8}""")))
+        assertTrue("Device ID should match format", deviceId.matches(Regex("""(device|user|session)_\d+_[0-9a-f]{16}_android""")))
         verify { mockEditor.putString("device_id", any()) }
     }
 
@@ -261,7 +261,7 @@ class TelemetryIdValidationTest {
 
         // Then: User ID should be generated and persisted
         assertNotNull("User ID should be generated", userId)
-        assertTrue("User ID should match format", userId.matches(Regex("""\d{13}_[a-z0-9]{8}""")))
+        assertTrue("User ID should match format", userId.matches(Regex("""(device|user|session)_\d+_[0-9a-f]{16}_android""")))
         verify { mockEditor.putString("edge_rum_user_id", any()) }
     }
 
