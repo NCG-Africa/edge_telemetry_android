@@ -1,6 +1,7 @@
 package com.androidtel.telemetry_library.core.services
 
 import android.util.Log
+import com.androidtel.telemetry_library.core.CountedEventQueue
 import com.androidtel.telemetry_library.core.OfflineBatchStorage
 import com.androidtel.telemetry_library.core.TelemetryConfig
 import com.androidtel.telemetry_library.core.TelemetryHttpClient
@@ -8,10 +9,8 @@ import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.androidtel.telemetry_library.core.models.TelemetryEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.androidtel.telemetry_library.core.TelemetryTime
-import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -71,7 +70,7 @@ internal class BatchProcessingService(
      * required.
      */
     suspend fun sendBatch(
-        eventQueue: ConcurrentLinkedQueue<TelemetryEvent>,
+        eventQueue: CountedEventQueue,
         forceSend: Boolean = false,
         flushOffline: Boolean = true,
         location: String? = null
@@ -80,11 +79,11 @@ internal class BatchProcessingService(
             Log.w(TAG, "Skipping batch send - IDs not properly initialized. Events remain queued (${eventQueue.size} events).")
             return
         }
-        
+
         if (!forceSend && eventQueue.size < config.batchSize) {
             return
         }
-        
+
         val eventsToSend = mutableListOf<TelemetryEvent>()
         repeat(eventQueue.size) {
             val ev = eventQueue.poll()
@@ -114,30 +113,37 @@ internal class BatchProcessingService(
     }
     
     /**
-     * Send stored batches from offline storage.
+     * Replay stored offline batches, oldest-first.
+     *
+     * Throttled to at most [REPLAY_BATCH_LIMIT] envelopes per call and stops on the first failure:
+     * a device offline long enough to fill the store must not fire the whole store back-to-back on
+     * reconnect, and a failure means the collector isn't ready for more. The flush timer paces the
+     * rest across subsequent ticks. Replay goes offline-store → network directly (never back through
+     * the in-memory queue).
      */
     suspend fun sendStoredBatches() {
         Log.i(TAG, "Checking for stored batches to send.")
         val storedBatches = offlineStorage.getStoredBatches()
-        if (storedBatches.isNotEmpty()) {
-            Log.i(TAG, "Found ${storedBatches.size} stored batches. Attempting to send.")
-            storedBatches.forEach { batch ->
-                val result = httpClient.sendBatch(batch)
-                if (result.isSuccess) {
-                    Log.i(TAG, "Successfully re-sent stored batch.")
-                    offlineStorage.removeBatch(batch.id)
-                } else {
-                    Log.e(TAG, "Failed to re-send stored batch. Will try again later.")
-                }
+        if (storedBatches.isEmpty()) return
+
+        Log.i(TAG, "Found ${storedBatches.size} stored batches. Replaying up to $REPLAY_BATCH_LIMIT.")
+        for (batch in storedBatches.take(REPLAY_BATCH_LIMIT)) {
+            val result = httpClient.sendBatch(batch)
+            if (result.isSuccess) {
+                Log.i(TAG, "Successfully re-sent stored batch.")
+                offlineStorage.removeBatch(batch.id)
+            } else {
+                Log.e(TAG, "Stored batch send failed; pausing replay until next flush tick.")
+                return
             }
         }
     }
-    
+
     /**
      * Trigger batch send asynchronously.
      */
     fun triggerBatchSend(
-        eventQueue: ConcurrentLinkedQueue<TelemetryEvent>,
+        eventQueue: CountedEventQueue,
         location: String? = null
     ): Job {
         batchSendJob = scope.launch {
@@ -145,31 +151,11 @@ internal class BatchProcessingService(
         }
         return batchSendJob!!
     }
-    
-    /**
-     * Restore offline batches to event queue
-     */
-    suspend fun restoreOfflineBatches(eventQueue: ConcurrentLinkedQueue<TelemetryEvent>) {
-        try {
-            val batches = offlineStorage.getStoredBatches()
-            batches.forEach { batch ->
-                batch.events.forEach { event ->
-                    eventQueue.offer(event)
-                }
-                offlineStorage.removeBatch(batch.id)
-            }
-            if (batches.isNotEmpty()) {
-                Log.d(TAG, "Restored ${batches.size} batches from offline storage")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error restoring offline buffer", e)
-        }
-    }
-    
+
     /**
      * Flush event queue to offline storage
      */
-    suspend fun flushToOfflineStorage(eventQueue: ConcurrentLinkedQueue<TelemetryEvent>) {
+    suspend fun flushToOfflineStorage(eventQueue: CountedEventQueue) {
         try {
             val eventsToStore = mutableListOf<TelemetryEvent>()
             while (eventQueue.isNotEmpty()) {
@@ -230,5 +216,7 @@ internal class BatchProcessingService(
     
     companion object {
         private const val TAG = "BatchProcessingService"
+        // Oldest envelopes drained per flush tick — caps reconnect burst; timer paces the rest.
+        const val REPLAY_BATCH_LIMIT = 10
     }
 }

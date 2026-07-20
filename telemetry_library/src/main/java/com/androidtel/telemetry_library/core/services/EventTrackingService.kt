@@ -2,6 +2,7 @@ package com.androidtel.telemetry_library.core.services
 
 import android.content.Context
 import android.util.Log
+import com.androidtel.telemetry_library.core.CountedEventQueue
 import com.androidtel.telemetry_library.core.TelemetryConfig
 import com.androidtel.telemetry_library.core.models.AppInfo
 import com.androidtel.telemetry_library.core.models.DeviceInfo
@@ -10,7 +11,6 @@ import com.androidtel.telemetry_library.core.models.TelemetryEvent
 import com.androidtel.telemetry_library.core.models.UserInfo
 import com.androidtel.telemetry_library.core.models.SessionInfo
 import com.androidtel.telemetry_library.core.TelemetryTime
-import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -28,7 +28,7 @@ internal class EventTrackingService(
     private val context: Context,
     private val config: TelemetryConfig
 ) {
-    private val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
+    private val eventQueue = CountedEventQueue()
     private val eventCount = AtomicInteger(0)
     private val metricCount = AtomicInteger(0)
     
@@ -62,7 +62,7 @@ internal class EventTrackingService(
             )
         }
         
-        event?.let { eventQueue.add(it) }
+        event?.let { eventQueue.enqueue(it) }
         return event
     }
     
@@ -88,7 +88,7 @@ internal class EventTrackingService(
             )
         }
         
-        event?.let { eventQueue.add(it) }
+        event?.let { eventQueue.enqueue(it) }
         return event
     }
     
@@ -144,7 +144,7 @@ internal class EventTrackingService(
     /**
      * Get event queue for batch processing
      */
-    fun getEventQueue(): ConcurrentLinkedQueue<TelemetryEvent> = eventQueue
+    fun getEventQueue(): CountedEventQueue = eventQueue
     
     /**
      * Get current event count

@@ -20,7 +20,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import java.lang.reflect.Field
-import java.util.concurrent.ConcurrentLinkedQueue
+import com.androidtel.telemetry_library.core.CountedEventQueue
 
 /**
  * Test suite to verify that telemetry data is ONLY sent when device ID and user ID
@@ -112,8 +112,8 @@ class TelemetryIdValidationTest {
         )
         // Note: setIdsInitialized(true) is deliberately NOT called.
 
-        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
-        eventQueue.add(mockk(relaxed = true))
+        val eventQueue = CountedEventQueue()
+        eventQueue.enqueue(mockk(relaxed = true))
 
         // When: a send is forced while IDs are not initialized
         service.sendBatch(eventQueue, forceSend = true, flushOffline = false)

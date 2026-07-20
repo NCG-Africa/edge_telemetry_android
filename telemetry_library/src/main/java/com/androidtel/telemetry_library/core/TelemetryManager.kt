@@ -291,7 +291,11 @@ class TelemetryManager private constructor(
             // Timed flush force-sends partial batches so a low-activity session doesn't hold
             // telemetry indefinitely. Empty queue no-ops inside sendBatch (no heartbeat traffic).
             batchProcessingService.initialize(onFlush = {
-                scope.launch { sendBatch(forceSend = true) }
+                scope.launch {
+                    sendBatch(forceSend = true)
+                    // Replay offline-stored envelopes, throttled per tick (offline-store → network).
+                    sendStoredBatches()
+                }
             })
             Log.d("TelemetryManager", "Step 8: BatchProcessingService initialized")
             
@@ -402,12 +406,9 @@ class TelemetryManager private constructor(
 
         Log.i("TelemetryManager", "App moved to foreground")
 
-        // 1. Restore offline buffer back into in-memory event queue
-        scope.launch {
-            batchProcessingService.restoreOfflineBatches(eventTrackingService.getEventQueue())
-        }
-
-        // 2. Check session timeout and start new session if needed
+        // 1. Check session timeout and start new session if needed
+        // (Offline-stored envelopes replay via the flush tick — see sendStoredBatches — not by
+        //  restoring them into the in-memory queue, which would re-batch and evict live events.)
         if (sessionService.hasSessionTimedOut()) {
             val lastActive = sessionService.getLastActiveTimestamp()
             if (lastActive > 0) {
@@ -425,10 +426,10 @@ class TelemetryManager private constructor(
             Log.i("TelemetryManager", "Resuming existing session (elapsed: ${elapsed}ms)")
         }
         
-        // 3. Resume the flush timer
+        // 2. Resume the flush timer
         batchProcessingService.resumeFlushTimer()
 
-        // 4. Sample memory on each foreground transition — bounded by user-engagement cadence
+        // 3. Sample memory on each foreground transition — bounded by user-engagement cadence
         sampleMemoryUsage()
     }
 
@@ -530,7 +531,7 @@ class TelemetryManager private constructor(
         crashReportingService.recordCrash(
             throwable = throwable,
             buildAttributesFn = { attrs -> buildAttributes(attrs) },
-            onEventCreated = { event -> eventTrackingService.getEventQueue().add(event) }
+            onEventCreated = { event -> eventTrackingService.getEventQueue().enqueue(event) }
         )
     }
 
