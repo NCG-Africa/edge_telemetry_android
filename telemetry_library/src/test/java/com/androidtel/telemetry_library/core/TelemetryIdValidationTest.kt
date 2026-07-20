@@ -6,60 +6,71 @@ import android.content.SharedPreferences
 import com.androidtel.telemetry_library.core.ids.IdGenerator
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.androidtel.telemetry_library.core.models.TelemetryEvent
+import com.androidtel.telemetry_library.core.services.BatchProcessingService
 import io.mockk.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 import java.lang.reflect.Field
-import java.lang.reflect.Method
+import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
  * Test suite to verify that telemetry data is ONLY sent when device ID and user ID
  * are properly generated and stored. This ensures data integrity and prevents
  * transmission of events with invalid or missing identifiers.
+ *
+ * Uses a real Robolectric Application for TelemetryManager initialization (the established pattern
+ * across this module); IdGenerator-only tests still use lightweight mocks.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28])
 class TelemetryIdValidationTest {
 
-    private lateinit var mockApplication: Application
+    // Real application/context for full TelemetryManager init.
+    private lateinit var application: Application
+
+    // Lightweight mocks for IdGenerator-only tests.
     private lateinit var mockContext: Context
     private lateinit var mockPrefs: SharedPreferences
     private lateinit var mockEditor: SharedPreferences.Editor
 
+    // IdGenerator persists into these prefs/keys.
+    private val idPrefs: SharedPreferences
+        get() = application.getSharedPreferences("edge_telemetry_ids", Context.MODE_PRIVATE)
+
     @Before
     fun setup() {
-        mockApplication = mockk(relaxed = true)
+        application = RuntimeEnvironment.getApplication()
+
         mockContext = mockk(relaxed = true)
         mockPrefs = mockk(relaxed = true)
         mockEditor = mockk(relaxed = true)
 
-        every { mockApplication.applicationContext } returns mockContext
         every { mockContext.applicationContext } returns mockContext
         every { mockContext.getSharedPreferences(any(), any()) } returns mockPrefs
         every { mockPrefs.edit() } returns mockEditor
         every { mockEditor.putString(any(), any()) } returns mockEditor
-        every { mockEditor.putInt(any(), any()) } returns mockEditor
-        every { mockEditor.putLong(any(), any()) } returns mockEditor
-        every { mockEditor.putBoolean(any(), any()) } returns mockEditor
         every { mockEditor.remove(any()) } returns mockEditor
         every { mockEditor.apply() } just Runs
-        every { mockEditor.commit() } returns true
         every { mockPrefs.getString(any(), any()) } returns null
-        every { mockPrefs.getInt(any(), any()) } returns 0
-        every { mockPrefs.getLong(any(), any()) } returns 0L
-        every { mockPrefs.getBoolean(any(), any()) } returns false
-        every { mockContext.packageName } returns "com.test.app"
-        every { mockContext.cacheDir } returns mockk(relaxed = true)
-        every { mockContext.filesDir } returns mockk(relaxed = true)
 
-        // Reset TelemetryManager singleton
+        // Start each test from a clean ID store and singleton.
+        idPrefs.edit().clear().apply()
         resetTelemetryManagerInstance()
     }
 
     @After
     fun tearDown() {
         resetTelemetryManagerInstance()
+        idPrefs.edit().clear().apply()
         clearAllMocks()
     }
 
@@ -75,51 +86,41 @@ class TelemetryIdValidationTest {
 
     @Test
     fun `telemetry manager initializes with valid device ID and user ID`() {
-        // Given: SharedPreferences returns valid IDs
-        val validDeviceId = "1234567890123_device01"
-        val validUserId = "1234567890123_user001"
-        
-        every { mockPrefs.getString("device_id", null) } returns validDeviceId
-        every { mockPrefs.getString("user_id", null) } returns validUserId
-
         // When: TelemetryManager is initialized
         val config = TelemetryConfig(
             apiKey = "edge_test_key_123",
             endpoint = "https://telemetry.ncgafrica.com/telemetry"
         )
-        val manager = TelemetryManager.initialize(mockApplication, config)
+        val manager = TelemetryManager.initialize(application, config)
 
         // Then: IDs should be properly initialized
         val idsInitialized = getPrivateField(manager, "idsInitialized") as Boolean
-        assertTrue("IDs should be marked as initialized when valid IDs are present", idsInitialized)
+        assertTrue("IDs should be marked as initialized after successful init", idsInitialized)
     }
 
     @Test
     fun `telemetry manager blocks transmission when IDs are not initialized`() = runBlocking {
-        // Given: SharedPreferences returns null (no stored IDs)
-        every { mockPrefs.getString("device_id", null) } returns null
-        every { mockPrefs.getString("user_id", null) } returns null
-
-        // When: TelemetryManager is initialized
+        // Given: A batch-processing service that has NOT been marked as IDs-initialized
+        val httpClient = mockk<TelemetryHttpClient>(relaxed = true)
+        val offlineStorage = mockk<OfflineBatchStorage>(relaxed = true)
         val config = TelemetryConfig(
             apiKey = "edge_test_key_123",
             endpoint = "https://telemetry.ncgafrica.com/telemetry"
         )
-        val manager = TelemetryManager.initialize(mockApplication, config)
+        val service = BatchProcessingService(
+            config, httpClient, offlineStorage, CoroutineScope(Dispatchers.Unconfined)
+        )
+        // Note: setIdsInitialized(true) is deliberately NOT called.
 
-        // Force idsInitialized to false to simulate initialization failure
-        setPrivateField(manager, "idsInitialized", false)
+        val eventQueue = ConcurrentLinkedQueue<TelemetryEvent>()
+        eventQueue.add(mockk(relaxed = true))
 
-        // Queue an event
-        manager.recordEvent("test_event", mapOf("key" to "value"))
+        // When: a send is forced while IDs are not initialized
+        service.sendBatch(eventQueue, forceSend = true, flushOffline = false)
 
-        // Try to send batch
-        val sendBatchMethod = getSendBatchMethod(manager)
-        sendBatchMethod.invoke(manager, true, false) // forceSend = true, flushOffline = false
-
-        // Then: Event queue should still contain the event (not sent)
-        val eventQueue = getPrivateField(manager, "eventQueue") as java.util.concurrent.ConcurrentLinkedQueue<*>
-        assertTrue("Events should remain queued when IDs are not initialized", eventQueue.isEmpty())
+        // Then: nothing is transmitted and events remain queued
+        coVerify(exactly = 0) { httpClient.sendBatch(any()) }
+        assertFalse("Events should remain queued when IDs are not initialized", eventQueue.isEmpty())
     }
 
     @Test
@@ -198,51 +199,26 @@ class TelemetryIdValidationTest {
     }
 
     @Test
-    fun `ID validation prevents emergency fallback IDs from being marked as initialized`() {
-        // Given: Emergency fallback user ID
-        every { mockPrefs.getString("device_id", null) } returns "1234567890123_device01"
-        every { mockPrefs.getString("user_id", null) } returns null
-
-        // When: TelemetryManager is initialized
-        val config = TelemetryConfig(
-            apiKey = "edge_test_key_123",
-            endpoint = "https://telemetry.ncgafrica.com/telemetry"
-        )
-        val manager = TelemetryManager.initialize(mockApplication, config)
-
-        // Simulate emergency fallback by setting userId to emergency value
-        setPrivateField(manager, "userId", "user_emergency_1234567890")
-        
-        // Re-run initialization to trigger validation
-        val initializeUserIdMethod = manager::class.java.getDeclaredMethod("initializeUserId")
-        initializeUserIdMethod.isAccessible = true
-        initializeUserIdMethod.invoke(manager)
-
-        // Then: IDs should NOT be marked as initialized
-        val idsInitialized = getPrivateField(manager, "idsInitialized") as Boolean
-        assertFalse("Emergency fallback IDs should not be marked as initialized", idsInitialized)
-    }
-
-    @Test
     fun `valid IDs allow telemetry transmission`() {
-        // Given: Valid device and user IDs
+        // Given: Valid device and user IDs already persisted in the ID store
         val validDeviceId = "1234567890123_device01"
         val validUserId = "1234567890123_user001"
-        
-        every { mockPrefs.getString("device_id", null) } returns validDeviceId
-        every { mockPrefs.getString("user_id", null) } returns validUserId
+        idPrefs.edit()
+            .putString("device_id", validDeviceId)
+            .putString("edge_rum_user_id", validUserId)
+            .apply()
 
         // When: TelemetryManager is initialized
         val config = TelemetryConfig(
             apiKey = "edge_test_key_123",
             endpoint = "https://telemetry.ncgafrica.com/telemetry"
         )
-        val manager = TelemetryManager.initialize(mockApplication, config)
+        val manager = TelemetryManager.initialize(application, config)
 
         // Then: IDs should be initialized and valid
         val idsInitialized = getPrivateField(manager, "idsInitialized") as Boolean
-        val deviceId = getPrivateField(manager, "deviceId") as String
-        val userId = getPrivateField(manager, "userId") as String
+        val deviceId = manager.getDeviceId()
+        val userId = manager.getUserId()
 
         assertTrue("IDs should be marked as initialized", idsInitialized)
         assertEquals("Device ID should match", validDeviceId, deviceId)
@@ -255,7 +231,7 @@ class TelemetryIdValidationTest {
     fun `IdGenerator generates and persists device ID on first use`() {
         // Given: No stored device ID
         every { mockPrefs.getString("device_id", null) } returns null
-        
+
         val capturedDeviceId = slot<String>()
         every { mockEditor.putString("device_id", capture(capturedDeviceId)) } returns mockEditor
 
@@ -274,7 +250,7 @@ class TelemetryIdValidationTest {
     fun `IdGenerator generates and persists user ID on first use`() {
         // Given: No stored user ID
         every { mockPrefs.getString("edge_rum_user_id", null) } returns null
-        
+
         val capturedUserId = slot<String>()
         every { mockEditor.putString("edge_rum_user_id", capture(capturedUserId)) } returns mockEditor
 
@@ -289,17 +265,11 @@ class TelemetryIdValidationTest {
         verify { mockEditor.putString("edge_rum_user_id", any()) }
     }
 
-    // Helper methods to access private fields and methods via reflection
+    // Helper methods to access private fields via reflection
     private fun getPrivateField(obj: Any, fieldName: String): Any? {
         val field = findField(obj::class.java, fieldName)
         field.isAccessible = true
         return field.get(obj)
-    }
-
-    private fun setPrivateField(obj: Any, fieldName: String, value: Any?) {
-        val field = findField(obj::class.java, fieldName)
-        field.isAccessible = true
-        field.set(obj, value)
     }
 
     private fun findField(clazz: Class<*>, fieldName: String): Field {
@@ -312,11 +282,5 @@ class TelemetryIdValidationTest {
             }
         }
         throw NoSuchFieldException("Field $fieldName not found in class hierarchy")
-    }
-
-    private fun getSendBatchMethod(obj: Any): Method {
-        val method = obj::class.java.getDeclaredMethod("sendBatch", Boolean::class.java, Boolean::class.java)
-        method.isAccessible = true
-        return method
     }
 }

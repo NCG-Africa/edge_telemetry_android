@@ -48,6 +48,16 @@ class CrashRetryManager(
         // Shared circuit breaker state across all instances
         private val isRateLimited = AtomicBoolean(false)
         private val rateLimitUntil = AtomicLong(0L)
+
+        /**
+         * Resets the process-wide circuit breaker. Only for tests — the breaker is intentionally
+         * static (a backend 429 should back off every instance), so tests must reset it between
+         * cases or a 429 in one test suppresses HTTP sends in the next for [RATE_LIMIT_COOLDOWN_MS].
+         */
+        internal fun resetCircuitBreakerForTesting() {
+            isRateLimited.set(false)
+            rateLimitUntil.set(0L)
+        }
     }
     
     private val gson = Gson()

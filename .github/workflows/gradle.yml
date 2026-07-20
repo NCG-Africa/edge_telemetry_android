@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20   # safety net: kill a hung build fast instead of burning the default 6h
 
     steps:
       - name: Checkout repository

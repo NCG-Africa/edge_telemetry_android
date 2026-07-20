@@ -9,6 +9,7 @@ import com.androidtel.telemetry_library.core.session.SessionManager
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * SessionService - Handles session lifecycle and tracking
@@ -31,7 +32,7 @@ internal class SessionService(
     private lateinit var sessionId: String
     private var sessionStartTime = System.currentTimeMillis()
     private var totalSessions: Int = 0
-    private val visitedScreens: MutableSet<String> = mutableSetOf()
+    private val visitedScreens: MutableSet<String> = ConcurrentHashMap.newKeySet()
     
     private var enhancedSessionManager: SessionManager? = null
     

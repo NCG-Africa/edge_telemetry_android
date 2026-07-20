@@ -12,7 +12,8 @@ class IpLocationProvider(
     private val httpClient: OkHttpClient,
     private val apiEndpoint: String = "https://ipinfo.io/json",
     private val cacheDuration: Long = 3600000,
-    private val fallbackToIp: Boolean = true
+    private val fallbackToIp: Boolean = true,
+    private val ipEchoEndpoint: String = IP_ECHO_SERVICE
 ) : LocationProvider {
     
     companion object {
@@ -95,7 +96,7 @@ class IpLocationProvider(
     private suspend fun getIpAddressFallback(): String {
         return try {
             val request = Request.Builder()
-                .url(IP_ECHO_SERVICE)
+                .url(ipEchoEndpoint)
                 .get()
                 .build()
             

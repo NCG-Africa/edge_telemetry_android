@@ -19,7 +19,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.math.pow
-import kotlin.random.Random
+import java.util.concurrent.ThreadLocalRandom
 
 // Custom exceptions for clearer error handling.
 class ClientException(code: Int, message: String) : IOException("Client error $code: $message")
@@ -110,7 +110,7 @@ class TelemetryHttpClient(
     // Calculates the backoff delay with jitter.
     private fun calculateBackoffDelay(attempt: Int): Long {
         val baseDelay = 1000L // 1 second
-        return baseDelay * (2.0.pow(attempt).toLong()) + Random.nextLong(0, 1000)
+        return baseDelay * (2.0.pow(attempt).toLong()) + ThreadLocalRandom.current().nextLong(0, 1000)
     }
 
     // Performs the actual HTTP request.

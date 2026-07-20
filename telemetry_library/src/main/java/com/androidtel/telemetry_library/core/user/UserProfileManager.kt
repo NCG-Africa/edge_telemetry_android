@@ -96,6 +96,7 @@ class UserProfileManager(
     fun getUserAttributes(): Map<String, String> {
         return lock.read {
             buildMap {
+                put("user.id", idGenerator.getUserId())
                 currentProfile.name?.let { put("user_display_name", it) }
                 currentProfile.email?.let { put("user_email", it) }
                 currentProfile.phone?.let { put("user_phone", it) }

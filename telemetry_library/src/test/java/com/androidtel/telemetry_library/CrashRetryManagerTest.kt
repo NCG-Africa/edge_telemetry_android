@@ -7,6 +7,7 @@ import io.mockk.unmockkAll
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -27,6 +28,8 @@ class CrashRetryManagerTest {
 
     @Before
     fun setUp() {
+        // Circuit breaker is static/shared; reset it so a 429 in one test can't suppress the next.
+        CrashRetryManager.resetCircuitBreakerForTesting()
         context = RuntimeEnvironment.getApplication()
         mockWebServer = MockWebServer()
         mockWebServer.start()
@@ -53,7 +56,7 @@ class CrashRetryManagerTest {
         val crashData = createTestCrashData()
         crashRetryManager.sendCrashWithRetry(crashData)
 
-        val request = mockWebServer.takeRequest()
+        val request = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
         assertEquals(testApiKey, request.getHeader("X-API-Key"))
     }
 
@@ -64,7 +67,7 @@ class CrashRetryManagerTest {
         val crashData = createTestCrashData()
         crashRetryManager.sendCrashWithRetry(crashData)
 
-        val request = mockWebServer.takeRequest()
+        val request = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
         assertNotNull(request.getHeader("User-Agent"))
         assertTrue(request.getHeader("User-Agent")?.contains("EdgeTelemetryAndroid") == true)
     }
@@ -76,8 +79,9 @@ class CrashRetryManagerTest {
         val crashData = createTestCrashData()
         crashRetryManager.sendCrashWithRetry(crashData)
 
-        val request = mockWebServer.takeRequest()
-        assertEquals("application/json", request.getHeader("Content-Type"))
+        val request = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
+        // OkHttp's String.toRequestBody appends "; charset=utf-8" — match the media type, not the exact string.
+        assertTrue(request.getHeader("Content-Type")?.startsWith("application/json") == true)
     }
 
     @Test
@@ -87,7 +91,7 @@ class CrashRetryManagerTest {
         val crashData = createTestCrashData()
         crashRetryManager.sendCrashWithRetry(crashData)
 
-        val request = mockWebServer.takeRequest()
+        val request = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
         assertEquals("POST", request.method)
     }
 
@@ -132,7 +136,7 @@ class CrashRetryManagerTest {
         val crashData = createTestCrashData()
         crashRetryManager.sendCrashWithRetry(crashData)
 
-        val request = mockWebServer.takeRequest()
+        val request = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
         val apiKeyHeader = request.getHeader("X-API-Key")
         
         assertEquals(testApiKey, apiKeyHeader)
@@ -154,7 +158,7 @@ class CrashRetryManagerTest {
         val crashData = createTestCrashData()
         customManager.sendCrashWithRetry(crashData)
 
-        val request = mockWebServer.takeRequest()
+        val request = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
         assertEquals(customApiKey, request.getHeader("X-API-Key"))
     }
 
@@ -165,7 +169,7 @@ class CrashRetryManagerTest {
         val crashData = createTestCrashData()
         crashRetryManager.sendCrashWithRetry(crashData)
 
-        val request = mockWebServer.takeRequest()
+        val request = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
         val body = request.body.readUtf8()
         
         assertNotNull(body)
@@ -181,7 +185,7 @@ class CrashRetryManagerTest {
         val crashData = createTestCrashData()
         crashRetryManager.sendCrashWithRetry(crashData)
 
-        val request = mockWebServer.takeRequest()
+        val request = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
         
         assertNotNull(request.getHeader("X-API-Key"))
         assertNotNull(request.getHeader("Content-Type"))
@@ -199,13 +203,13 @@ class CrashRetryManagerTest {
         crashRetryManager.sendCrashWithRetry(crashData)
 
         // Clear previous requests
-        repeat(3) { mockWebServer.takeRequest() }
+        repeat(3) { mockWebServer.takeRequest(5, TimeUnit.SECONDS) }
 
         // Now retry offline crashes
         mockWebServer.enqueue(MockResponse().setResponseCode(200))
         crashRetryManager.retryOfflineCrashes()
 
-        val retryRequest = mockWebServer.takeRequest()
+        val retryRequest = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
         assertEquals(testApiKey, retryRequest.getHeader("X-API-Key"))
     }
 
@@ -216,7 +220,7 @@ class CrashRetryManagerTest {
         val crashData = createTestCrashData()
         crashRetryManager.sendCrashWithRetry(crashData)
 
-        val request = mockWebServer.takeRequest()
+        val request = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
         assertTrue(request.path?.contains("/telemetry") == true)
     }
 
@@ -235,7 +239,7 @@ class CrashRetryManagerTest {
         val crashData = createTestCrashData()
         customManager.sendCrashWithRetry(crashData)
 
-        val request = mockWebServer.takeRequest()
+        val request = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
         assertTrue(request.path?.contains("/custom/crash/endpoint") == true)
     }
 
@@ -255,7 +259,7 @@ class CrashRetryManagerTest {
 
         crashRetryManager.sendCrashWithRetry(crashData)
 
-        val request = mockWebServer.takeRequest()
+        val request = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
         val body = request.body.readUtf8()
         
         assertTrue(body.contains("\"type\":\"crash\""))

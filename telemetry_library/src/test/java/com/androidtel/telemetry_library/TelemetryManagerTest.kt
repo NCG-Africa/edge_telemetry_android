@@ -3,32 +3,31 @@ package com.androidtel.telemetry_library
 import android.app.Application
 import com.androidtel.telemetry_library.core.TelemetryConfig
 import com.androidtel.telemetry_library.core.TelemetryManager
-import io.mockk.mockk
-import io.mockk.unmockkAll
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28], manifest = Config.NONE)
+@Config(sdk = [28])
 class TelemetryManagerTest {
 
-    private lateinit var mockApplication: Application
+    private lateinit var application: Application
 
     @Before
     fun setUp() {
-        mockApplication = mockk(relaxed = true)
+        // Use a real Robolectric Application so the full initialization sequence can run.
+        application = RuntimeEnvironment.getApplication()
         // Reset singleton instance before each test
         TelemetryManager.resetForTesting()
     }
 
     @After
     fun tearDown() {
-        unmockkAll()
         TelemetryManager.resetForTesting()
     }
 
@@ -36,7 +35,7 @@ class TelemetryManagerTest {
     fun `initialize with blank API key throws IllegalArgumentException`() {
         val exception = assertThrows(IllegalArgumentException::class.java) {
             TelemetryManager.initialize(
-                application = mockApplication,
+                application = application,
                 apiKey = ""
             )
         }
@@ -47,7 +46,7 @@ class TelemetryManagerTest {
     fun `initialize with whitespace-only API key throws IllegalArgumentException`() {
         val exception = assertThrows(IllegalArgumentException::class.java) {
             TelemetryManager.initialize(
-                application = mockApplication,
+                application = application,
                 apiKey = "   "
             )
         }
@@ -58,7 +57,7 @@ class TelemetryManagerTest {
     fun `initialize with invalid API key format throws IllegalArgumentException`() {
         val exception = assertThrows(IllegalArgumentException::class.java) {
             TelemetryManager.initialize(
-                application = mockApplication,
+                application = application,
                 apiKey = "invalid_key_format"
             )
         }
@@ -69,7 +68,7 @@ class TelemetryManagerTest {
     fun `initialize with API key not starting with edge_ throws IllegalArgumentException`() {
         val exception = assertThrows(IllegalArgumentException::class.java) {
             TelemetryManager.initialize(
-                application = mockApplication,
+                application = application,
                 apiKey = "api_key_12345"
             )
         }
@@ -79,7 +78,7 @@ class TelemetryManagerTest {
     @Test
     fun `initialize with valid API key succeeds`() {
         val manager = TelemetryManager.initialize(
-            application = mockApplication,
+            application = application,
             apiKey = "edge_valid_api_key_12345"
         )
         assertNotNull(manager)
@@ -115,18 +114,18 @@ class TelemetryManagerTest {
             batchSize = 50
         )
 
-        val manager = TelemetryManager.initialize(mockApplication, config)
+        val manager = TelemetryManager.initialize(application, config)
         assertNotNull(manager)
     }
 
     @Test
     fun `singleton instance is maintained across multiple initialize calls`() {
         val manager1 = TelemetryManager.initialize(
-            application = mockApplication,
+            application = application,
             apiKey = "edge_test_key_1"
         )
         val manager2 = TelemetryManager.initialize(
-            application = mockApplication,
+            application = application,
             apiKey = "edge_test_key_2"
         )
         assertSame(manager1, manager2)
@@ -136,7 +135,7 @@ class TelemetryManagerTest {
     fun `API key validation happens before any initialization`() {
         try {
             TelemetryManager.initialize(
-                application = mockApplication,
+                application = application,
                 apiKey = ""
             )
             fail("Expected IllegalArgumentException to be thrown")
@@ -149,7 +148,7 @@ class TelemetryManagerTest {
     fun `error message is helpful for blank API key`() {
         val exception = assertThrows(IllegalArgumentException::class.java) {
             TelemetryManager.initialize(
-                application = mockApplication,
+                application = application,
                 apiKey = ""
             )
         }
@@ -161,7 +160,7 @@ class TelemetryManagerTest {
     fun `error message is helpful for invalid API key format`() {
         val exception = assertThrows(IllegalArgumentException::class.java) {
             TelemetryManager.initialize(
-                application = mockApplication,
+                application = application,
                 apiKey = "wrong_prefix_key"
             )
         }
@@ -172,7 +171,7 @@ class TelemetryManagerTest {
     @Test
     fun `existing valid initializations continue to work`() {
         val manager = TelemetryManager.initialize(
-            application = mockApplication,
+            application = application,
             apiKey = "edge_valid_key_abc123",
             batchSize = 30
         )
@@ -182,7 +181,7 @@ class TelemetryManagerTest {
     @Test
     fun `API key with edge_ prefix and special characters is valid`() {
         val manager = TelemetryManager.initialize(
-            application = mockApplication,
+            application = application,
             apiKey = "edge_key-with_special.chars123"
         )
         assertNotNull(manager)
@@ -191,7 +190,7 @@ class TelemetryManagerTest {
     @Test
     fun `API key with only edge_ prefix is valid`() {
         val manager = TelemetryManager.initialize(
-            application = mockApplication,
+            application = application,
             apiKey = "edge_"
         )
         assertNotNull(manager)
