@@ -111,7 +111,6 @@ These features work out of the box after `TelemetryManager.initialize()`:
 | Feature | Config flag |
 |---|---|
 | Location tracking | `enableLocationTracking = true` |
-| Legacy screen events | `enableLegacyScreenEvents = true` |
 
 ## Key APIs for Developers
 

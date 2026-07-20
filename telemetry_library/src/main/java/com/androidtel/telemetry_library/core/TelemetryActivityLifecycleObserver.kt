@@ -62,22 +62,10 @@ class TelemetryActivityLifecycleObserver(
         val screenName = getScreenName(activity)
         Log.d("TelemetryObserver", "Activity Paused: $screenName")
 
-        // Stop performance tracking to prevent memory leaks
+        // Stop performance tracking to prevent memory leaks. Do NOT end screen timing here:
+        // onActivityStopped owns endScreen so screen.duration (with exit_method) fires on the
+        // pause→stop flow instead of being starved by a pause-path screen_view (issue #53, Part 2).
         performanceTracker.stop()
-
-        // End timing and emit screen_view event
-        val durationMs = screenTimingTracker.endScreen(screenName)
-        if (durationMs != null) {
-            telemetryManager.recordEvent(
-                eventName = "screen_view",
-                attributes = mapOf(
-                    "screen_name" to screenName,
-                    "duration_ms" to durationMs,
-                    "session_id" to telemetryManager.getSessionId(),
-                    "timestamp" to TelemetryTime.now()
-                )
-            )
-        }
     }
 
     override fun onActivityStopped(activity: Activity) {
