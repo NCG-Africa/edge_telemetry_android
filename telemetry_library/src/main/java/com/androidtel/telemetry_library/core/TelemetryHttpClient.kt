@@ -7,7 +7,6 @@ import com.androidtel.telemetry_library.core.models.EventAttributes
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.androidtel.telemetry_library.core.models.TelemetryDataOut
 import com.androidtel.telemetry_library.core.models.TelemetryEventOut
-import com.androidtel.telemetry_library.core.models.TelemetryPayload
 import com.google.gson.Gson
 import kotlinx.coroutines.delay
 import okhttp3.MediaType.Companion.toMediaType
@@ -121,31 +120,17 @@ class TelemetryHttpClient(
             .addHeader("Content-Type", "application/json")
             .addHeader("User-Agent", "EdgeTelemetryAndroid/${BuildConfig.SDK_VERSION}")
             .addHeader("X-API-Key", apiKey)
-            .addHeader("X-SDK-Version", BuildConfig.SDK_VERSION)
-            .addHeader("X-SDK-Platform", "android")
             .build()
         return okHttpClient.newCall(request).execute()
     }
 
 
     // --- Extension: Convert Batch -> Outgoing JSON ---
+    // Serializes the single unified `telemetry_batch` envelope (issue #48). device.id lives per
+    // event in `attributes` (guarded in flattenAttributes); no top-level device_id/location.
     fun TelemetryBatch.toJson(): String {
-        // Extract device_id from the first event's attributes
-        val deviceId = this.events.firstOrNull()?.attributes?.device?.deviceId
-        
-        // CRITICAL: device_id must NEVER be null or empty
-        // This should never happen due to validation in TelemetryManager.sendBatch()
-        if (deviceId.isNullOrBlank()) {
-            throw IllegalStateException(
-                "CRITICAL ERROR: device_id is null or empty in telemetry batch. " +
-                "This indicates IDs were not properly validated before sending."
-            )
-        }
-        
-        val safeDeviceId = deviceId
-        
         val out = TelemetryDataOut(
-            type = "batch",
+            type = "telemetry_batch",
             events = this.events.map { event ->
                 TelemetryEventOut(
                     type = event.type,
@@ -157,18 +142,18 @@ class TelemetryHttpClient(
                 )
             },
             batch_size = this.batchSize,
-            timestamp = this.timestamp,
-            device_id = safeDeviceId,
-            location = this.location
+            timestamp = this.timestamp
         )
-        
-        // Send TelemetryDataOut directly (no wrapper) to match backend's expected format
         return Gson().toJson(out)
     }
 
     // ---- Helper: Flatten attributes into map ----
     private fun flattenAttributes(attrs: EventAttributes): Map<String, Any?> {
         val flat = mutableMapOf<String, Any?>()
+
+        // SDK identity — required common attrs on every event (issue #48). Replaces the X-SDK-* headers.
+        flat["sdk.version"] = BuildConfig.SDK_VERSION
+        flat["sdk.platform"] = "android"
 
         // App
         flat["app.name"] = attrs.app.appName

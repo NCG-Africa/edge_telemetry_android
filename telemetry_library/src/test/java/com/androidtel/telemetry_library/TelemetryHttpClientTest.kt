@@ -190,7 +190,7 @@ class TelemetryHttpClientTest {
         
         assertNotNull(body)
         assertTrue(body.isNotEmpty())
-        assertTrue(body.contains("\"device_id\""))
+        assertTrue(body.contains("\"type\":\"telemetry_batch\""))
         assertTrue(body.contains("\"timestamp\""))
     }
 

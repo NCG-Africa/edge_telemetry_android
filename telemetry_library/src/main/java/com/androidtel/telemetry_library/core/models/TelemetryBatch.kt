@@ -12,13 +12,14 @@ data class TelemetryPayload(
     fun toJson(): String = Gson().toJson(this)
 }
 
+// Unified wire envelope (issue #48). Top-level is exactly {type, timestamp, batch_size, events}.
+// device_id/location/tenant_id/data-wrapper are gone: device.id is a per-event attr, geo is
+// collector-derived, tenant is identified server-side by X-API-Key.
 data class TelemetryDataOut(
-    val type: String = "batch",
+    val type: String = "telemetry_batch",
     val events: List<TelemetryEventOut>,
     val batch_size: Int,
-    val timestamp: String,
-    val device_id: String,
-    val location: String? = null
+    val timestamp: String
 )
 
 // ---- Flattened Event ----

@@ -92,43 +92,6 @@ class LocationIntegrationTest {
     }
 
     @Test
-    fun `location is included in telemetry batch payload`() = runBlocking {
-        val jsonResponse = """
-            {
-                "ip": "105.163.0.47",
-                "city": "Mombasa",
-                "country": "Kenya"
-            }
-        """.trimIndent()
-        
-        mockWebServer.enqueue(MockResponse()
-            .setResponseCode(200)
-            .setBody(jsonResponse))
-
-        locationProvider = IpLocationProvider(
-            httpClient = httpClient,
-            apiEndpoint = mockWebServer.url("/json").toString(),
-            cacheDuration = 3600000,
-            fallbackToIp = true
-        )
-
-        val location = locationProvider.getLocation()
-        val batch = createTestTelemetryBatch()
-        
-        val telemetryDataOut = TelemetryDataOut(
-            type = "batch",
-            device_id = "test_device_123",
-            events = batch.events.map { convertToTelemetryEventOut(it) },
-            batch_size = batch.batchSize,
-            timestamp = batch.timestamp.toString(),
-            location = location
-        )
-        
-        assertNotNull(telemetryDataOut.location)
-        assertEquals("Mombasa/Kenya", telemetryDataOut.location)
-    }
-
-    @Test
     fun `IP address is included in payload when API returns IP fallback`() = runBlocking {
         val jsonResponse = """
             {
@@ -361,80 +324,5 @@ class LocationIntegrationTest {
         }
     }
 
-    private fun createTestTelemetryBatch(): TelemetryBatch {
-        val appInfo = AppInfo(
-            appName = "TestApp",
-            appVersion = "1.0.0",
-            appBuildNumber = "100",
-            appPackageName = "com.test.app"
-        )
 
-        val deviceInfo = DeviceInfo(
-            deviceId = "test_device_123",
-            platform = "Android",
-            platformVersion = "13",
-            model = "TestModel",
-            manufacturer = "TestManufacturer",
-            brand = "TestBrand",
-            androidSdk = "33",
-            androidRelease = "13",
-            fingerprint = "test_fingerprint",
-            hardware = "test_hardware",
-            product = "test_product"
-        )
-
-        val userInfo = UserInfo(
-            userId = "test_user_123",
-            name = null,
-            email = null,
-            phone = null
-        )
-
-        val sessionInfo = SessionInfo(
-            sessionId = "test_session_123",
-            startTime = System.currentTimeMillis().toString(),
-            durationMs = 1000L,
-            eventCount = 1,
-            metricCount = 0,
-            screenCount = 1,
-            visitedScreens = "TestScreen",
-            isFirstSession = false,
-            totalSessions = 5,
-            networkType = "WiFi"
-        )
-
-        val attributes = EventAttributes(
-            app = appInfo,
-            device = deviceInfo,
-            user = userInfo,
-            session = sessionInfo,
-            customAttributes = emptyMap()
-        )
-
-        val event = TelemetryEvent(
-            type = "event",
-            eventName = "test.event",
-            metricName = null,
-            value = null,
-            timestamp = System.currentTimeMillis().toString(),
-            attributes = attributes
-        )
-
-        return TelemetryBatch(
-            batchSize = 1,
-            timestamp = System.currentTimeMillis().toString(),
-            events = listOf(event)
-        )
-    }
-
-    private fun convertToTelemetryEventOut(event: TelemetryEvent): TelemetryEventOut {
-        return TelemetryEventOut(
-            type = event.type,
-            eventName = event.eventName,
-            metricName = event.metricName,
-            value = event.value,
-            timestamp = event.timestamp.toString(),
-            attributes = emptyMap()
-        )
-    }
 }

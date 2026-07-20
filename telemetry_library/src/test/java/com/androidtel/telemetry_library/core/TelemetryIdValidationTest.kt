@@ -153,8 +153,8 @@ class TelemetryIdValidationTest {
             fail("Should throw IllegalStateException when device ID is blank")
         } catch (e: IllegalStateException) {
             assertTrue(
-                "Exception message should mention device_id",
-                e.message?.contains("device_id") == true
+                "Exception message should mention device.id",
+                e.message?.contains("device.id") == true
             )
         }
     }
