@@ -288,7 +288,11 @@ class TelemetryManager private constructor(
             
             // Step 8: Initialize BatchProcessingService
             batchProcessingService = BatchProcessingService(config, httpClient, offlineStorage, scope)
-            batchProcessingService.initialize()
+            // Timed flush force-sends partial batches so a low-activity session doesn't hold
+            // telemetry indefinitely. Empty queue no-ops inside sendBatch (no heartbeat traffic).
+            batchProcessingService.initialize(onFlush = {
+                scope.launch { sendBatch(forceSend = true) }
+            })
             Log.d("TelemetryManager", "Step 8: BatchProcessingService initialized")
             
             // Step 9: Initialize legacy components for backward compatibility

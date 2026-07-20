@@ -34,13 +34,17 @@ internal class BatchProcessingService(
 ) {
     private var flushTimer: ScheduledExecutorService? = null
     private var batchSendJob: Job? = null
-    
+
+    // Stored as a field (not a startFlushTimer param) so resumeFlushTimer() re-wires it after a stop.
+    private var onFlush: (() -> Unit)? = null
+
     // Volatile so readers on the background flush coroutine see writes from the init thread without
     // a happens-before via an external lock.
     @Volatile
     private var idsInitialized: Boolean = false
-    
-    fun initialize() {
+
+    fun initialize(onFlush: () -> Unit) {
+        this.onFlush = onFlush
         startFlushTimer()
         Log.d(TAG, "BatchProcessingService initialized")
     }
@@ -193,7 +197,7 @@ internal class BatchProcessingService(
         flushTimer = Executors.newSingleThreadScheduledExecutor()
         flushTimer?.scheduleWithFixedDelay({
             try {
-                // Timer will trigger batch send check in TelemetryManager
+                onFlush?.invoke()
             } catch (e: Exception) {
                 Log.e(TAG, "Error in flush timer", e)
             }
