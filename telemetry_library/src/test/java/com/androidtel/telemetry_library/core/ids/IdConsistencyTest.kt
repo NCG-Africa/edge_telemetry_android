@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.androidtel.telemetry_library.core.TelemetryManager
 import com.androidtel.telemetry_library.core.breadcrumbs.BreadcrumbManager
-import com.androidtel.telemetry_library.core.crash.CrashReporter
 import com.androidtel.telemetry_library.core.device.DeviceInfoCollector
 import com.androidtel.telemetry_library.core.session.SessionManager
 import com.androidtel.telemetry_library.core.user.UserProfileManager
@@ -72,30 +71,6 @@ class IdConsistencyTest {
         val deviceId = deviceInfo["device.id"]
         
         assertEquals("DeviceInfoCollector must use IdGenerator device ID", persistedDeviceId, deviceId)
-    }
-
-    @Test
-    fun `CrashReporter receives and uses IdGenerator instance`() {
-        val persistedDeviceId = "1234567890123_crash001"
-        every { mockPrefs.getString("device_id", null) } returns persistedDeviceId
-        
-        val mockTelemetryManager = mockk<TelemetryManager>(relaxed = true)
-        val breadcrumbManager = BreadcrumbManager()
-        
-        every { mockTelemetryManager.applicationContext } returns mockContext
-        
-        val crashReporter = CrashReporter(
-            context = mockContext,
-            telemetryManager = mockTelemetryManager,
-            breadcrumbManager = breadcrumbManager,
-            idGenerator = idGenerator,
-            apiKey = "test_api_key",
-            telemetryEndpoint = "https://test.endpoint",
-            enabled = true,
-            debugMode = false
-        )
-        
-        assertNotNull("CrashReporter must be initialized with IdGenerator", crashReporter)
     }
 
     @Test
