@@ -14,7 +14,6 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.navigation.NavController
 import com.androidtel.telemetry_library.core.breadcrumbs.BreadcrumbManager
-import com.androidtel.telemetry_library.core.crash.CrashReporter
 import com.androidtel.telemetry_library.core.device.DeviceInfoCollector
 import com.androidtel.telemetry_library.core.ids.IdGenerator
 import com.androidtel.telemetry_library.core.models.AppInfo
@@ -235,7 +234,7 @@ class TelemetryManager private constructor(
      * 9. isReady.set(true)
      * 10. Drain preInitQueue (FIFO)
      * 11. if (enableScreenTracking)   → register ActivityLifecycleCallbacks
-     * 12. if (enableCrashReporting)   → install CrashReporter
+     * 12. if (enableCrashReporting)   → install fatal-crash handler (CrashReportingService)
      * 13. if (enableLifecycleTracking)→ register ProcessLifecycleOwner observer
      * 14. if (enableNetworkTracking)  → instantiate TelemetryInterceptor
      */
@@ -271,10 +270,13 @@ class TelemetryManager private constructor(
             Log.d("TelemetryManager", "Step 6: UserProfileService initialized")
             
             // Step 7: Initialize CrashReportingService
-            crashReportingService = CrashReportingService(
-                context, config, idGenerator, httpClient, offlineStorage, scope, apiKey, telemetryEndpoint
+            // Crashes ride the same enrichment (buildAttributes) and event sink (recordEvent) as
+            // every other event — one app.crash pipeline, no separate Path B (issue #56).
+            crashReportingService = CrashReportingService(context, config, httpClient)
+            crashReportingService.initialize(
+                buildAttributesFn = { attrs -> buildAttributes(attrs) },
+                recordCrashEventFn = { attrs -> recordEvent("app.crash", attrs) }
             )
-            crashReportingService.initialize()
             Log.d("TelemetryManager", "Step 7: CrashReportingService initialized")
             
             // Step 8: Initialize BatchProcessingService
@@ -348,6 +350,9 @@ class TelemetryManager private constructor(
             if (!sessionService.wasResumed()) {
                 emitSessionStartedEvent()
             }
+
+            // Step 16: Replay a frozen fatal crash from a previous launch, if any (issue #56).
+            scope.launch { replayFatalCrashIfAny() }
 
         } catch (e: Exception) {
             Log.e("TelemetryManager", "Failed to complete initialization sequence", e)
@@ -545,11 +550,7 @@ class TelemetryManager private constructor(
 
     // --- Crash and Error Reporting ---
     fun recordCrash(throwable: Throwable) {
-        crashReportingService.recordCrash(
-            throwable = throwable,
-            buildAttributesFn = { attrs -> buildAttributes(attrs) },
-            onEventCreated = { event -> eventTrackingService.getEventQueue().enqueue(event) }
-        )
+        crashReportingService.recordCrash(throwable)
     }
 
     @Deprecated(
@@ -658,9 +659,10 @@ class TelemetryManager private constructor(
         batchProcessingService.sendStoredBatches()
     }
 
-    // Crash persistence methods delegated to CrashReportingService
-    private suspend fun sendPersistedCrashIfAny() {
-        crashReportingService.sendPersistedCrashIfAny()
+    // Replay the frozen fatal crash (issue #56): delivered via the shared transport, deleted only
+    // after a 2xx. Delegated to CrashReportingService.
+    private suspend fun replayFatalCrashIfAny() {
+        crashReportingService.replayFatalCrashIfAny()
     }
 
 
@@ -1019,11 +1021,6 @@ class TelemetryManager private constructor(
      */
     internal fun getBreadcrumbManager(): BreadcrumbManager? = crashReportingService.getBreadcrumbManager()
 
-    /**
-     * Get crash reporter (for internal use)
-     */
-    internal fun getCrashReporter(): CrashReporter? = crashReportingService.getCrashReporter()
-    
 
     // ================================
     // Pre-Init Queue & Helper Methods

@@ -90,24 +90,6 @@ class DeviceInfoCollector(
     }
     
     /**
-     * Get comprehensive attributes for crash payloads
-     */
-    fun getCrashAttributes(): Map<String, String> {
-        val attributes = mutableMapOf<String, String>()
-        
-        // Add device info
-        attributes.putAll(collectDeviceInfo())
-        
-        // Add app info
-        attributes.putAll(collectAppInfo())
-        
-        // Add network info
-        attributes["network.type"] = getNetworkType()
-        
-        return attributes
-    }
-    
-    /**
      * Get build number with proper handling for different API levels
      */
     private fun getBuildNumber(packageInfo: android.content.pm.PackageInfo): String {

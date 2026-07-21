@@ -2,134 +2,201 @@ package com.androidtel.telemetry_library.core.services
 
 import android.content.Context
 import android.util.Log
-import com.androidtel.telemetry_library.core.OfflineBatchStorage
 import com.androidtel.telemetry_library.core.TelemetryConfig
 import com.androidtel.telemetry_library.core.TelemetryHttpClient
+import com.androidtel.telemetry_library.core.TelemetryTime
 import com.androidtel.telemetry_library.core.breadcrumbs.BreadcrumbManager
-import com.androidtel.telemetry_library.core.crash.CrashReporter
-import com.androidtel.telemetry_library.core.ids.IdGenerator
+import com.androidtel.telemetry_library.core.crash.FatalCrashStore
 import com.androidtel.telemetry_library.core.models.EventAttributes
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.androidtel.telemetry_library.core.models.TelemetryEvent
+import com.androidtel.telemetry_library.core.retry.CrashReplay
 import com.google.gson.Gson
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
-import com.androidtel.telemetry_library.core.TelemetryTime
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * CrashReportingService - Handles crash and error reporting
- * Extracted from TelemetryManager as part of Phase 2 refactoring
- * 
- * Responsibilities:
- * - Install crash handler
- * - Record crashes with stack traces
- * - Track errors manually
- * - Manage breadcrumbs
- * - Persist crash data
+ * CrashReportingService — the single crash pipeline (issue #56, Path B retired).
+ *
+ * Every crash is a standard `app.crash` event enriched through the same `buildAttributes` path as
+ * any other event, so it automatically carries `session.*`/`user.*`/`sdk.*` — the audit #1 fix,
+ * since old Path B dropped that context and the processor (which keys on session.id/user.id) dropped
+ * every crash. Two rails, keyed on whether the process is dying:
+ *
+ *  - **Durable-fatal** (uncaught handler): synchronously build the enriched event on the crashing
+ *    thread and freeze it to `filesDir` (blocking write + fsync) BEFORE re-throwing. Replayed on the
+ *    next `initialize()` and deleted only after a 2xx — survives an offline process death with no
+ *    loss and no duplication.
+ *  - **Normal batch** (`trackError` / `recordCrash`): enrich as `app.crash` and hand to the standard
+ *    event sink — same batching, flush, and offline retry as every event.
+ *
+ * `is_fatal`/`handled` are native JSON bools; keys are D1-canonical (unprefixed).
  */
 internal class CrashReportingService(
     private val context: Context,
     private val config: TelemetryConfig,
-    private val idGenerator: IdGenerator,
-    private val httpClient: TelemetryHttpClient,
-    private val offlineStorage: OfflineBatchStorage,
-    private val scope: CoroutineScope,
-    private val apiKey: String,
-    private val telemetryEndpoint: String
+    private val httpClient: TelemetryHttpClient
 ) {
     private val gson = Gson()
-    
-    private var crashReporter: CrashReporter? = null
     private var breadcrumbManager: BreadcrumbManager? = null
-    // Atomic so concurrent CrashReportingService.initialize() calls can't double-install the
-    // Thread.UncaughtExceptionHandler (which would chain twice and double-report).
-    private val crashHandlerInstalled = java.util.concurrent.atomic.AtomicBoolean(false)
 
-    // Synchronizes access to the persisted-crash file so concurrent recordCrash() / read paths
-    // can't corrupt the JSON. App's private storage = single-process, so a local lock suffices.
-    private val persistedCrashFileLock = Any()
+    // Atomic so concurrent initialize() calls can't double-install the UncaughtExceptionHandler.
+    private val crashHandlerInstalled = AtomicBoolean(false)
 
-    private val persistedCrashFileName = "telemetry_pending_crash.json"
-    private val persistedCrashFile: File
-        get() = File(context.cacheDir, persistedCrashFileName)
+    // Enrichment + normal-batch sink, injected from TelemetryManager at initialize().
+    private var buildAttributesFn: ((Map<String, Any>) -> EventAttributes?)? = null
+    private var recordCrashEventFn: ((Map<String, Any>) -> Unit)? = null
 
-    fun initialize() {
+    // trackError context. product_id no longer reaches the wire (D1) — setProductContext is retained
+    // only so the public API doesn't break. user_action still rides the canonical key set.
+    private var lastUserAction: String? = null
+
+    fun initialize(
+        buildAttributesFn: (Map<String, Any>) -> EventAttributes?,
+        recordCrashEventFn: (Map<String, Any>) -> Unit
+    ) {
+        this.buildAttributesFn = buildAttributesFn
+        this.recordCrashEventFn = recordCrashEventFn
         breadcrumbManager = BreadcrumbManager()
 
         if (config.enableCrashReporting && crashHandlerInstalled.compareAndSet(false, true)) {
-            crashReporter = CrashReporter(
-                context = context,
-                telemetryManager = null,
-                breadcrumbManager = breadcrumbManager!!,
-                idGenerator = idGenerator,
-                apiKey = apiKey,
-                telemetryEndpoint = telemetryEndpoint,
-                enabled = true,
-                debugMode = false
-            )
-            // Note: installGlobalExceptionHandler() is already called in CrashReporter.init when enabled=true
-            Log.d(TAG, "Crash handler installed")
+            installFatalHandler()
+            Log.d(TAG, "Fatal crash handler installed")
         }
-
         Log.d(TAG, "CrashReportingService initialized")
     }
-    
-    /**
-     * Record a crash event
-     */
-    fun recordCrash(
-        throwable: Throwable,
-        buildAttributesFn: (Map<String, Any>) -> EventAttributes?,
-        onEventCreated: (TelemetryEvent) -> Unit
-    ) {
-        val sw = StringWriter()
-        throwable.printStackTrace(PrintWriter(sw))
-        val stackTrace = sw.toString()
-        
-        val breadcrumbs = breadcrumbManager?.getBreadcrumbsAsJson() ?: "[]"
-        val breadcrumbCount = breadcrumbManager?.getBreadcrumbCount() ?: 0
-        
-        val attributes = mapOf(
-            "error.message" to "${throwable.javaClass.name}: ${throwable.message ?: ""}".take(1000),
-            "error.stack_trace" to stackTrace.take(2000),
-            "error.exception_type" to throwable.javaClass.simpleName.take(255),
-            "error.context" to extractErrorContext(stackTrace).take(500),
-            "error.cause" to (throwable.cause?.message ?: "unknown").take(255),
-            "error.severity_level" to determineSeverityLevel(throwable),
-            "error.is_fatal" to true,
-            "error.breadcrumbs" to breadcrumbs.take(800),
-            "error.breadcrumb_count" to breadcrumbCount
-        )
-        
-        val event = buildAttributesFn(attributes)?.let {
-            TelemetryEvent(
-                type = "event",
-                eventName = "app.crash",
-                timestamp = TelemetryTime.now(),
-                attributes = it
-            )
+
+    // --- Durable-fatal rail ---
+
+    private fun installFatalHandler() {
+        val original = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                freezeFatalCrash(thread, throwable)
+            } catch (e: Throwable) {
+                Log.e(TAG, "Failed to freeze fatal crash", e)
+            } finally {
+                // Preserve normal crash behaviour: hand off to the platform handler, which kills the
+                // process. The freeze above has already completed synchronously by this point.
+                original?.uncaughtException(thread, throwable)
+            }
         }
-        
-        event?.let {
-            onEventCreated(it)
-            
-            val batch = TelemetryBatch(
-                batchSize = 1,
-                timestamp = TelemetryTime.now(),
-                events = listOf(it)
-            )
-            persistBatchSync(batch)
-        }
-        
-        scope.launch { sendBatchAsync() }
     }
-    
+
     /**
-     * Add breadcrumb
+     * Synchronously, on the crashing thread, before the process dies: build the fully-enriched
+     * `app.crash` event and freeze it. Replay sends it as-is — never re-enriched at replay time
+     * (that would stamp a new session onto an old crash).
      */
+    private fun freezeFatalCrash(thread: Thread, throwable: Throwable) {
+        val attrs = buildCrashAttributes(
+            throwable = throwable,
+            isFatal = true,
+            handled = false,
+            extra = mapOf(
+                "crash.thread" to thread.name,
+                "crash.is_main_thread" to (thread.name == "main")
+            )
+        )
+        val enriched = buildAttributesFn?.invoke(attrs) ?: return
+        val event = TelemetryEvent(
+            type = "event",
+            eventName = "app.crash",
+            timestamp = TelemetryTime.now(),
+            attributes = enriched
+        )
+        val batch = TelemetryBatch(batchSize = 1, timestamp = TelemetryTime.now(), events = listOf(event))
+        FatalCrashStore.writeBlocking(context.filesDir, gson.toJson(batch))
+    }
+
+    /**
+     * Replay the frozen fatal crash on init via the shared transport; delete only on a 2xx. On
+     * failure leave the file and let WorkManager retry, so crash delivery stays independent of the
+     * normal batch-flush timing and survives across launches until actually delivered.
+     */
+    suspend fun replayFatalCrashIfAny() {
+        if (!FatalCrashStore.replayOnce(context.filesDir, httpClient, gson)) {
+            Log.w(TAG, "Fatal crash replay failed; scheduling WorkManager retry")
+            CrashReplay.schedule(context, config.apiKey, config.endpoint)
+        }
+    }
+
+    // --- Normal batch rail ---
+
+    fun recordCrash(throwable: Throwable) = enqueueHandledCrash(throwable, null, null, null)
+
+    fun trackError(error: Throwable, attributes: Map<String, String>? = null) =
+        enqueueHandledCrash(error, null, null, attributes)
+
+    fun trackError(
+        error: Throwable,
+        errorCode: String? = null,
+        productId: String? = null,
+        userAction: String? = null,
+        attributes: Map<String, String>? = null
+    ) {
+        // buildCrashAttributes applies the lastUserAction fallback; just record + forward the raw arg.
+        userAction?.let { lastUserAction = it.take(500) }
+        enqueueHandledCrash(error, errorCode, userAction, attributes)
+    }
+
+    fun trackError(message: String, stackTrace: String? = null, attributes: Map<String, String>? = null) =
+        enqueueHandledCrash(RuntimeException(message), null, null, attributes, stackTraceOverride = stackTrace)
+
+    private fun enqueueHandledCrash(
+        throwable: Throwable,
+        errorCode: String?,
+        userAction: String?,
+        attributes: Map<String, String>?,
+        stackTraceOverride: String? = null
+    ) {
+        if (!config.enableCrashReporting) {
+            Log.w(TAG, "Crash reporting not enabled")
+            return
+        }
+        val attrs = buildCrashAttributes(
+            throwable = throwable,
+            isFatal = false,
+            handled = true,
+            errorCode = errorCode,
+            userAction = userAction,
+            stackTraceOverride = stackTraceOverride,
+            extra = attributes?.mapValues { it.value as Any } ?: emptyMap()
+        )
+        recordCrashEventFn?.invoke(attrs) ?: Log.w(TAG, "Crash event sink not wired")
+    }
+
+    // --- Canonical app.crash attribute set (D1: unprefixed, natively-typed) ---
+
+    internal fun buildCrashAttributes(
+        throwable: Throwable,
+        isFatal: Boolean,
+        handled: Boolean,
+        errorCode: String? = null,
+        userAction: String? = null,
+        stackTraceOverride: String? = null,
+        extra: Map<String, Any> = emptyMap()
+    ): Map<String, Any> {
+        val stacktrace = stackTraceOverride ?: stackTraceOf(throwable)
+        val attrs = mutableMapOf<String, Any>(
+            "message" to "${throwable.javaClass.name}: ${throwable.message ?: ""}".take(1000),
+            "stacktrace" to stacktrace.take(2000),
+            "exception_type" to throwable.javaClass.simpleName.take(255),
+            "cause" to (throwable.cause?.message ?: "unknown").take(255),
+            "error_context" to extractErrorContext(stacktrace).take(500),
+            "is_fatal" to isFatal,
+            "handled" to handled,
+            "crash.breadcrumbs" to (breadcrumbManager?.getBreadcrumbsAsJson() ?: "[]")
+        )
+        (userAction ?: lastUserAction)?.let { attrs["user_action"] = it.take(500) }
+        errorCode?.let { attrs["error_code"] = it.take(100) }
+        attrs.putAll(extra)
+        return attrs
+    }
+
+    // --- Breadcrumbs & context ---
+
     fun addBreadcrumb(
         message: String,
         category: String = "custom",
@@ -139,218 +206,44 @@ internal class CrashReportingService(
         breadcrumbManager?.addBreadcrumb(message, category, level, data)
             ?: Log.w(TAG, "Breadcrumb manager not initialized")
     }
-    
-    /**
-     * Track error manually
-     */
-    fun trackError(error: Throwable, attributes: Map<String, String>? = null) {
-        if (config.enableCrashReporting && crashReporter != null) {
-            crashReporter!!.trackError(error, attributes)
-        } else {
-            Log.w(TAG, "Crash reporting not enabled")
-        }
-    }
-    
-    /**
-     * Track error with enhanced context
-     */
-    fun trackError(
-        error: Throwable,
-        errorCode: String? = null,
-        productId: String? = null,
-        userAction: String? = null,
-        attributes: Map<String, String>? = null
-    ) {
-        if (config.enableCrashReporting && crashReporter != null) {
-            crashReporter!!.trackError(error, errorCode, productId, userAction, attributes)
-        } else {
-            Log.w(TAG, "Crash reporting not enabled")
-        }
-    }
-    
-    /**
-     * Track error with message
-     */
-    fun trackError(message: String, stackTrace: String? = null, attributes: Map<String, String>? = null) {
-        if (config.enableCrashReporting && crashReporter != null) {
-            crashReporter!!.trackError(message, stackTrace, attributes)
-        } else {
-            Log.w(TAG, "Crash reporting not enabled")
-        }
-    }
-    
-    /**
-     * Set product context
-     */
-    fun setProductContext(productId: String) {
-        if (config.enableCrashReporting && crashReporter != null) {
-            crashReporter!!.setProductContext(productId)
-        } else {
-            Log.w(TAG, "Crash reporting not enabled")
-        }
-    }
-    
-    /**
-     * Set last user action
-     */
-    fun setLastUserAction(action: String) {
-        if (config.enableCrashReporting && crashReporter != null) {
-            crashReporter!!.setLastUserAction(action)
-        } else {
-            Log.w(TAG, "Crash reporting not enabled")
-        }
-    }
-    
-    /**
-     * Test crash reporting
-     */
+
+    // product_id is dropped from the wire (D1 follow-up); retained as a no-op so callers don't break.
+    fun setProductContext(productId: String) { /* no-op: product_id no longer reaches the crash wire */ }
+
+    fun setLastUserAction(action: String) { lastUserAction = action.take(500) }
+
     fun testCrashReporting(customMessage: String? = null) {
-        if (config.enableCrashReporting && crashReporter != null) {
-            crashReporter!!.testCrashReporting(customMessage)
-        } else {
-            Log.w(TAG, "Crash reporting not enabled. Cannot test.")
-        }
+        val message = customMessage ?: "Test crash from EdgeTelemetry SDK"
+        breadcrumbManager?.addCustom("Test crash initiated", mapOf("test" to "true"))
+        trackError(RuntimeException(message), mapOf("test.crash" to "true"))
+        Log.i(TAG, "Test crash reported: $message")
     }
-    
-    /**
-     * Get breadcrumb manager
-     */
+
     fun getBreadcrumbManager(): BreadcrumbManager? = breadcrumbManager
-    
-    /**
-     * Get crash reporter
-     */
-    fun getCrashReporter(): CrashReporter? = crashReporter
-    
-    /**
-     * Persist batch synchronously.
-     *
-     * Single intra-process mutex (`persistedCrashFileLock`) serializes all access to the persisted
-     * crash file so concurrent recordCrash() / send / delete paths cannot race and corrupt the
-     * JSON file. Sufficient because the file lives in app-private storage (single OS process).
-     */
-    private fun persistBatchSync(batch: TelemetryBatch) {
-        synchronized(persistedCrashFileLock) {
-            try {
-                val json = gson.toJson(batch)
-                persistedCrashFile.parentFile?.mkdirs()
-                persistedCrashFile.writeText(json)
-                Log.i(TAG, "Persisted crash batch to ${persistedCrashFile.absolutePath}")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to persist crash batch: ${e.localizedMessage}", e)
-            }
-        }
+
+    // --- Helpers ---
+
+    private fun stackTraceOf(throwable: Throwable): String {
+        val sw = StringWriter()
+        throwable.printStackTrace(PrintWriter(sw))
+        return sw.toString()
     }
 
-    /**
-     * Read persisted crash batch.
-     */
-    fun readPersistedBatch(): TelemetryBatch? {
-        synchronized(persistedCrashFileLock) {
-            return try {
-                if (!persistedCrashFile.exists()) return null
-                val text = persistedCrashFile.readText()
-                gson.fromJson(text, TelemetryBatch::class.java)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to read persisted crash batch: ${e.localizedMessage}", e)
-                null
-            }
-        }
-    }
-
-    /**
-     * Delete persisted batch.
-     */
-    fun deletePersistedBatch() {
-        synchronized(persistedCrashFileLock) {
-            try {
-                if (persistedCrashFile.exists()) {
-                    persistedCrashFile.delete()
-                    Log.i(TAG, "Deleted persisted crash file.")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to delete persisted crash file: ${e.localizedMessage}", e)
-            }
-        }
-    }
-    
-    /**
-     * Send persisted crash if any.
-     *
-     * User profile is snapshotted into each event at recordCrash() time. Backend backfills
-     * rum_users from event attributes, so no per-batch override is needed.
-     */
-    suspend fun sendPersistedCrashIfAny() {
-        val batch = readPersistedBatch()
-        if (batch == null) {
-            return
-        }
-
-        Log.i(TAG, "Found persisted crash batch; attempting to send.")
-        try {
-            val result = httpClient.sendBatch(batch)
-            if (result.isSuccess) {
-                Log.i(TAG, "Successfully sent persisted crash batch.")
-                deletePersistedBatch()
-            } else {
-                Log.e(TAG, "Failed to send persisted crash batch; moving to offline storage.")
-                offlineStorage.storeBatch(batch)
-                deletePersistedBatch()
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error sending persisted crash batch: ${e.localizedMessage}", e)
-        }
-    }
-
-    /**
-     * Send batch asynchronously.
-     */
-    private suspend fun sendBatchAsync() {
-        val batch = readPersistedBatch() ?: return
-        val result = httpClient.sendBatch(batch)
-        if (result.isSuccess) {
-            deletePersistedBatch()
-        }
-    }
-    
-    /**
-     * Extract error context from stack trace
-     */
     private fun extractErrorContext(stackTrace: String): String {
         return try {
-            val lines = stackTrace.lines()
-            val firstFrame = lines.firstOrNull { it.trim().startsWith("at ") } ?: return "unknown"
-            
+            val firstFrame = stackTrace.lines().firstOrNull { it.trim().startsWith("at ") } ?: return "unknown"
             val atIndex = firstFrame.indexOf("at ")
             if (atIndex == -1) return "unknown"
-            
             val methodPart = firstFrame.substring(atIndex + 3).trim()
             val parenIndex = methodPart.indexOf("(")
             val fullMethod = if (parenIndex > 0) methodPart.substring(0, parenIndex) else methodPart
-            
             val parts = fullMethod.split(".")
-            if (parts.size >= 2) {
-                "${parts[parts.size - 2]}.${parts[parts.size - 1]}"
-            } else {
-                fullMethod
-            }
+            if (parts.size >= 2) "${parts[parts.size - 2]}.${parts[parts.size - 1]}" else fullMethod
         } catch (e: Exception) {
             "unknown"
         }
     }
-    
-    /**
-     * Determine severity level based on exception type
-     */
-    private fun determineSeverityLevel(throwable: Throwable): String {
-        return when {
-            throwable is OutOfMemoryError || throwable is StackOverflowError -> "critical"
-            throwable is IllegalStateException || throwable is NullPointerException -> "error"
-            throwable is IllegalArgumentException -> "warning"
-            else -> "error"
-        }
-    }
-    
+
     companion object {
         private const val TAG = "CrashReportingService"
     }
