@@ -46,9 +46,10 @@ internal class CrashReportingService(
     // Atomic so concurrent initialize() calls can't double-install the UncaughtExceptionHandler.
     private val crashHandlerInstalled = AtomicBoolean(false)
 
-    // Enrichment + normal-batch sink, injected from TelemetryManager at initialize().
+    // Enrichment + normal-batch sinks, injected from TelemetryManager at initialize().
     private var buildAttributesFn: ((Map<String, Any>) -> EventAttributes?)? = null
     private var recordCrashEventFn: ((Map<String, Any>) -> Unit)? = null
+    private var recordHangEventFn: ((Map<String, Any>) -> Unit)? = null
 
     // trackError context. product_id no longer reaches the wire (D1) — setProductContext is retained
     // only so the public API doesn't break. user_action still rides the canonical key set.
@@ -56,10 +57,12 @@ internal class CrashReportingService(
 
     fun initialize(
         buildAttributesFn: (Map<String, Any>) -> EventAttributes?,
-        recordCrashEventFn: (Map<String, Any>) -> Unit
+        recordCrashEventFn: (Map<String, Any>) -> Unit,
+        recordHangEventFn: (Map<String, Any>) -> Unit
     ) {
         this.buildAttributesFn = buildAttributesFn
         this.recordCrashEventFn = recordCrashEventFn
+        this.recordHangEventFn = recordHangEventFn
         breadcrumbManager = BreadcrumbManager()
 
         if (config.enableCrashReporting && crashHandlerInstalled.compareAndSet(false, true)) {
@@ -161,6 +164,26 @@ internal class CrashReportingService(
     // and the next init retries — same exactly-once rail as the crash (#60).
     suspend fun replayAnrIfAny() {
         FatalCrashStore.replayOnce(context.filesDir, httpClient, gson, FatalCrashStore.ANR_FILE_NAME)
+    }
+
+    // --- Hang: normal in-memory batch (issue #61, NOT the durable rail) ---
+
+    /**
+     * Sub-5s main-thread stall detected by the watchdog. Runs on the watchdog thread. Unlike ANR, a
+     * hang doesn't get the app killed (it's below the ANR line by definition), so it rides the normal
+     * batch — no `filesDir` persistence (spec §6). Main-thread stack only (§4). `is_fatal:false`.
+     * Session/user are frozen at detection time by the standard enrichment on the sink.
+     */
+    fun recordHang(durationMs: Long, stack: String) {
+        recordHangEventFn?.invoke(
+            mapOf(
+                "is_fatal" to false,
+                "handled" to false,
+                "hang.duration_ms" to durationMs,
+                "screen.name" to (NavigationStackTracker.currentScreen() ?: ""),
+                "hang.stack" to stack
+            )
+        ) ?: Log.w(TAG, "Hang event sink not wired")
     }
 
     // --- Normal batch rail ---

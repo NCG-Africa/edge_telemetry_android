@@ -43,14 +43,17 @@ class AnrWatchdogTest {
 
     private var fakeNow = 0L
     private val fires = mutableListOf<Pair<Long, List<ThreadDump>>>()
+    private val hangs = mutableListOf<Pair<Long, String>>()
     private lateinit var watchdog: AnrWatchdog
 
     @Before
     fun setUp() {
         fakeNow = 0L
         fires.clear()
+        hangs.clear()
         watchdog = AnrWatchdog(
             onAnr = { durationMs, threads -> fires.add(durationMs to threads) },
+            onHang = { durationMs, stack -> hangs.add(durationMs to stack) },
             mainHandler = Handler(Looper.getMainLooper()),
             clock = { fakeNow }
         )
@@ -61,13 +64,13 @@ class AnrWatchdogTest {
     // AC1: main blocked past 5s → exactly one app.anr, all-thread dump with main flagged.
     @Test
     fun `blocking main past 5s fires one anr with main flagged dump`() {
-        watchdog.scanOnce()                 // posts the heartbeat; main looper left paused → never runs
-        fakeNow = AnrWatchdog.THRESHOLD_MS  // 5s elapse with no pong
+        watchdog.scanOnce()                     // posts the heartbeat; main looper left paused → never runs
+        fakeNow = AnrWatchdog.ANR_THRESHOLD_MS  // 5s elapse with no pong
         watchdog.scanOnce()
 
         assertEquals(1, fires.size)
         val (durationMs, threads) = fires.first()
-        assertTrue("duration >= 5000", durationMs >= AnrWatchdog.THRESHOLD_MS)
+        assertTrue("duration >= 5000", durationMs >= AnrWatchdog.ANR_THRESHOLD_MS)
         assertTrue("dump flags the main thread", threads.any { it.main })
     }
 
@@ -76,13 +79,13 @@ class AnrWatchdogTest {
     fun `main answering before threshold fires nothing`() {
         watchdog.scanOnce()   // posts heartbeat
         idleMain()            // main runs the pong → up to date
-        fakeNow = AnrWatchdog.THRESHOLD_MS
+        fakeNow = AnrWatchdog.ANR_THRESHOLD_MS
         watchdog.scanOnce()
 
         assertEquals(0, fires.size)
     }
 
-    // §6 intra-hang dedup: a 12s block is one event, not one per scan.
+    // §6 intra-hang dedup: a 12s block is one anr event, not one per scan.
     @Test
     fun `long hang dedups to a single event`() {
         watchdog.scanOnce()
@@ -95,9 +98,76 @@ class AnrWatchdogTest {
         // Main recovers, then hangs again → a fresh event (latch cleared by the pong).
         idleMain()
         watchdog.scanOnce()                     // re-arm
-        fakeNow += AnrWatchdog.THRESHOLD_MS
+        fakeNow += AnrWatchdog.ANR_THRESHOLD_MS
         watchdog.scanOnce()
         assertEquals(2, fires.size)
+    }
+
+    // --- Issue #61: hang detection, band [2000,5000) off the same watchdog ---
+
+    // AC (#61): main blocked ≥2s but <5s → exactly one app.hang, main-thread stack only, no anr.
+    @Test
+    fun `blocking main past 2s but under 5s fires one hang and no anr`() {
+        watchdog.scanOnce()                      // posts heartbeat; main paused
+        fakeNow = AnrWatchdog.HANG_THRESHOLD_MS  // 2s elapse, no pong
+        watchdog.scanOnce()
+
+        assertEquals(1, hangs.size)
+        assertEquals(0, fires.size)
+        val (durationMs, stack) = hangs.first()
+        assertTrue("duration >= 2000", durationMs >= AnrWatchdog.HANG_THRESHOLD_MS)
+        assertTrue("duration < 5000", durationMs < AnrWatchdog.ANR_THRESHOLD_MS)
+        assertTrue("main-thread stack captured", stack.isNotBlank())
+    }
+
+    // AC (#61): a healthy main thread that answers before 2s fires nothing.
+    @Test
+    fun `main answering before 2s fires no hang`() {
+        watchdog.scanOnce()
+        idleMain()
+        fakeNow = AnrWatchdog.HANG_THRESHOLD_MS
+        watchdog.scanOnce()
+
+        assertEquals(0, hangs.size)
+        assertEquals(0, fires.size)
+    }
+
+    // AC (#61) escalation: one unbroken 6s block → exactly one hang AND one anr (not two hangs).
+    @Test
+    fun `single unbroken block crossing both bands fires one hang and one anr`() {
+        watchdog.scanOnce()                          // posts heartbeat
+        fakeNow = AnrWatchdog.HANG_THRESHOLD_MS       // 2s → hang
+        watchdog.scanOnce()
+        fakeNow = AnrWatchdog.ANR_THRESHOLD_MS        // 5s → anr, same stall
+        watchdog.scanOnce()
+        fakeNow = 6000L                               // still blocked → no dupes
+        watchdog.scanOnce()
+
+        assertEquals(1, hangs.size)
+        assertEquals(1, fires.size)
+    }
+
+    // AC (#61) intra-hang dedup: a 3s block is one hang, not one per scan.
+    @Test
+    fun `three second block dedups to a single hang`() {
+        watchdog.scanOnce()
+        for (t in longArrayOf(2000, 2500, 3000)) {
+            fakeNow = t
+            watchdog.scanOnce()
+        }
+        assertEquals(1, hangs.size)
+        assertEquals(0, fires.size)
+    }
+
+    // AC (#61) band boundary: a 4.9s block → one hang, no anr.
+    @Test
+    fun `block just under 5s fires hang but not anr`() {
+        watchdog.scanOnce()
+        fakeNow = 4900L
+        watchdog.scanOnce()
+
+        assertEquals(1, hangs.size)
+        assertEquals(0, fires.size)
     }
 
     // AC3: delivered on the durable filesDir rail — frozen app.anr replays and deletes only on a 2xx.
