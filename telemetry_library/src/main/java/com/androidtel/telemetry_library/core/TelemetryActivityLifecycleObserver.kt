@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.fragment.app.FragmentActivity
+import com.androidtel.telemetry_library.core.interaction.UserInteractionTracker
 import com.androidtel.telemetry_library.core.navigation.NavigationStackTracker
 
 class TelemetryActivityLifecycleObserver(
@@ -14,6 +15,7 @@ class TelemetryActivityLifecycleObserver(
 
     private val screenTimingTracker = ScreenTimingTracker()
     private val navigationTracker = NavigationStackTracker()
+    private val interactionTracker = UserInteractionTracker(telemetryManager, navigationTracker::getCurrentScreen)
     // Unified performance tracker - automatically selects appropriate implementation
     private val performanceTracker: PerformanceTracker = PerformanceTrackerFactory.createPerformanceTracker(telemetryManager)
 
@@ -43,6 +45,11 @@ class TelemetryActivityLifecycleObserver(
         // Start performance tracking (automatically uses appropriate implementation)
         performanceTracker.start(activity)
 
+        // Capture user interactions (taps/swipes) by wrapping the window callback
+        if (telemetryManager.isUserInteractionEventsEnabled()) {
+            interactionTracker.attach(activity)
+        }
+
         // Track navigation with proper structure
         val navEvent = navigationTracker.push(screenName)
         telemetryManager.recordEvent(
@@ -61,6 +68,9 @@ class TelemetryActivityLifecycleObserver(
     override fun onActivityPaused(activity: Activity) {
         val screenName = getScreenName(activity)
         Log.d("TelemetryObserver", "Activity Paused: $screenName")
+
+        // Restore the original window callback to avoid leaks / double-wrapping on re-resume
+        interactionTracker.detach(activity)
 
         // Stop performance tracking to prevent memory leaks. Do NOT end screen timing here:
         // onActivityStopped owns endScreen so screen.duration (with exit_method) fires on the
