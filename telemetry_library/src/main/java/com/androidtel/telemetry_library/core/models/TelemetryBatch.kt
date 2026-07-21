@@ -1,16 +1,6 @@
 package com.androidtel.telemetry_library.core.models
 
-import com.google.gson.Gson
 import java.util.UUID
-
-// ---- Payload + Data ----
-data class TelemetryPayload(
-    val timestamp: String,
-    val device_id: String,  // Device ID at top level for easy filtering/routing
-    val data: TelemetryDataOut
-) {
-    fun toJson(): String = Gson().toJson(this)
-}
 
 // Unified wire envelope (issue #48). Top-level is exactly {type, timestamp, batch_size, events}.
 // device_id/location/tenant_id/data-wrapper are gone: device.id is a per-event attr, geo is

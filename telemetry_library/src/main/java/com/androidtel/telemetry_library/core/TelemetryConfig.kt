@@ -15,8 +15,7 @@ data class TelemetryConfig(
     val enableFrameTracking: Boolean = true,
     val enableUserInteractionEvents: Boolean = true,
     val enableCapabilityEvents: Boolean = true,
-    val enableSessionTracking: Boolean = true,
-    val enableLocationTracking: Boolean = false
+    val enableSessionTracking: Boolean = true
 ) {
     init {
         require(apiKey.isNotBlank()) { "apiKey must not be blank" }

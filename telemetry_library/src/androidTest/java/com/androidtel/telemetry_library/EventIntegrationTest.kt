@@ -34,7 +34,6 @@ class EventIntegrationTest {
             enableCrashReporting = true,
             enableUserProfiles = true,
             enableSessionTracking = true,
-            enableLocationTracking = false,
             debugMode = true
         )
         

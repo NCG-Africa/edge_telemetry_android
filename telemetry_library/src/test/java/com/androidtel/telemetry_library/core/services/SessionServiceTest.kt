@@ -35,7 +35,6 @@ class SessionServiceTest {
             endpoint = "https://test.example.com",
             enableCrashReporting = true,
             enableSessionTracking = true,
-            enableLocationTracking = false,
             batchSize = 50,
             flushIntervalMs = 30000,
             sessionTimeoutMs = 1800000 // 30 minutes

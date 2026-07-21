@@ -55,7 +55,6 @@ class CrashReportingServiceTest {
             endpoint = testEndpoint,
             enableCrashReporting = true,
             enableSessionTracking = true,
-            enableLocationTracking = false,
             batchSize = 50,
             flushIntervalMs = 30000,
             sessionTimeoutMs = 1800000

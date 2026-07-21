@@ -14,13 +14,11 @@ import java.io.File
  */
 class TimestampSourceGuardTest {
 
-    // Dead code still carrying Instant.now(); deleted by #37 (JsonEventTracker,
-    // FlutterCompatiblePayload) and #40 (EdgeTelemetryInterceptor). Drop these
-    // exclusions when those tickets land.
+    // FlutterCompatiblePayload still carries live Instant.now() in its crash-payload
+    // helpers (API-26 landmine tracked separately). JsonEventTracker and
+    // EdgeTelemetryInterceptor were deleted by #55.
     private val deadInstantFiles = setOf(
-        "JsonEventTracker.kt",
         "FlutterCompatiblePayload.kt",
-        "EdgeTelemetryInterceptor.kt",
     )
 
     private val srcMain: File =

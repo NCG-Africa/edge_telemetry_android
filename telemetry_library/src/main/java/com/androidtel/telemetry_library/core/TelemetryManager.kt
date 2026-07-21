@@ -16,10 +16,7 @@ import androidx.navigation.NavController
 import com.androidtel.telemetry_library.core.breadcrumbs.BreadcrumbManager
 import com.androidtel.telemetry_library.core.crash.CrashReporter
 import com.androidtel.telemetry_library.core.device.DeviceInfoCollector
-import com.androidtel.telemetry_library.core.events.JsonEventTracker
 import com.androidtel.telemetry_library.core.ids.IdGenerator
-import com.androidtel.telemetry_library.core.location.IpLocationProvider
-import com.androidtel.telemetry_library.core.location.LocationProvider
 import com.androidtel.telemetry_library.core.models.AppInfo
 import com.androidtel.telemetry_library.core.services.EventTrackingService
 import com.androidtel.telemetry_library.core.services.SessionService
@@ -101,11 +98,6 @@ class TelemetryManager private constructor(
 
     // Legacy components (for backward compatibility)
     private var deviceInfoCollector: DeviceInfoCollector? = null
-    private var jsonEventTracker: JsonEventTracker? = null
-
-    // Location tracking components
-    private var locationProvider: LocationProvider? = null
-    private var currentLocation: String? = null
 
     // Memory tracker — sampled on session boundaries and app-resume to keep traffic bounded
     private var memoryTracker: MemoryTracker? = null
@@ -645,29 +637,18 @@ class TelemetryManager private constructor(
     // Checks the queue size and sends a batch if the threshold is met.
     private fun maybeSendBatch() {
         if (batchProcessingService.shouldSendBatch(eventTrackingService.getEventQueue().size)) {
-            val location = if (config.enableLocationTracking) {
-                locationProvider?.getCachedLocation() ?: currentLocation
-            } else {
-                null
-            }
-            batchProcessingService.triggerBatchSend(eventTrackingService.getEventQueue(), location)
+            batchProcessingService.triggerBatchSend(eventTrackingService.getEventQueue(), null)
         }
     }
 
     // This method sends the buffered events as a single JSON batch.
     // Delegated to BatchProcessingService
     private suspend fun sendBatch(forceSend: Boolean = false, flushOffline: Boolean = true) {
-        val location = if (config.enableLocationTracking) {
-            locationProvider?.getCachedLocation() ?: currentLocation
-        } else {
-            null
-        }
-
         batchProcessingService.sendBatch(
             eventTrackingService.getEventQueue(),
             forceSend,
             flushOffline,
-            location
+            null
         )
     }
 
@@ -1026,14 +1007,6 @@ class TelemetryManager private constructor(
      */
     fun testCrashReporting(customMessage: String? = null) {
         crashReportingService.testCrashReporting(customMessage)
-    }
-
-    /**
-     * Test connectivity (Flutter-compatible)
-     */
-    fun testConnectivity() {
-        jsonEventTracker?.testConnectivity()
-            ?: Log.w("TelemetryManager", "Event tracker not initialized")
     }
 
     /**

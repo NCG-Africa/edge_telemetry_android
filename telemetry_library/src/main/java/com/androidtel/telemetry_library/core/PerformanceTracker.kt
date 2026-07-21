@@ -57,29 +57,3 @@ class ModernPerformanceTracker(
         )
     }
 }
-
-/**
- * Wrapper for LegacyPerformanceTracker to implement PerformanceTracker interface.
- */
-class LegacyPerformanceTrackerWrapper(
-    private val telemetryManager: TelemetryManager
-) : PerformanceTracker {
-    
-    private val legacyTracker = LegacyPerformanceTracker(telemetryManager)
-    
-    override fun start(activity: Activity) {
-        legacyTracker.start(activity)
-    }
-    
-    override fun stop() {
-        legacyTracker.stop()
-    }
-    
-    override fun isActive(): Boolean {
-        return legacyTracker.isActive()
-    }
-    
-    override fun getCurrentMetrics(): Map<String, Any> {
-        return legacyTracker.getCurrentMetrics()
-    }
-}
