@@ -17,16 +17,20 @@ import java.io.FileOutputStream
  */
 internal object FatalCrashStore {
     private const val TAG = "FatalCrashStore"
-    private const val FILE_NAME = "pending_fatal_crash.json"
+    const val FILE_NAME = "pending_fatal_crash.json"
+    // ANR rides the same rail on its own slot (issue #60): same freeze → replay → delete-after-2xx,
+    // a separate file so a later fatal crash can't overwrite a pending ANR. is_fatal:false in the
+    // record distinguishes it downstream.
+    const val ANR_FILE_NAME = "pending_anr.json"
 
-    fun file(filesDir: File): File = File(filesDir, FILE_NAME)
+    fun file(filesDir: File, fileName: String = FILE_NAME): File = File(filesDir, fileName)
 
     /**
      * Synchronous, fsync'd write on the crashing thread. Blocks until the bytes are on disk so the
      * frozen crash survives an immediate process death.
      */
-    fun writeBlocking(filesDir: File, json: String) {
-        val f = file(filesDir)
+    fun writeBlocking(filesDir: File, json: String, fileName: String = FILE_NAME) {
+        val f = file(filesDir, fileName)
         f.parentFile?.mkdirs()
         FileOutputStream(f).use { fos ->
             fos.write(json.toByteArray(Charsets.UTF_8))
@@ -36,32 +40,38 @@ internal object FatalCrashStore {
     }
 
     /** Reads the frozen batch, or null if absent. A corrupt file is dropped so replay can't loop. */
-    fun readBatch(filesDir: File, gson: Gson): TelemetryBatch? {
-        val f = file(filesDir)
+    fun readBatch(filesDir: File, gson: Gson, fileName: String = FILE_NAME): TelemetryBatch? {
+        val f = file(filesDir, fileName)
         if (!f.exists() || f.length() == 0L) return null
         return try {
             gson.fromJson(f.readText(), TelemetryBatch::class.java)
         } catch (e: Exception) {
-            Log.e(TAG, "Corrupt fatal-crash file — deleting", e)
+            Log.e(TAG, "Corrupt frozen-event file $fileName — deleting", e)
             f.delete()
             null
         }
     }
 
-    fun delete(filesDir: File) {
-        val f = file(filesDir)
+    fun delete(filesDir: File, fileName: String = FILE_NAME) {
+        val f = file(filesDir, fileName)
         if (f.exists()) f.delete()
     }
 
     /**
-     * The exactly-once delivery invariant, in one place: send the frozen crash as-is, delete only on
+     * The exactly-once delivery invariant, in one place: send the frozen record as-is, delete only on
      * a 2xx. Returns true when there's nothing to send or it was delivered; false when it must be
-     * retried. Both replay rails (init + WorkManager) call this so the invariant can't drift.
+     * retried. Every replay rail (crash init, ANR init, WorkManager) calls this so the invariant
+     * can't drift.
      */
-    suspend fun replayOnce(filesDir: File, client: TelemetryHttpClient, gson: Gson = Gson()): Boolean {
-        val batch = readBatch(filesDir, gson) ?: return true
+    suspend fun replayOnce(
+        filesDir: File,
+        client: TelemetryHttpClient,
+        gson: Gson = Gson(),
+        fileName: String = FILE_NAME
+    ): Boolean {
+        val batch = readBatch(filesDir, gson, fileName) ?: return true
         return if (client.sendBatch(batch).isSuccess) {
-            delete(filesDir)
+            delete(filesDir, fileName)
             true
         } else {
             false

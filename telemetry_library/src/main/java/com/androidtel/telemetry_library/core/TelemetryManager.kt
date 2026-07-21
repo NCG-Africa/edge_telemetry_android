@@ -13,6 +13,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.navigation.NavController
+import com.androidtel.telemetry_library.core.anr.AnrWatchdog
 import com.androidtel.telemetry_library.core.breadcrumbs.BreadcrumbManager
 import com.androidtel.telemetry_library.core.device.DeviceInfoCollector
 import com.androidtel.telemetry_library.core.ids.IdGenerator
@@ -26,12 +27,9 @@ import com.androidtel.telemetry_library.core.services.BatchProcessingService
 import com.androidtel.telemetry_library.core.models.DeviceInfo
 import com.androidtel.telemetry_library.core.models.EventAttributes
 import com.androidtel.telemetry_library.core.models.SessionInfo
-import com.androidtel.telemetry_library.core.models.TelemetryBatch
-import com.androidtel.telemetry_library.core.models.TelemetryEvent
 import com.androidtel.telemetry_library.core.models.UserInfo
 import com.androidtel.telemetry_library.core.session.SessionManager
 import com.androidtel.telemetry_library.core.user.UserProfileManager
-import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
 import okhttp3.Interceptor
 import kotlinx.coroutines.Dispatchers
@@ -114,7 +112,10 @@ class TelemetryManager private constructor(
     private lateinit var userProfileService: UserProfileService
     private lateinit var crashReportingService: CrashReportingService
     private lateinit var batchProcessingService: BatchProcessingService
-    
+
+    // Main-thread ANR watchdog (issue #60). Started on foreground, stopped on background.
+    private var anrWatchdog: AnrWatchdog? = null
+
     // Helper methods to check feature flags
     internal fun isMemoryTrackingEnabled(): Boolean = config.enableMemoryTracking
     internal fun isStorageTrackingEnabled(): Boolean = config.enableStorageTracking
@@ -216,6 +217,8 @@ class TelemetryManager private constructor(
          */
         @JvmStatic
         internal fun resetForTesting() {
+            // Stop the daemon so it doesn't keep posting heartbeats across tests (issue #60).
+            instance?.anrWatchdog?.stop()
             instance = null
         }
     }
@@ -328,6 +331,13 @@ class TelemetryManager private constructor(
                 }
             }
 
+            // Step 12b: Build the ANR watchdog BEFORE the lifecycle observer below, so a late init
+            // that happens while already foregrounded (addObserver replays onStart synchronously)
+            // still finds a non-null watchdog to arm (issue #60).
+            anrWatchdog = AnrWatchdog(onAnr = { durationMs, threads ->
+                crashReportingService.freezeAnr(durationMs, threads)
+            })
+
             // Step 13: Register ProcessLifecycleOwner observer if enabled
             if (config.enableLifecycleTracking && processObserverRegistered.compareAndSet(false, true)) {
                 ProcessLifecycleOwner.get().lifecycle.addObserver(this)
@@ -353,8 +363,12 @@ class TelemetryManager private constructor(
                 emitSessionStartedEvent()
             }
 
-            // Step 16: Replay a frozen fatal crash from a previous launch, if any (issue #56).
-            scope.launch { replayFatalCrashIfAny() }
+            // Step 16: Replay a frozen fatal crash from a previous launch, if any (issue #56), and a
+            // frozen ANR on the same durable rail (issue #60).
+            scope.launch {
+                replayFatalCrashIfAny()
+                replayPendingAnrIfAny()
+            }
 
         } catch (e: Exception) {
             Log.e("TelemetryManager", "Failed to complete initialization sequence", e)
@@ -454,6 +468,9 @@ class TelemetryManager private constructor(
 
         // 3. Sample memory on each foreground transition — bounded by user-engagement cadence
         sampleMemoryUsage()
+
+        // 4. Arm the ANR watchdog — foreground-only main-thread monitoring (issue #60).
+        anrWatchdog?.start()
     }
 
     // This is called when the app goes into the background. We can track the session end here.
@@ -477,6 +494,9 @@ class TelemetryManager private constructor(
 
         // 4. Clear the current trace root so a background sync doesn't attach to a stale tap (#59).
         TraceManager.onBackground()
+
+        // 5. Pause the ANR watchdog — background ANRs are out of scope for v1 (issue #60).
+        anrWatchdog?.stop()
     }
 
     // Records a new metric event with the specified details.
@@ -640,6 +660,19 @@ class TelemetryManager private constructor(
     // after a 2xx. Delegated to CrashReportingService.
     private suspend fun replayFatalCrashIfAny() {
         crashReportingService.replayFatalCrashIfAny()
+    }
+
+    /**
+     * ANR detected (issue #60). Runs on the watchdog thread — off the blocked main thread — so it can
+     * build the fully-enriched `app.anr` event and freeze it to the durable `filesDir` rail BEFORE
+     * the system may kill the app for the same hang. `is_fatal:false`/`handled:false`: a watchdog fire
+     * isn't a crash and wasn't caught by app code. Session/user are frozen at detection time by the
+     * standard enrichment. Delivered on next init via [replayPendingAnrIfAny], deleted only on a 2xx.
+     */
+    // ANR freeze/replay live on the durable-fatal rail owned by CrashReportingService (issue #60),
+    // alongside the crash freeze so the exactly-once discipline has one owner.
+    private suspend fun replayPendingAnrIfAny() {
+        crashReportingService.replayAnrIfAny()
     }
 
 
