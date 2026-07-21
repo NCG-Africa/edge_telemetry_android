@@ -15,7 +15,8 @@ data class TelemetryConfig(
     val enableFrameTracking: Boolean = true,
     val enableUserInteractionEvents: Boolean = true,
     val enableCapabilityEvents: Boolean = true,
-    val enableSessionTracking: Boolean = true
+    val enableSessionTracking: Boolean = true,
+    val traceSampleRate: Double = 1.0
 ) {
     init {
         require(apiKey.isNotBlank()) { "apiKey must not be blank" }
@@ -24,5 +25,6 @@ data class TelemetryConfig(
         require(batchSize > 0) { "batchSize must be > 0" }
         require(flushIntervalMs > 0) { "flushIntervalMs must be > 0" }
         require(sessionTimeoutMs > 0) { "sessionTimeoutMs must be > 0" }
+        require(traceSampleRate in 0.0..1.0) { "traceSampleRate must be in 0.0..1.0" }
     }
 }

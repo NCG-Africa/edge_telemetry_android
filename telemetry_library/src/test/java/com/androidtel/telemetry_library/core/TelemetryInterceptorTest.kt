@@ -1,5 +1,6 @@
 package com.androidtel.telemetry_library.core
 
+import com.androidtel.telemetry_library.core.trace.TraceManager
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -10,6 +11,7 @@ import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -40,6 +42,8 @@ class TelemetryInterceptorTest {
         // Release non-daemon OkHttp threads so the suite doesn't hang (see takerequest gotcha).
         client.dispatcher.executorService.shutdown()
         client.connectionPool.evictAll()
+        TraceManager.traceSampleRate = 1.0
+        TraceManager.onBackground()
     }
 
     @Test
@@ -67,5 +71,53 @@ class TelemetryInterceptorTest {
         assertEquals(0, recorded.captured["http.status_code"])
         assertEquals(false, recorded.captured["http.success"])
         assertFalse(recorded.captured.containsKey("http.error"))
+    }
+
+    @Test
+    fun `sampled root injects traceparent and stamps child span attrs`() {
+        TraceManager.traceSampleRate = 1.0
+        TraceManager.onBackground()
+        val root = TraceManager.onInteraction(System.currentTimeMillis())!!
+        server.enqueue(MockResponse().setResponseCode(200))
+
+        client.newCall(Request.Builder().url(server.url("/x")).build()).execute().close()
+
+        val sent = server.takeRequest().getHeader("traceparent")!!
+        assertTrue("well-formed traceparent", Regex("^00-[0-9a-f]{32}-[0-9a-f]{16}-01$").matches(sent))
+        assertTrue("carries the root trace id", sent.contains(root["trace.id"] as String))
+
+        val a = recorded.captured
+        assertEquals(root["trace.id"], a["trace.id"])
+        assertEquals(root["span.id"], a["parent.span.id"])
+        assertTrue(sent.contains(a["span.id"] as String))
+    }
+
+    @Test
+    fun `no active root injects no header and no trace attrs`() {
+        TraceManager.traceSampleRate = 1.0
+        TraceManager.onBackground() // no root
+        server.enqueue(MockResponse().setResponseCode(200))
+
+        client.newCall(Request.Builder().url(server.url("/x")).build()).execute().close()
+
+        assertNull("no header when no root", server.takeRequest().getHeader("traceparent"))
+        assertFalse(recorded.captured.containsKey("trace.id"))
+    }
+
+    @Test
+    fun `existing traceparent is not overwritten`() {
+        TraceManager.traceSampleRate = 1.0
+        TraceManager.onBackground()
+        TraceManager.onInteraction(System.currentTimeMillis()) // active root exists
+        val appHeader = "00-abcdef01234567890abcdef012345678-1122334455667788-01"
+        server.enqueue(MockResponse().setResponseCode(200))
+
+        client.newCall(
+            Request.Builder().url(server.url("/x")).header("traceparent", appHeader).build()
+        ).execute().close()
+
+        assertEquals(appHeader, server.takeRequest().getHeader("traceparent"))
+        assertFalse("we don't stamp our attrs when caller owns the header",
+            recorded.captured.containsKey("trace.id"))
     }
 }

@@ -10,6 +10,7 @@ import android.view.Window
 import android.view.WindowManager
 import android.widget.EditText
 import com.androidtel.telemetry_library.core.TelemetryManager
+import com.androidtel.telemetry_library.core.trace.TraceManager
 import kotlin.math.abs
 
 /**
@@ -72,6 +73,10 @@ class UserInteractionTracker(
         )
         if (direction != null) attrs["ui.direction"] = direction
         currentScreen()?.let { attrs["ui.screen"] = it }
+
+        // A user interaction always opens a fresh trace root (#59). Stamp trace.id/span.id when
+        // sampled; null (unsampled) leaves the event with no trace attrs.
+        TraceManager.onInteraction(System.currentTimeMillis())?.let { attrs.putAll(it) }
 
         telemetryManager.recordEvent("ui.interaction", attrs)
         telemetryManager.addBreadcrumb("$type $name", category = "ui")

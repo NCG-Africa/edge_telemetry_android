@@ -16,6 +16,7 @@ import androidx.navigation.NavController
 import com.androidtel.telemetry_library.core.breadcrumbs.BreadcrumbManager
 import com.androidtel.telemetry_library.core.device.DeviceInfoCollector
 import com.androidtel.telemetry_library.core.ids.IdGenerator
+import com.androidtel.telemetry_library.core.trace.TraceManager
 import com.androidtel.telemetry_library.core.models.AppInfo
 import com.androidtel.telemetry_library.core.services.EventTrackingService
 import com.androidtel.telemetry_library.core.services.SessionService
@@ -242,6 +243,7 @@ class TelemetryManager private constructor(
         try {
             // Step 1: Config already validated in TelemetryConfig.init
             Log.d("TelemetryManager", "Step 1: Config validated")
+            TraceManager.traceSampleRate = config.traceSampleRate
             
             // Step 2: Restore or generate deviceId
             idGenerator = IdGenerator()
@@ -472,6 +474,9 @@ class TelemetryManager private constructor(
         
         // 3. Pause the flush timer
         batchProcessingService.stopFlushTimer()
+
+        // 4. Clear the current trace root so a background sync doesn't attach to a stale tap (#59).
+        TraceManager.onBackground()
     }
 
     // Records a new metric event with the specified details.
@@ -544,6 +549,8 @@ class TelemetryManager private constructor(
     // --- Screen Navigation Tracking for Jetpack Compose ---
     fun recordComposeScreenView(screenRoute: String) {
         screenTimingTracker.startScreen(screenRoute)
+        // Child of a recent interaction (tap→nav) else a new trace root (#59).
+        val trace = TraceManager.onNavigation(System.currentTimeMillis()) ?: emptyMap()
         recordEvent(
             eventName = "navigation",
             attributes = mapOf(
@@ -553,7 +560,7 @@ class TelemetryManager private constructor(
                 "navigation.route_type" to "compose_route",
                 "navigation.has_arguments" to false,
                 "navigation.timestamp" to TelemetryTime.now()
-            )
+            ) + trace
         )
     }
 

@@ -9,6 +9,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.androidtel.telemetry_library.EdgeTelemetry
 import com.androidtel.telemetry_library.core.navigation.NavigationStackTracker
 import com.androidtel.telemetry_library.core.TelemetryTime
+import com.androidtel.telemetry_library.core.trace.TraceManager
 
 /**
  * Enhanced Compose integration for EdgeTelemetry that provides automatic navigation tracking
@@ -70,8 +71,9 @@ fun TrackComposeScreen(
             data = breadcrumbData
         )
         
-        // Track navigation event
-        EdgeTelemetry.getInstance().recordEvent("navigation", eventData)
+        // Track navigation event — child of a recent interaction (tap→nav) else a new trace root (#59).
+        val trace = TraceManager.onNavigation(System.currentTimeMillis()) ?: emptyMap()
+        EdgeTelemetry.getInstance().recordEvent("navigation", eventData + trace)
         
         onDispose {
             val duration = System.currentTimeMillis() - startTime
