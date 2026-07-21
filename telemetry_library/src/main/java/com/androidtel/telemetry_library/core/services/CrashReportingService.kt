@@ -5,8 +5,10 @@ import android.util.Log
 import com.androidtel.telemetry_library.core.TelemetryConfig
 import com.androidtel.telemetry_library.core.TelemetryHttpClient
 import com.androidtel.telemetry_library.core.TelemetryTime
+import com.androidtel.telemetry_library.core.anr.ThreadDump
 import com.androidtel.telemetry_library.core.breadcrumbs.BreadcrumbManager
 import com.androidtel.telemetry_library.core.crash.FatalCrashStore
+import com.androidtel.telemetry_library.core.navigation.NavigationStackTracker
 import com.androidtel.telemetry_library.core.models.EventAttributes
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.androidtel.telemetry_library.core.models.TelemetryEvent
@@ -120,6 +122,45 @@ internal class CrashReportingService(
             Log.w(TAG, "Fatal crash replay failed; scheduling WorkManager retry")
             CrashReplay.schedule(context, config.apiKey, config.endpoint)
         }
+    }
+
+    // --- ANR durable-fatal rail (issue #60) ---
+
+    /**
+     * ANR detected by the watchdog. Runs on the watchdog thread — off the blocked main thread — so it
+     * builds a fully-enriched `app.anr` event and freezes it to its own slot on the durable `filesDir`
+     * rail BEFORE the system may kill the app for the same hang. `is_fatal:false`/`handled:false`: a
+     * watchdog fire isn't a crash and wasn't caught by app code. Session/user are frozen at detection
+     * time by the standard enrichment.
+     *
+     * ponytail: durable-only — freeze here, deliver on next init via [replayAnrIfAny]. Spec §5 also
+     * enqueues to the live batch for same-session delivery, but that double-sends (the live send
+     * doesn't delete the disk file, so replay re-sends next launch). Upgrade path: enqueue live AND
+     * delete the slot once that batch is acked, if surviving-process ANRs must report same-session.
+     */
+    fun freezeAnr(durationMs: Long, threads: List<ThreadDump>) {
+        val attrs = mapOf<String, Any>(
+            "is_fatal" to false,
+            "handled" to false,
+            "anr.duration_ms" to durationMs,
+            "screen.name" to (NavigationStackTracker.currentScreen() ?: ""),
+            "anr.threads" to threads
+        )
+        val enriched = buildAttributesFn?.invoke(attrs) ?: return
+        val event = TelemetryEvent(
+            type = "event",
+            eventName = "app.anr",
+            timestamp = TelemetryTime.now(),
+            attributes = enriched
+        )
+        val batch = TelemetryBatch(batchSize = 1, timestamp = TelemetryTime.now(), events = listOf(event))
+        FatalCrashStore.writeBlocking(context.filesDir, gson.toJson(batch), FatalCrashStore.ANR_FILE_NAME)
+    }
+
+    // Replay a frozen ANR from a previous launch; delete only on a 2xx. On failure the file survives
+    // and the next init retries — same exactly-once rail as the crash (#60).
+    suspend fun replayAnrIfAny() {
+        FatalCrashStore.replayOnce(context.filesDir, httpClient, gson, FatalCrashStore.ANR_FILE_NAME)
     }
 
     // --- Normal batch rail ---

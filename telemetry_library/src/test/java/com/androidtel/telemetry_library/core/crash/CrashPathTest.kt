@@ -191,6 +191,44 @@ class CrashPathTest {
         assertTrue(event.attributes.customAttributes.containsKey("crash.thread"))
     }
 
+    // #60: ANR freeze writes a fully-enriched app.anr to its OWN durable slot (separate from the
+    // crash slot), is_fatal:false/handled:false, all-thread dump with main flagged, standard enrichment.
+    @Test
+    fun `anr freeze writes enriched app_anr to its own slot`() {
+        val filesDir = RuntimeEnvironment.getApplication().filesDir
+        com.androidtel.telemetry_library.core.crash.FatalCrashStore.delete(
+            filesDir, com.androidtel.telemetry_library.core.crash.FatalCrashStore.ANR_FILE_NAME
+        )
+        service.initialize(buildAttributesFn = { enrich(it) }, recordCrashEventFn = {})
+
+        val threads = listOf(
+            com.androidtel.telemetry_library.core.anr.ThreadDump("main", "RUNNABLE", true, "at a.b(F:1)"),
+            com.androidtel.telemetry_library.core.anr.ThreadDump("worker", "WAITING", false, "at c.d(F:2)")
+        )
+        service.freezeAnr(durationMs = 5000L, threads = threads)
+
+        // Crash slot untouched; ANR rides its own file.
+        assertNull(FatalCrashStore.readBatch(filesDir, gson))
+        val batch = FatalCrashStore.readBatch(
+            filesDir, gson, com.androidtel.telemetry_library.core.crash.FatalCrashStore.ANR_FILE_NAME
+        )!!
+        val event = batch.events.first()
+        assertEquals("app.anr", event.eventName)
+        assertEquals(crashSessionId, event.attributes.session.sessionId)
+        assertEquals(crashUserId, event.attributes.user.userId)
+        val custom = event.attributes.customAttributes
+        assertEquals(false, custom["is_fatal"])
+        assertEquals(false, custom["handled"])
+        assertTrue(custom.containsKey("anr.duration_ms"))
+        assertTrue(custom.containsKey("screen.name"))
+        // Gson round-trips the dump into a list of maps (customAttributes is Map<String,Any>).
+        @Suppress("UNCHECKED_CAST")
+        val dumped = custom["anr.threads"] as List<Map<String, Any>>
+        assertTrue("dump flags the main thread", dumped.any { it["main"] == true })
+
+        FatalCrashStore.delete(filesDir, com.androidtel.telemetry_library.core.crash.FatalCrashStore.ANR_FILE_NAME)
+    }
+
     // 2. Fatal survives process death: frozen file replays with its ORIGINAL session, and is
     //    deleted only after a 2xx (non-2xx leaves it for retry).
     @Test
