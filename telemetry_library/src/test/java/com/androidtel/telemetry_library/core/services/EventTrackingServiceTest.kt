@@ -194,55 +194,6 @@ class EventTrackingServiceTest {
     }
 
     @Test
-    fun `test recordNetworkRequest creates event with network attributes`() {
-        service.recordNetworkRequest(
-            url = "https://api.example.com/users",
-            method = "POST",
-            statusCode = 200,
-            durationMs = 345,
-            requestBodySize = 1024,
-            responseBodySize = 2048,
-            error = null,
-            attributes = emptyMap(),
-            userInfo = userInfo,
-            sessionInfo = sessionInfo
-        )
-        
-        assertEquals(1, service.getEventCount())
-        val event = service.getEventQueue().peek()
-        assertEquals("http.request", event?.eventName)
-        
-        val customAttrs = event?.attributes?.customAttributes as Map<*, *>
-        assertEquals("https://api.example.com/users", customAttrs["http.url"])
-        assertEquals("POST", customAttrs["http.method"])
-        assertEquals(200, customAttrs["http.status_code"])
-        assertEquals(345L, customAttrs["http.duration_ms"])
-        assertEquals(true, customAttrs["http.success"])
-        assertEquals(1024L, customAttrs["http.request_body_size"])
-        assertEquals(2048L, customAttrs["http.response_body_size"])
-        assertEquals("none", customAttrs["http.error"])
-    }
-
-    @Test
-    fun `test recordNetworkRequest with error`() {
-        service.recordNetworkRequest(
-            url = "https://api.example.com/users",
-            method = "GET",
-            statusCode = 500,
-            durationMs = 123,
-            error = "Internal Server Error",
-            attributes = emptyMap(),
-            userInfo = userInfo,
-            sessionInfo = sessionInfo
-        )
-        
-        val event = service.getEventQueue().peek()
-        val customAttrs = event?.attributes?.customAttributes as Map<*, *>
-        assertEquals(false, customAttrs["http.success"])
-        assertEquals("Internal Server Error", customAttrs["http.error"])
-    }
-
-    @Test
     fun `test resetEventCount clears count`() {
         service.recordEvent("event1", emptyMap(), userInfo, sessionInfo)
         service.recordEvent("event2", emptyMap(), userInfo, sessionInfo)
@@ -371,24 +322,6 @@ class EventTrackingServiceTest {
         
         assertNull(event) // Should return null when appInfo is not initialized
         assertEquals(1, uninitializedService.getEventCount()) // Count still increments
-    }
-
-    @Test
-    fun `test network request with client error status code`() {
-        service.recordNetworkRequest(
-            url = "https://api.example.com/not-found",
-            method = "GET",
-            statusCode = 404,
-            durationMs = 100,
-            attributes = emptyMap(),
-            userInfo = userInfo,
-            sessionInfo = sessionInfo
-        )
-        
-        val event = service.getEventQueue().peek()
-        val customAttrs = event?.attributes?.customAttributes as Map<*, *>
-        assertEquals(false, customAttrs["http.success"])
-        assertEquals(404, customAttrs["http.status_code"])
     }
 
     @Test

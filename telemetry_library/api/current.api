@@ -324,7 +324,6 @@ package com.androidtel.telemetry_library.core {
     method @Deprecated public void recordError(Throwable throwable, optional java.util.Map<java.lang.String,?> attributes);
     method public void recordEvent(String eventName, optional java.util.Map<java.lang.String,?> attributes);
     method public void recordMetric(String metricName, double value, optional java.util.Map<java.lang.String,?> attributes);
-    method public void recordNetworkRequest(String url, String method, int statusCode, long durationMs, optional long requestBodySize, optional long responseBodySize, optional String? error, optional java.util.Map<java.lang.String,?> attributes);
     method public void recordScreenDuration(String screenName, long durationMs, String exitMethod);
     method @Deprecated public void recordScreenView(String screenName);
     method public void setLastUserAction(String action);
@@ -495,19 +494,6 @@ package com.androidtel.telemetry_library.core.events {
   }
 
   public static final class JsonEventTracker.Companion {
-  }
-
-}
-
-package com.androidtel.telemetry_library.core.http {
-
-  public final class EdgeTelemetryInterceptor implements okhttp3.Interceptor {
-    ctor public EdgeTelemetryInterceptor(com.androidtel.telemetry_library.core.events.JsonEventTracker eventTracker, com.androidtel.telemetry_library.core.breadcrumbs.BreadcrumbManager breadcrumbManager, String telemetryEndpoint);
-    method public okhttp3.Response intercept(okhttp3.Interceptor.Chain chain);
-    field public static final com.androidtel.telemetry_library.core.http.EdgeTelemetryInterceptor.Companion Companion;
-  }
-
-  public static final class EdgeTelemetryInterceptor.Companion {
   }
 
 }

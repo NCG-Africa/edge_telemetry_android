@@ -379,11 +379,7 @@ fun MyAppTheme(content: @Composable () -> Unit) {
 /*
 class ApiService {
     private val httpClient = OkHttpClient.Builder()
-        .addInterceptor(EdgeTelemetryInterceptor(
-            eventTracker = EdgeTelemetry.getInstance().eventTracker,
-            breadcrumbManager = EdgeTelemetry.getInstance().breadcrumbManager,
-            telemetryEndpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry"
-        ))
+        .addInterceptor(TelemetryManager.createNetworkInterceptor())
         .build()
     
     suspend fun fetchUserData(): Result<UserData> {

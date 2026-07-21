@@ -1,0 +1,71 @@
+package com.androidtel.telemetry_library.core
+
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.slot
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import java.util.concurrent.TimeUnit
+
+class TelemetryInterceptorTest {
+
+    private lateinit var server: MockWebServer
+    private lateinit var client: OkHttpClient
+    private val telemetryManager: TelemetryManager = mockk(relaxed = true)
+    private val recorded = slot<Map<String, Any>>()
+
+    @Before
+    fun setup() {
+        server = MockWebServer()
+        server.start()
+        client = OkHttpClient.Builder()
+            .addInterceptor(TelemetryInterceptor(telemetryManager))
+            .connectTimeout(1, TimeUnit.SECONDS)
+            .readTimeout(1, TimeUnit.SECONDS)
+            .build()
+        every { telemetryManager.recordEvent("http.request", capture(recorded)) } returns Unit
+    }
+
+    @After
+    fun teardown() {
+        server.shutdown()
+        // Release non-daemon OkHttp threads so the suite doesn't hang (see takerequest gotcha).
+        client.dispatcher.executorService.shutdown()
+        client.connectionPool.evictAll()
+    }
+
+    @Test
+    fun `auto HTTP emits http dot keys, 2xx success, no query string`() {
+        server.enqueue(MockResponse().setResponseCode(200))
+        client.newCall(
+            Request.Builder().url(server.url("/pay?token=SECRET&acct=123")).build()
+        ).execute().close()
+
+        val a = recorded.captured
+        assertTrue("http.status_code present", a.containsKey("http.status_code"))
+        assertEquals(200, a["http.status_code"])
+        assertEquals(true, a["http.success"])
+        assertFalse("no query on the wire", (a["http.url"] as String).contains("?"))
+        assertFalse("no token leak", (a["http.url"] as String).contains("SECRET"))
+        assertFalse("no legacy http.error key", a.containsKey("http.error"))
+    }
+
+    @Test
+    fun `transport failure emits status 0, success false, still recorded`() {
+        // Point client at a dead port so chain.proceed throws IOException.
+        runCatching {
+            client.newCall(Request.Builder().url("http://127.0.0.1:1/x").build()).execute()
+        }
+        assertEquals(0, recorded.captured["http.status_code"])
+        assertEquals(false, recorded.captured["http.success"])
+        assertFalse(recorded.captured.containsKey("http.error"))
+    }
+}

@@ -2,7 +2,6 @@ package com.androidtel.telemetry_library.core
 
 import okhttp3.Interceptor
 import okhttp3.Response
-import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 class TelemetryInterceptor(
@@ -21,32 +20,28 @@ class TelemetryInterceptor(
         
         val startTime = System.nanoTime()
         var response: Response? = null
-        var error: IOException? = null
 
         try {
             response = chain.proceed(request)
             return response
-        } catch (e: IOException) {
-            error = e
-            throw e
         } finally {
             val endTime = System.nanoTime()
             val durationMs = TimeUnit.NANOSECONDS.toMillis(endTime - startTime)
-            val requestBodySize = request.body?.contentLength() ?: 0
-            val responseBodySize = response?.body?.contentLength() ?: 0
             val statusCode = response?.code ?: 0
 
-            telemetryManager.recordEvent(
-                eventName = "http_request",
-                attributes = mapOf(
-                    "url" to requestUrl.substringBefore('?'),
-                    "method" to request.method,
-                    "response_code" to statusCode,
-                    "latency_ms" to durationMs,
-                    "request_size_bytes" to requestBodySize,
-                    "response_size_bytes" to responseBodySize
-                )
-            )
+            val attributes = buildMap<String, Any> {
+                put("http.url", requestUrl.substringBefore('?'))
+                put("http.method", request.method)
+                put("http.status_code", statusCode)
+                put("http.duration_ms", durationMs)
+                put("http.success", statusCode in 200..299)
+                // Omit size fields when contentLength() < 0 (chunked/streamed): a true
+                // "optional pair", so the backend column stays null rather than a false 0.
+                request.body?.contentLength()?.takeIf { it >= 0 }?.let { put("http.request_size", it) }
+                response?.body?.contentLength()?.takeIf { it >= 0 }?.let { put("http.response_size", it) }
+            }
+
+            telemetryManager.recordEvent(eventName = "http.request", attributes = attributes)
         }
     }
     

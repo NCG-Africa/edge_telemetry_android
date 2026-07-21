@@ -66,7 +66,6 @@ edge_telemetry_android/
 │           ├── user/                     # UserProfileManager
 │           ├── ids/                      # IdGenerator (device, session, user IDs)
 │           ├── navigation/              # NavigationStackTracker
-│           ├── http/                     # EdgeTelemetryInterceptor
 │           ├── device/                   # DeviceInfoCollector
 │           ├── location/                # IpLocationProvider (opt-in)
 │           ├── events/                  # JsonEventTracker
