@@ -12,6 +12,26 @@ class IdGenerator {
         private const val KEY_USER_ID = "edge_rum_user_id"
 
         private val secureRandom = SecureRandom()
+
+        /** W3C Trace Context trace-id: 32 lowercase hex (128-bit). Raw hex, not a join key (#43). */
+        fun traceId(): String = randomHex(16)
+
+        /** W3C Trace Context span-id: 16 lowercase hex (64-bit). */
+        fun spanId(): String = randomHex(8)
+
+        /** `2 * byteCount` lowercase hex chars from the shared crypto RNG. */
+        private fun randomHex(byteCount: Int): String {
+            val bytes = ByteArray(byteCount)
+            synchronized(secureRandom) {
+                secureRandom.nextBytes(bytes)
+            }
+            val sb = StringBuilder(byteCount * 2)
+            for (b in bytes) {
+                sb.append(Character.forDigit((b.toInt() shr 4) and 0xF, 16))
+                sb.append(Character.forDigit(b.toInt() and 0xF, 16))
+            }
+            return sb.toString()
+        }
     }
     
     @Volatile
@@ -64,16 +84,5 @@ class IdGenerator {
     }
 
     // 16 lowercase hex chars (64 bits) from crypto RNG.
-    private fun hex16(): String {
-        val bytes = ByteArray(8)
-        synchronized(secureRandom) {
-            secureRandom.nextBytes(bytes)
-        }
-        val sb = StringBuilder(16)
-        for (b in bytes) {
-            sb.append(Character.forDigit((b.toInt() shr 4) and 0xF, 16))
-            sb.append(Character.forDigit(b.toInt() and 0xF, 16))
-        }
-        return sb.toString()
-    }
+    private fun hex16(): String = randomHex(8)
 }

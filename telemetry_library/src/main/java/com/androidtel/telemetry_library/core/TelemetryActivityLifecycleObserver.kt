@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.fragment.app.FragmentActivity
 import com.androidtel.telemetry_library.core.interaction.UserInteractionTracker
 import com.androidtel.telemetry_library.core.navigation.NavigationStackTracker
+import com.androidtel.telemetry_library.core.trace.TraceManager
 
 class TelemetryActivityLifecycleObserver(
     private val telemetryManager: TelemetryManager = TelemetryManager.getInstance()
@@ -52,17 +53,17 @@ class TelemetryActivityLifecycleObserver(
 
         // Track navigation with proper structure
         val navEvent = navigationTracker.push(screenName)
-        telemetryManager.recordEvent(
-            eventName = "navigation",
-            attributes = mapOf(
-                "navigation.from_screen" to (navEvent.fromScreen ?: ""),
-                "navigation.to_screen" to navEvent.toScreen,
-                "navigation.method" to navEvent.method.toLowerCaseString(),
-                "navigation.route_type" to detectRouteType(activity),
-                "navigation.has_arguments" to hasIntentExtras(activity),
-                "navigation.timestamp" to navEvent.timestamp
-            )
+        val navAttributes = mutableMapOf<String, Any>(
+            "navigation.from_screen" to (navEvent.fromScreen ?: ""),
+            "navigation.to_screen" to navEvent.toScreen,
+            "navigation.method" to navEvent.method.toLowerCaseString(),
+            "navigation.route_type" to detectRouteType(activity),
+            "navigation.has_arguments" to hasIntentExtras(activity),
+            "navigation.timestamp" to navEvent.timestamp
         )
+        // Child of a recent interaction (tap→nav) else a new trace root (#59).
+        TraceManager.onNavigation(System.currentTimeMillis())?.let { navAttributes.putAll(it) }
+        telemetryManager.recordEvent(eventName = "navigation", attributes = navAttributes)
     }
 
     override fun onActivityPaused(activity: Activity) {

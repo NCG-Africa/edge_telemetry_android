@@ -1,5 +1,6 @@
 package com.androidtel.telemetry_library.core
 
+import com.androidtel.telemetry_library.core.trace.TraceManager
 import okhttp3.Interceptor
 import okhttp3.Response
 import java.util.concurrent.TimeUnit
@@ -18,11 +19,19 @@ class TelemetryInterceptor(
             return chain.proceed(request)
         }
         
+        // Distributed trace child span (#59): mint one under the current root, inject the W3C
+        // traceparent, and stamp the trace attrs on http.request. If the caller already set a
+        // traceparent, don't overwrite it (and don't stamp our attrs); no sampled root → no trace.
+        val trace = if (request.header("traceparent") == null) TraceManager.onNetworkCall() else null
+        val outgoing = trace?.let {
+            request.newBuilder().header("traceparent", it.first).build()
+        } ?: request
+
         val startTime = System.nanoTime()
         var response: Response? = null
 
         try {
-            response = chain.proceed(request)
+            response = chain.proceed(outgoing)
             return response
         } finally {
             val endTime = System.nanoTime()
@@ -39,6 +48,7 @@ class TelemetryInterceptor(
                 // "optional pair", so the backend column stays null rather than a false 0.
                 request.body?.contentLength()?.takeIf { it >= 0 }?.let { put("http.request_size", it) }
                 response?.body?.contentLength()?.takeIf { it >= 0 }?.let { put("http.response_size", it) }
+                trace?.let { putAll(it.second) }
             }
 
             telemetryManager.recordEvent(eventName = "http.request", attributes = attributes)

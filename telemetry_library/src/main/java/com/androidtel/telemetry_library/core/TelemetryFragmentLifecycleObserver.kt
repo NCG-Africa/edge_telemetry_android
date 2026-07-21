@@ -8,6 +8,7 @@ import android.view.View
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
 import com.androidtel.telemetry_library.core.navigation.NavigationStackTracker
+import com.androidtel.telemetry_library.core.trace.TraceManager
 
 class TelemetryFragmentLifecycleObserver(private val telemetryManager: TelemetryManager = TelemetryManager.getInstance()) :
     FragmentManager.FragmentLifecycleCallbacks() {
@@ -25,6 +26,8 @@ class TelemetryFragmentLifecycleObserver(private val telemetryManager: Telemetry
 
         // Track navigation with proper structure
         val navEvent = navigationTracker.push(fragmentName)
+        // Child of a recent interaction (tap→nav) else a new trace root (#59).
+        val trace = TraceManager.onNavigation(System.currentTimeMillis()) ?: emptyMap()
         telemetryManager.recordEvent(
             eventName = "navigation",
             attributes = mapOf(
@@ -34,7 +37,7 @@ class TelemetryFragmentLifecycleObserver(private val telemetryManager: Telemetry
                 "navigation.route_type" to "fragment_flow",
                 "navigation.has_arguments" to (f.arguments?.isEmpty == false),
                 "navigation.timestamp" to navEvent.timestamp
-            )
+            ) + trace
         )
     }
 

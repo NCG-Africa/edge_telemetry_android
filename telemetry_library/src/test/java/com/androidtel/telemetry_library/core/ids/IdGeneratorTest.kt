@@ -600,6 +600,24 @@ class IdGeneratorTest {
         assertTrue("Session ID must start with session_", sessionId.startsWith("session_"))
     }
 
+    // --- W3C trace/span raw-hex helpers (#59) ---
+
+    @Test
+    fun `traceId is 32 lowercase hex`() {
+        repeat(100) { assertTrue(Regex("^[0-9a-f]{32}$").matches(IdGenerator.traceId())) }
+    }
+
+    @Test
+    fun `spanId is 16 lowercase hex`() {
+        repeat(100) { assertTrue(Regex("^[0-9a-f]{16}$").matches(IdGenerator.spanId())) }
+    }
+
+    @Test
+    fun `trace and span ids are collision-free over 1000`() {
+        assertEquals(1000, (1..1000).map { IdGenerator.traceId() }.toSet().size)
+        assertEquals(1000, (1..1000).map { IdGenerator.spanId() }.toSet().size)
+    }
+
     @Test
     fun `fresh install - device user session all mint new format`() {
         `when`(mockPrefs.getString("device_id", null)).thenReturn(null)
