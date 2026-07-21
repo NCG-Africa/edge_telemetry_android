@@ -22,17 +22,11 @@
     public *** trackScreen(...);
     public *** setUserProfile(...);
     public *** clearUserProfile(...);
-    public *** recordNetworkRequest(...);
     public static *** createNetworkInterceptor();
 }
 
 # Keep TelemetryInterceptor for OkHttp integration
 -keep public class com.androidtel.telemetry_library.core.TelemetryInterceptor {
-    public <init>(...);
-}
-
-# Keep EdgeTelemetryInterceptor for OkHttp integration
--keep public class com.androidtel.telemetry_library.core.http.EdgeTelemetryInterceptor {
     public <init>(...);
 }
 

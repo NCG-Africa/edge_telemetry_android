@@ -155,20 +155,6 @@ class TelemetryManagerIntegrationTest {
     }
 
     @Test
-    fun `test network tracking workflow`() {
-        telemetryManager.recordNetworkRequest(
-            url = "https://api.example.com/users",
-            method = "GET",
-            statusCode = 200,
-            durationMs = 234,
-            requestBodySize = 0,
-            responseBodySize = 1024
-        )
-
-        // Network request should be tracked
-    }
-
-    @Test
     fun `test breadcrumb workflow`() {
         telemetryManager.addBreadcrumb("Step 1", "navigation", "info")
         telemetryManager.addBreadcrumb("Step 2", "user_action", "debug")
@@ -360,14 +346,6 @@ class TelemetryManagerIntegrationTest {
         // Record events
         telemetryManager.recordEvent("login_attempt", mapOf("method" to "email"))
 
-        // Track network request
-        telemetryManager.recordNetworkRequest(
-            url = "https://api.example.com/auth/login",
-            method = "POST",
-            statusCode = 200,
-            durationMs = 456
-        )
-
         // Record success event
         telemetryManager.recordEvent("login_success", emptyMap())
 
@@ -407,19 +385,6 @@ class TelemetryManagerIntegrationTest {
         }
 
         // Batch should be triggered (verified by no exceptions)
-    }
-
-    @Test
-    fun `test network request with error tracking`() {
-        telemetryManager.recordNetworkRequest(
-            url = "https://api.example.com/error",
-            method = "GET",
-            statusCode = 500,
-            durationMs = 123,
-            error = "Internal Server Error"
-        )
-
-        // Error should be tracked
     }
 
     @Test

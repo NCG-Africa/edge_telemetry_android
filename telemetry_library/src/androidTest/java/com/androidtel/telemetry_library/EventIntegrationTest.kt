@@ -12,8 +12,6 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
 /**
  * End-to-End Integration Tests
@@ -51,19 +49,6 @@ class EventIntegrationTest {
     
     @Test
     fun testHttpRequestEventTracking() {
-        val latch = CountDownLatch(1)
-        
-        // Track HTTP request
-        telemetryManager.recordNetworkRequest(
-            url = "https://api.example.com/users",
-            method = "GET",
-            statusCode = 200,
-            durationMs = 150L
-        )
-        
-        // Give time for event to be queued
-        latch.await(1, TimeUnit.SECONDS)
-        
         // Verify event would pass validation
         val attributes = mapOf(
             "http.url" to "https://api.example.com/users",

@@ -93,36 +93,6 @@ internal class EventTrackingService(
     }
     
     /**
-     * Record network request event
-     */
-    fun recordNetworkRequest(
-        url: String,
-        method: String,
-        statusCode: Int,
-        durationMs: Long,
-        requestBodySize: Long = 0,
-        responseBodySize: Long = 0,
-        error: String? = null,
-        attributes: Map<String, Any> = emptyMap(),
-        userInfo: UserInfo,
-        sessionInfo: SessionInfo
-    ) {
-        val networkAttributes = mapOf(
-            "http.url" to url,
-            "http.method" to method,
-            "http.status_code" to statusCode,
-            "http.duration_ms" to durationMs,
-            "http.timestamp" to TelemetryTime.now(),
-            "http.success" to (statusCode < 400),
-            "http.request_body_size" to requestBodySize,
-            "http.response_body_size" to responseBodySize,
-            "http.error" to (error ?: "none")
-        )
-        val combinedAttributes = attributes + networkAttributes
-        recordEvent("http.request", combinedAttributes, userInfo, sessionInfo)
-    }
-    
-    /**
      * Build event attributes with full context
      */
     private fun buildAttributes(

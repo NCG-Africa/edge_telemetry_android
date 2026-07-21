@@ -518,36 +518,6 @@ class TelemetryManager private constructor(
     }
 
 
-
-    // --- Network Request Tracking ---
-    fun recordNetworkRequest(
-        url: String,
-        method: String,
-        statusCode: Int,
-        durationMs: Long,
-        requestBodySize: Long = 0,
-        responseBodySize: Long = 0,
-        error: String? = null,
-        attributes: Map<String, Any> = emptyMap()
-    ) {
-        if (!isReady.get()) {
-            offerToPreInitQueue { recordNetworkRequest(url, method, statusCode, durationMs, requestBodySize, responseBodySize, error, attributes) }
-            return
-        }
-        
-        val userInfo = userProfileService.getUserInfo()
-        val sessionInfo = sessionService.getSessionInfo(
-            eventTrackingService.getEventCount(),
-            eventTrackingService.getMetricCount(),
-            getNetworkType(context)
-        )
-        
-        eventTrackingService.recordNetworkRequest(
-            url, method, statusCode, durationMs, requestBodySize, responseBodySize, error, attributes, userInfo, sessionInfo
-        )
-        maybeSendBatch()
-    }
-
     // --- Crash and Error Reporting ---
     fun recordCrash(throwable: Throwable) {
         crashReportingService.recordCrash(throwable)
