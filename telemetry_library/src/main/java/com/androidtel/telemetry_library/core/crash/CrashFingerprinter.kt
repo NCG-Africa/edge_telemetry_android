@@ -1,7 +1,7 @@
 package com.androidtel.telemetry_library.core.crash
 
 /**
- * Crash fingerprinting algorithm that matches the Flutter SDK exactly
+ * Crash fingerprinting algorithm that matches the backend collector exactly
  */
 object CrashFingerprinter {
     

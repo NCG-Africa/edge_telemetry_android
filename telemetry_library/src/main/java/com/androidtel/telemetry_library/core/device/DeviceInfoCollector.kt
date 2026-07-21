@@ -10,7 +10,7 @@ import com.androidtel.telemetry_library.core.ids.IdGenerator
 
 /**
  * Device Information Collector that provides comprehensive device attributes
- * matching the Flutter SDK payload structure exactly
+ * matching the backend collector payload structure exactly
  */
 class DeviceInfoCollector(
     private val context: Context,

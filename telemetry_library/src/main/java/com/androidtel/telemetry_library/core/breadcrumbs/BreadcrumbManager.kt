@@ -10,7 +10,7 @@ import kotlin.concurrent.write
 
 /**
  * Breadcrumb Manager that maintains a circular buffer of breadcrumbs
- * with thread-safe operations and JSON serialization matching Flutter SDK
+ * with thread-safe operations and JSON serialization matching the backend collector
  */
 class BreadcrumbManager {
     
