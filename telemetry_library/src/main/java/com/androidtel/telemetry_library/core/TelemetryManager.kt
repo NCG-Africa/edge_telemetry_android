@@ -280,7 +280,8 @@ class TelemetryManager private constructor(
             crashReportingService = CrashReportingService(context, config, httpClient)
             crashReportingService.initialize(
                 buildAttributesFn = { attrs -> buildAttributes(attrs) },
-                recordCrashEventFn = { attrs -> recordEvent("app.crash", attrs) }
+                recordCrashEventFn = { attrs -> recordEvent("app.crash", attrs) },
+                recordHangEventFn = { attrs -> recordEvent("app.hang", attrs) }
             )
             Log.d("TelemetryManager", "Step 7: CrashReportingService initialized")
             
@@ -334,9 +335,10 @@ class TelemetryManager private constructor(
             // Step 12b: Build the ANR watchdog BEFORE the lifecycle observer below, so a late init
             // that happens while already foregrounded (addObserver replays onStart synchronously)
             // still finds a non-null watchdog to arm (issue #60).
-            anrWatchdog = AnrWatchdog(onAnr = { durationMs, threads ->
-                crashReportingService.freezeAnr(durationMs, threads)
-            })
+            anrWatchdog = AnrWatchdog(
+                onAnr = { durationMs, threads -> crashReportingService.freezeAnr(durationMs, threads) },
+                onHang = { durationMs, stack -> crashReportingService.recordHang(durationMs, stack) }
+            )
 
             // Step 13: Register ProcessLifecycleOwner observer if enabled
             if (config.enableLifecycleTracking && processObserverRegistered.compareAndSet(false, true)) {

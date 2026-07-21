@@ -174,7 +174,8 @@ class CrashPathTest {
         }
         service.initialize(
             buildAttributesFn = { enrich(it) },
-            recordCrashEventFn = { /* not used on the fatal rail */ }
+            recordCrashEventFn = { /* not used on the fatal rail */ },
+            recordHangEventFn = { /* not used on the fatal rail */ }
         )
 
         val installed = Thread.getDefaultUncaughtExceptionHandler()!!
@@ -199,7 +200,7 @@ class CrashPathTest {
         com.androidtel.telemetry_library.core.crash.FatalCrashStore.delete(
             filesDir, com.androidtel.telemetry_library.core.crash.FatalCrashStore.ANR_FILE_NAME
         )
-        service.initialize(buildAttributesFn = { enrich(it) }, recordCrashEventFn = {})
+        service.initialize(buildAttributesFn = { enrich(it) }, recordCrashEventFn = {}, recordHangEventFn = {})
 
         val threads = listOf(
             com.androidtel.telemetry_library.core.anr.ThreadDump("main", "RUNNABLE", true, "at a.b(F:1)"),
