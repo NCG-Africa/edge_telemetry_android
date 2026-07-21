@@ -862,7 +862,7 @@ class TelemetryManager private constructor(
     }
 
     // ================================
-    // Flutter-Compatible Public API
+    // Backend-Compatible Public API
     // ================================
 
     /**

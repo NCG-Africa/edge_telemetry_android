@@ -3,7 +3,7 @@ package com.androidtel.telemetry_library.core.breadcrumbs
 import com.androidtel.telemetry_library.core.TelemetryTime
 
 /**
- * Breadcrumb data structure matching Flutter SDK format
+ * Breadcrumb data structure matching backend collector format
  */
 data class Breadcrumb(
     val message: String,
@@ -31,7 +31,7 @@ data class Breadcrumb(
 }
 
 /**
- * Breadcrumb categories matching Flutter SDK
+ * Breadcrumb categories matching the backend collector
  */
 object BreadcrumbCategory {
     const val NAVIGATION = "navigation"
@@ -43,7 +43,7 @@ object BreadcrumbCategory {
 }
 
 /**
- * Breadcrumb levels matching Flutter SDK
+ * Breadcrumb levels matching the backend collector
  */
 object BreadcrumbLevel {
     const val DEBUG = "debug"
