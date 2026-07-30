@@ -28,7 +28,11 @@ class UnknownException(code: Int) : IOException("Unknown HTTP error code: $code"
 class TelemetryHttpClient(
     private val telemetryUrl: String,
     private val apiKey: String,
-    private val debugMode: Boolean
+    private val debugMode: Boolean,
+    // Static device-context bundle (issue #93), minted once at init. Stamped verbatim on every
+    // outgoing event in flattenAttributes — the single chokepoint every event/crash/offline batch
+    // passes through. Native types (Int/Boolean), not stringified. Empty for callers that omit it.
+    private val staticDeviceContext: Map<String, Any?> = emptyMap()
 ) {
 
 
@@ -180,6 +184,9 @@ class TelemetryHttpClient(
         flat["device.fingerprint"] = attrs.device.fingerprint
         flat["device.hardware"] = attrs.device.hardware
         flat["device.product"] = attrs.device.product
+
+        // Static device-context bundle (issue #93) — 9 launch-time device.* keys, native types.
+        flat.putAll(staticDeviceContext)
 
         // User - CRITICAL: user.id must never be null or empty
         // This should never happen due to validation in TelemetryManager.sendBatch()

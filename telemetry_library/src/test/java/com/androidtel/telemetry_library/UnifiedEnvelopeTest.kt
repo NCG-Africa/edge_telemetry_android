@@ -95,6 +95,58 @@ class UnifiedEnvelopeTest {
     }
 
     @Test
+    fun `static device-context bundle is stamped on every event with native types`() {
+        // Seam A (issue #93): the 9 static device.* keys minted once at init ride the transport's
+        // enrichment and land on every flattened event with their exact names + native types.
+        val staticContext = mapOf<String, Any?>(
+            "device.cpu_abi" to "arm64-v8a",
+            "device.cpu_cores" to 8,
+            "device.low_ram" to false,
+            "device.screen_density" to 420,
+            "device.screen_width_px" to 1080,
+            "device.screen_height_px" to 2340,
+            "device.dark_mode" to true,
+            "device.locale" to "en-US",
+            "device.timezone" to "Africa/Nairobi"
+        )
+        val client = TelemetryHttpClient(
+            telemetryUrl = mockWebServer.url("/telemetry").toString(),
+            apiKey = testApiKey,
+            debugMode = false,
+            staticDeviceContext = staticContext
+        )
+        mockWebServer.enqueue(MockResponse().setResponseCode(200))
+        runBlocking { client.sendBatch(createTestBatch(events = 2)) }
+        val body = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!.body.readUtf8()
+        client.getOkHttpClient().release()
+
+        val events = JsonParser.parseString(body).asJsonObject.getAsJsonArray("events")
+        assertTrue(events.size() > 0)
+        events.forEach { el ->
+            val attrs = el.asJsonObject.getAsJsonObject("attributes")
+
+            assertEquals("arm64-v8a", attrs.get("device.cpu_abi").asString)
+            assertEquals("en-US", attrs.get("device.locale").asString)
+            assertEquals("Africa/Nairobi", attrs.get("device.timezone").asString)
+
+            // Int keys must serialize as JSON numbers, not strings.
+            listOf("device.cpu_cores", "device.screen_density",
+                "device.screen_width_px", "device.screen_height_px").forEach { k ->
+                val p = attrs.get(k).asJsonPrimitive
+                assertTrue("$k must be a JSON number", p.isNumber)
+            }
+            assertEquals(8, attrs.get("device.cpu_cores").asInt)
+            assertEquals(2340, attrs.get("device.screen_height_px").asInt)
+
+            // Boolean keys must serialize as JSON booleans.
+            assertTrue("device.low_ram must be a JSON boolean",
+                attrs.get("device.low_ram").asJsonPrimitive.isBoolean)
+            assertFalse(attrs.get("device.low_ram").asBoolean)
+            assertTrue(attrs.get("device.dark_mode").asBoolean)
+        }
+    }
+
+    @Test
     fun `X-SDK headers are removed and X-API-Key stays`() {
         mockWebServer.enqueue(MockResponse().setResponseCode(200))
         runBlocking { httpClient.sendBatch(createTestBatch()) }
