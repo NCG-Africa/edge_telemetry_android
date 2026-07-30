@@ -148,7 +148,11 @@ class TelemetryManager private constructor(
                     httpClient = TelemetryHttpClient(
                         telemetryUrl = config.endpoint,
                         apiKey = config.apiKey,
-                        debugMode = false
+                        debugMode = false,
+                        // Mint the static device-context bundle once, here at init (issue #93).
+                        staticDeviceContext = DeviceInfoCollector.collectStaticDeviceContext(
+                            application.applicationContext
+                        )
                     ),
                     offlineStorage = OfflineBatchStorage(application.applicationContext),
                     screenTimingTracker = ScreenTimingTracker(),
