@@ -16,6 +16,7 @@ import androidx.navigation.NavController
 import com.androidtel.telemetry_library.core.anr.AnrWatchdog
 import com.androidtel.telemetry_library.core.breadcrumbs.BreadcrumbManager
 import com.androidtel.telemetry_library.core.device.DeviceInfoCollector
+import com.androidtel.telemetry_library.core.exit.ExitInfoReader
 import com.androidtel.telemetry_library.core.ids.IdGenerator
 import com.androidtel.telemetry_library.core.trace.TraceManager
 import com.androidtel.telemetry_library.core.models.AppInfo
@@ -374,6 +375,10 @@ class TelemetryManager private constructor(
             scope.launch {
                 replayFatalCrashIfAny()
                 replayPendingAnrIfAny()
+                // Step 17: Harvest the OS exit-reason buffer (issue #94) — one app.exit per abnormal
+                // historical death, incl. system ANR/OOM/kill the in-process watchdog can't see.
+                // Blocking I/O, so it rides this Dispatchers.IO launch; no-op below API 30.
+                ExitInfoReader.harvest(context) { attrs -> recordEvent("app.exit", attrs) }
             }
 
         } catch (e: Exception) {
