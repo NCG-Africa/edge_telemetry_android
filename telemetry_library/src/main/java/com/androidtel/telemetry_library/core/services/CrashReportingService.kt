@@ -8,6 +8,7 @@ import com.androidtel.telemetry_library.core.TelemetryTime
 import com.androidtel.telemetry_library.core.anr.ThreadDump
 import com.androidtel.telemetry_library.core.breadcrumbs.BreadcrumbManager
 import com.androidtel.telemetry_library.core.crash.FatalCrashStore
+import com.androidtel.telemetry_library.core.device.DeviceStateSnapshot
 import com.androidtel.telemetry_library.core.navigation.NavigationStackTracker
 import com.androidtel.telemetry_library.core.models.EventAttributes
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
@@ -102,7 +103,7 @@ internal class CrashReportingService(
             extra = mapOf(
                 "crash.thread" to thread.name,
                 "crash.is_main_thread" to (thread.name == "main")
-            )
+            ) + DeviceStateSnapshot.read(context)
         )
         val enriched = buildAttributesFn?.invoke(attrs) ?: return
         val event = TelemetryEvent(
@@ -148,7 +149,7 @@ internal class CrashReportingService(
             "anr.duration_ms" to durationMs,
             "screen.name" to (NavigationStackTracker.currentScreen() ?: ""),
             "anr.threads" to threads
-        )
+        ) + DeviceStateSnapshot.read(context)
         val enriched = buildAttributesFn?.invoke(attrs) ?: return
         val event = TelemetryEvent(
             type = "event",
@@ -182,7 +183,7 @@ internal class CrashReportingService(
                 "hang.duration_ms" to durationMs,
                 "screen.name" to (NavigationStackTracker.currentScreen() ?: ""),
                 "hang.stack" to stack
-            )
+            ) + DeviceStateSnapshot.read(context)
         ) ?: Log.w(TAG, "Hang event sink not wired")
     }
 
