@@ -1,11 +1,13 @@
 package com.androidtel.telemetry_library.core
 
 import android.annotation.SuppressLint
+import android.app.ActivityManager
 import android.app.Application
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.os.Build
+import android.os.Process
 import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.core.content.ContextCompat
@@ -18,6 +20,7 @@ import com.androidtel.telemetry_library.core.breadcrumbs.BreadcrumbManager
 import com.androidtel.telemetry_library.core.device.DeviceInfoCollector
 import com.androidtel.telemetry_library.core.exit.ExitInfoReader
 import com.androidtel.telemetry_library.core.ids.IdGenerator
+import com.androidtel.telemetry_library.core.startup.AppStartTracker
 import com.androidtel.telemetry_library.core.trace.TraceManager
 import com.androidtel.telemetry_library.core.models.AppInfo
 import com.androidtel.telemetry_library.core.services.EventTrackingService
@@ -116,6 +119,9 @@ class TelemetryManager private constructor(
 
     // Main-thread ANR watchdog (issue #60). Started on foreground, stopped on background.
     private var anrWatchdog: AnrWatchdog? = null
+    // Cold-start timer (issue #95). Built at init with the process fork time + importance-at-init;
+    // fired by the lifecycle observer's first onResume. Null when screen tracking is off / late init.
+    private var appStartTracker: AppStartTracker? = null
 
     // Helper methods to check feature flags
     internal fun isMemoryTrackingEnabled(): Boolean = config.enableMemoryTracking
@@ -330,6 +336,23 @@ class TelemetryManager private constructor(
                     val observer = TelemetryActivityLifecycleObserver(this)
                     app.registerActivityLifecycleCallbacks(observer)
                     Log.d("TelemetryManager", "Step 12: Activity lifecycle observer registered")
+
+                    // Step 12a: Cold-start timer (issue #95). Anchor = true fork time; importance
+                    // captured now (at init) decides the background-start guard. The observer's first
+                    // onResume fires it. Registered after the observer, so a late init that missed the
+                    // first resume simply never fires it → no app.start that process (documented).
+                    val memoryState = ActivityManager.RunningAppProcessInfo()
+                    ActivityManager.getMyMemoryState(memoryState)
+                    appStartTracker = AppStartTracker(
+                        startUptimeMs = Process.getStartUptimeMillis(),
+                        importanceAtInit = memoryState.importance,
+                        emit = { type, durationMs ->
+                            recordEvent(
+                                "app.start",
+                                mapOf("app.start.type" to type, "app.start.duration_ms" to durationMs)
+                            )
+                        }
+                    )
                 } else {
                     // Roll back the CAS so a later retry with a proper Application context succeeds
                     activityObserverRegistered.set(false)
@@ -553,6 +576,15 @@ class TelemetryManager private constructor(
         maybeSendBatch()
     }
 
+
+    /**
+     * The lifecycle observer calls this on every Activity onResume; the tracker times the first only
+     * and emits one `app.start` (or drops per the background-start guards). Null before init / when
+     * screen tracking is off — a no-op then (issue #95).
+     */
+    internal fun notifyActivityResumed() {
+        appStartTracker?.onFirstResume()
+    }
 
     // --- Crash and Error Reporting ---
     fun recordCrash(throwable: Throwable) {

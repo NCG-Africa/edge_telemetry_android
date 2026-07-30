@@ -40,6 +40,9 @@ class TelemetryActivityLifecycleObserver(
         val screenName = getScreenName(activity)
         Log.d("TelemetryObserver", "Activity Resumed: $screenName")
 
+        // Cold-start end marker (issue #95): first observed resume times app.start; later ones no-op.
+        telemetryManager.notifyActivityResumed()
+
         // Start tracking screen duration
         screenTimingTracker.startScreen(screenName)
 
