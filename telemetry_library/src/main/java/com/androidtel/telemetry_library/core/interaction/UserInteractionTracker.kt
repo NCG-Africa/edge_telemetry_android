@@ -76,7 +76,7 @@ class UserInteractionTracker(
 
         // A user interaction always opens a fresh trace root (#59). Stamp trace.id/span.id when
         // sampled; null (unsampled) leaves the event with no trace attrs.
-        TraceManager.onInteraction(System.currentTimeMillis())?.let { attrs.putAll(it) }
+        TraceManager.onInteraction()?.let { attrs.putAll(it) }
 
         telemetryManager.recordEvent("ui.interaction", attrs)
         telemetryManager.addBreadcrumb("$type $name", category = "ui")

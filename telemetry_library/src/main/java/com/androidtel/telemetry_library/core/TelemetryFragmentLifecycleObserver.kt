@@ -27,7 +27,7 @@ class TelemetryFragmentLifecycleObserver(private val telemetryManager: Telemetry
         // Track navigation with proper structure
         val navEvent = navigationTracker.push(fragmentName)
         // Child of a recent interaction (tap→nav) else a new trace root (#59).
-        val trace = TraceManager.onNavigation(System.currentTimeMillis()) ?: emptyMap()
+        val trace = TraceManager.onNavigation() ?: emptyMap()
         telemetryManager.recordEvent(
             eventName = "navigation",
             attributes = mapOf(

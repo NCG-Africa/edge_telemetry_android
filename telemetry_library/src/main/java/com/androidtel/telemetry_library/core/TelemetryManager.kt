@@ -221,6 +221,21 @@ class TelemetryManager private constructor(
                 telemetryEndpoint = manager.telemetryEndpoint
             )
         }
+
+        /**
+         * Opt-in trace seam (#109 Δ1) for app-owned coroutine calls the SDK's listeners can't reach.
+         * Capture on the main thread inside a tap/nav handler, then propagate so a call fired after a
+         * `Dispatchers.IO` hop still attributes to the action that started it:
+         *
+         * ```
+         * withContext(TelemetryManager.traceElement()) { api.get() }
+         * ```
+         *
+         * Returns `EmptyCoroutineContext` when no action is active (the call is then unattributed).
+         */
+        fun traceElement(): kotlin.coroutines.CoroutineContext =
+            TraceManager.current()?.let { TraceManager.asElement(it) }
+                ?: kotlin.coroutines.EmptyCoroutineContext
         
         /**
          * Reset singleton instance for testing purposes only.
@@ -258,6 +273,9 @@ class TelemetryManager private constructor(
             // Step 1: Config already validated in TelemetryConfig.init
             Log.d("TelemetryManager", "Step 1: Config validated")
             TraceManager.traceSampleRate = config.traceSampleRate
+            // Δ2 — build the normalized allowlist once; the interceptor's gate reads it via TraceManager.
+            TraceManager.traceHostAllowlist =
+                config.traceHostAllowlist.map { it.trim().lowercase() }.toSet()
             
             // Step 2: Restore or generate deviceId
             idGenerator = IdGenerator()
@@ -612,8 +630,8 @@ class TelemetryManager private constructor(
     // --- Screen Navigation Tracking for Jetpack Compose ---
     fun recordComposeScreenView(screenRoute: String) {
         screenTimingTracker.startScreen(screenRoute)
-        // Child of a recent interaction (tap→nav) else a new trace root (#59).
-        val trace = TraceManager.onNavigation(System.currentTimeMillis()) ?: emptyMap()
+        // Child of the active action root (tap→nav) else a new trace root (#109).
+        val trace = TraceManager.onNavigation() ?: emptyMap()
         recordEvent(
             eventName = "navigation",
             attributes = mapOf(

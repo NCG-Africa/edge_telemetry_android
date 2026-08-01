@@ -14,10 +14,18 @@ class IdGenerator {
         private val secureRandom = SecureRandom()
 
         /** W3C Trace Context trace-id: 32 lowercase hex (128-bit). Raw hex, not a join key (#43). */
-        fun traceId(): String = randomHex(16)
+        fun traceId(): String = nonZeroHex(16)
 
         /** W3C Trace Context span-id: 16 lowercase hex (64-bit). */
-        fun spanId(): String = randomHex(8)
+        fun spanId(): String = nonZeroHex(8)
+
+        // An all-zero id is an invalid W3C id (and, on the adopt side, a "malformed" marker). Re-roll
+        // the astronomically-rare all-zero draw so a generated id is never all-zero.
+        private fun nonZeroHex(byteCount: Int): String {
+            var hex = randomHex(byteCount)
+            while (hex.all { it == '0' }) hex = randomHex(byteCount)
+            return hex
+        }
 
         /** `2 * byteCount` lowercase hex chars from the shared crypto RNG. */
         private fun randomHex(byteCount: Int): String {

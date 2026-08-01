@@ -1,7 +1,6 @@
 package com.androidtel.telemetry_library.core
 
 import com.androidtel.telemetry_library.core.trace.TraceManager
-import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import okhttp3.OkHttpClient
@@ -21,6 +20,7 @@ class TelemetryInterceptorTest {
 
     private lateinit var server: MockWebServer
     private lateinit var client: OkHttpClient
+    private lateinit var host: String
     private val telemetryManager: TelemetryManager = mockk(relaxed = true)
     private val recorded = slot<Map<String, Any>>()
 
@@ -28,12 +28,16 @@ class TelemetryInterceptorTest {
     fun setup() {
         server = MockWebServer()
         server.start()
+        host = server.hostName
         client = OkHttpClient.Builder()
             .addInterceptor(TelemetryInterceptor(telemetryManager))
             .connectTimeout(1, TimeUnit.SECONDS)
             .readTimeout(1, TimeUnit.SECONDS)
             .build()
-        every { telemetryManager.recordEvent("http.request", capture(recorded)) } returns Unit
+        io.mockk.every { telemetryManager.recordEvent("http.request", capture(recorded)) } returns Unit
+        TraceManager.traceSampleRate = 1.0
+        TraceManager.traceHostAllowlist = emptySet()
+        TraceManager.onBackground()
     }
 
     @After
@@ -43,7 +47,12 @@ class TelemetryInterceptorTest {
         client.dispatcher.executorService.shutdown()
         client.connectionPool.evictAll()
         TraceManager.traceSampleRate = 1.0
+        TraceManager.traceHostAllowlist = emptySet()
         TraceManager.onBackground()
+    }
+
+    private fun allowServer() {
+        TraceManager.traceHostAllowlist = setOf(host.lowercase())
     }
 
     @Test
@@ -64,7 +73,6 @@ class TelemetryInterceptorTest {
 
     @Test
     fun `transport failure emits status 0, success false, still recorded`() {
-        // Point client at a dead port so chain.proceed throws IOException.
         runCatching {
             client.newCall(Request.Builder().url("http://127.0.0.1:1/x").build()).execute()
         }
@@ -74,50 +82,85 @@ class TelemetryInterceptorTest {
     }
 
     @Test
-    fun `sampled root injects traceparent and stamps child span attrs`() {
-        TraceManager.traceSampleRate = 1.0
-        TraceManager.onBackground()
-        val root = TraceManager.onInteraction(System.currentTimeMillis())!!
+    fun `on-allowlist active root injects traceparent and stamps child span attrs`() {
+        allowServer()
+        val root = TraceManager.onInteraction()!!
         server.enqueue(MockResponse().setResponseCode(200))
 
         client.newCall(Request.Builder().url(server.url("/x")).build()).execute().close()
 
         val sent = server.takeRequest().getHeader("traceparent")!!
-        assertTrue("well-formed traceparent", Regex("^00-[0-9a-f]{32}-[0-9a-f]{16}-01$").matches(sent))
+        assertTrue("well-formed", Regex("^00-[0-9a-f]{32}-[0-9a-f]{16}-01$").matches(sent))
         assertTrue("carries the root trace id", sent.contains(root["trace.id"] as String))
 
         val a = recorded.captured
         assertEquals(root["trace.id"], a["trace.id"])
         assertEquals(root["span.id"], a["parent.span.id"])
+        assertEquals("injected_attributed", a["traceparent.outcome"])
         assertTrue(sent.contains(a["span.id"] as String))
     }
 
     @Test
-    fun `no active root injects no header and no trace attrs`() {
-        TraceManager.traceSampleRate = 1.0
-        TraceManager.onBackground() // no root
+    fun `off-allowlist suppresses the header but still stamps trace attrs`() {
+        // allowlist empty → server host off-allowlist
+        TraceManager.onInteraction()
         server.enqueue(MockResponse().setResponseCode(200))
 
         client.newCall(Request.Builder().url(server.url("/x")).build()).execute().close()
 
-        assertNull("no header when no root", server.takeRequest().getHeader("traceparent"))
-        assertFalse(recorded.captured.containsKey("trace.id"))
+        assertNull("no header off-allowlist", server.takeRequest().getHeader("traceparent"))
+        val a = recorded.captured
+        assertTrue("still recorded locally", a.containsKey("trace.id"))
+        assertEquals("skipped_off_allowlist", a["traceparent.outcome"])
     }
 
     @Test
-    fun `existing traceparent is not overwritten`() {
-        TraceManager.traceSampleRate = 1.0
-        TraceManager.onBackground()
-        TraceManager.onInteraction(System.currentTimeMillis()) // active root exists
-        val appHeader = "00-abcdef01234567890abcdef012345678-1122334455667788-01"
+    fun `no-action on-allowlist call injects an unattributed trace`() {
+        allowServer() // no root active
+        server.enqueue(MockResponse().setResponseCode(200))
+
+        client.newCall(Request.Builder().url(server.url("/x")).build()).execute().close()
+
+        val sent = server.takeRequest().getHeader("traceparent")!!
+        assertTrue(Regex("^00-[0-9a-f]{32}-[0-9a-f]{16}-01$").matches(sent))
+        val a = recorded.captured
+        assertTrue(a.containsKey("trace.id"))
+        assertEquals("injected_unattributed", a["traceparent.outcome"])
+        assertFalse(a.containsKey("rum.action.id"))
+    }
+
+    @Test
+    fun `valid inbound traceparent is left untouched and adopted`() {
+        allowServer()
+        val t = "a".repeat(32)
+        val p = "b".repeat(16)
+        val inbound = "00-$t-$p-01"
         server.enqueue(MockResponse().setResponseCode(200))
 
         client.newCall(
-            Request.Builder().url(server.url("/x")).header("traceparent", appHeader).build()
+            Request.Builder().url(server.url("/x")).header("traceparent", inbound).build()
         ).execute().close()
 
-        assertEquals(appHeader, server.takeRequest().getHeader("traceparent"))
-        assertFalse("we don't stamp our attrs when caller owns the header",
-            recorded.captured.containsKey("trace.id"))
+        assertEquals("header untouched", inbound, server.takeRequest().getHeader("traceparent"))
+        val a = recorded.captured
+        assertEquals(t, a["trace.id"])
+        assertEquals(p, a["span.id"])
+        assertEquals("adopted", a["traceparent.outcome"])
+    }
+
+    @Test
+    fun `malformed inbound traceparent is replaced`() {
+        allowServer()
+        val malformed = "ff-${"a".repeat(32)}-${"b".repeat(16)}-01"
+        server.enqueue(MockResponse().setResponseCode(200))
+
+        client.newCall(
+            Request.Builder().url(server.url("/x")).header("traceparent", malformed).build()
+        ).execute().close()
+
+        val sent = server.takeRequest().getHeader("traceparent")!!
+        assertTrue("replaced with a valid header", Regex("^00-[0-9a-f]{32}-[0-9a-f]{16}-01$").matches(sent))
+        assertTrue("not the malformed one", sent != malformed)
+        assertEquals("injected_unattributed", recorded.captured["traceparent.outcome"])
     }
 }

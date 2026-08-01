@@ -65,7 +65,7 @@ class TelemetryActivityLifecycleObserver(
             "navigation.timestamp" to navEvent.timestamp
         )
         // Child of a recent interaction (tap→nav) else a new trace root (#59).
-        TraceManager.onNavigation(System.currentTimeMillis())?.let { navAttributes.putAll(it) }
+        TraceManager.onNavigation()?.let { navAttributes.putAll(it) }
         telemetryManager.recordEvent(eventName = "navigation", attributes = navAttributes)
     }
 
