@@ -16,7 +16,10 @@ data class TelemetryConfig(
     val enableUserInteractionEvents: Boolean = true,
     val enableCapabilityEvents: Boolean = true,
     val enableSessionTracking: Boolean = true,
-    val traceSampleRate: Double = 1.0
+    val traceSampleRate: Double = 1.0,
+    // Bare hosts (no scheme/port/path), exact-match case-insensitive. `traceparent` is injected ONLY
+    // to hosts in this list. Empty (the default) = inject nowhere — v2 is dark-on-upgrade (see README).
+    val traceHostAllowlist: List<String> = emptyList()
 ) {
     init {
         require(apiKey.isNotBlank()) { "apiKey must not be blank" }
@@ -26,5 +29,12 @@ data class TelemetryConfig(
         require(flushIntervalMs > 0) { "flushIntervalMs must be > 0" }
         require(sessionTimeoutMs > 0) { "sessionTimeoutMs must be > 0" }
         require(traceSampleRate in 0.0..1.0) { "traceSampleRate must be in 0.0..1.0" }
+        traceHostAllowlist.forEach {
+            val h = it.trim().lowercase()
+            require(h.isNotBlank()) { "traceHostAllowlist entry must not be blank" }
+            require(!h.contains("/") && !h.contains(":")) {
+                "traceHostAllowlist entry must be a bare host (no scheme, path, or port), got '$it'"
+            }
+        }
     }
 }

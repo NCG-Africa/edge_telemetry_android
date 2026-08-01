@@ -19,12 +19,12 @@ class TelemetryInterceptor(
             return chain.proceed(request)
         }
         
-        // Distributed trace child span (#59): mint one under the current root, inject the W3C
-        // traceparent, and stamp the trace attrs on http.request. If the caller already set a
-        // traceparent, don't overwrite it (and don't stamp our attrs); no sampled root → no trace.
-        val trace = if (request.header("traceparent") == null) TraceManager.onNetworkCall() else null
-        val outgoing = trace?.let {
-            request.newBuilder().header("traceparent", it.first).build()
+        // Distributed trace v2 (#109): thin adapter. Hand TraceManager the two request facts (host +
+        // any inbound traceparent); it resolves the whole outcome ladder (allowlist gate, adoption,
+        // unattributed, attributed) and returns the header action + the attrs to stamp on http.request.
+        val decision = TraceManager.onNetworkCall(request.url.host, request.header("traceparent"))
+        val outgoing = decision?.newHeader?.let {
+            request.newBuilder().header("traceparent", it).build()
         } ?: request
 
         val startTime = System.nanoTime()
@@ -48,7 +48,7 @@ class TelemetryInterceptor(
                 // "optional pair", so the backend column stays null rather than a false 0.
                 request.body?.contentLength()?.takeIf { it >= 0 }?.let { put("http.request_size", it) }
                 response?.body?.contentLength()?.takeIf { it >= 0 }?.let { put("http.response_size", it) }
-                trace?.let { putAll(it.second) }
+                decision?.let { putAll(it.attrs) }
             }
 
             telemetryManager.recordEvent(eventName = "http.request", attributes = attributes)

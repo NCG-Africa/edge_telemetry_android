@@ -49,9 +49,18 @@ object AttributeValidator {
     /**
      * All required standard attributes combined
      */
-    private val ALL_REQUIRED_ATTRIBUTES = REQUIRED_APP_ATTRIBUTES + 
-        REQUIRED_DEVICE_ATTRIBUTES + 
+    private val ALL_REQUIRED_ATTRIBUTES = REQUIRED_APP_ATTRIBUTES +
+        REQUIRED_DEVICE_ATTRIBUTES +
         REQUIRED_USER_SESSION_ATTRIBUTES
+
+    /**
+     * Distributed-trace v2 (#109) optional keys — recognized/known, never required. Listed so a
+     * maintainer sees they sit deliberately outside the required sets; enrichment must not flag them.
+     * (No known-key whitelist rejects attributes today, so this is documentation of intent.)
+     */
+    val KNOWN_OPTIONAL_TRACE_ATTRIBUTES = setOf(
+        "trace.id", "span.id", "parent.span.id", "rum.action.id", "traceparent.outcome"
+    )
     
     /**
      * Validate that all required standard attributes are present

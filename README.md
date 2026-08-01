@@ -822,6 +822,57 @@ TelemetryManager.initialize(config)
 - Validation at build time
 - Cleaner initialization code
 
+### Distributed Tracing (v2)
+
+The SDK stitches an app action → the network calls it triggers → backend spans into one W3C trace by
+injecting a `traceparent` header on outbound requests.
+
+#### `traceHostAllowlist` — ⚠️ dark on upgrade
+
+```kotlin
+val config = TelemetryConfig(
+    apiKey = "edge_...",
+    endpoint = "https://collector.example.com/...",
+    traceHostAllowlist = listOf("api.example.com", "checkout.example.com")
+)
+```
+
+`List<String>`, default `emptyList()`. Bare hosts only — **no scheme, port, or path** (a mis-formatted
+entry fails fast at `initialize()`). Match is exact host, case-insensitive; `api.example.com` matches
+that host **only** — not `example.com`, not `api.example.com.evil.com`.
+
+> **⚠️ Upgrading to v2:** distributed tracing goes **dark** on upgrade — **no** `traceparent` is
+> injected on any request — until you enumerate your backend hosts in `traceHostAllowlist`. There is
+> intentionally **no** "inject everywhere" option; the header must never reach a host you didn't name.
+> Off-allowlist calls are still recorded locally (you keep `trace.id`/`span.id` on your own
+> `http.request` events); only the outbound header is withheld.
+
+Sampling is fixed — `traceSampleRate` stays `1.0`; it is **not** a v2 knob.
+
+#### `traceparent.outcome`
+
+Every traced `http.request` event carries a `traceparent.outcome` string so you can tell per request how
+the header was handled. Untraced requests (the SDK's own telemetry POSTs) carry no such attribute —
+absence means "not traced."
+
+| Value | Meaning |
+|---|---|
+| `injected_attributed` | header injected; call belongs to a known RUM action |
+| `injected_unattributed` | header injected; no active action (parentless trace) |
+| `adopted` | inbound `traceparent` mirrored; header + trace left as the caller set them |
+| `skipped_off_allowlist` | host not in `traceHostAllowlist`; recorded locally, no header sent |
+| *(absent)* | request not traced |
+
+#### Attributing app-owned coroutine calls
+
+The SDK's tap/nav listeners run outside your coroutines, so a call fired from `viewModelScope.launch { … }`
+on `Dispatchers.IO` is unattributed by default. Opt in by propagating the trace element captured on the
+main thread:
+
+```kotlin
+withContext(TelemetryManager.traceElement()) { api.get() }
+```
+
 ### User Profile Management (Both Versions)
 
 #### Kotlin

@@ -63,10 +63,23 @@ object EventPayloadValidator {
         // Validate timestamp format
         validateTimestamp(attributes["http.timestamp"], "http.timestamp", errors)
         validateTimestamp(timestamp, "event.timestamp", errors)
-        
+
+        // Distributed-trace v2 (#109): known optional keys — validate if present, never required.
+        attributes["traceparent.outcome"]?.let { outcome ->
+            val valid = com.androidtel.telemetry_library.core.trace.TraceManager.OUTCOMES
+            if (outcome !is String || outcome !in valid) {
+                errors.add("traceparent.outcome must be one of $valid, got '$outcome'")
+            }
+        }
+        attributes["rum.action.id"]?.let { id ->
+            if (id !is String) {
+                errors.add("rum.action.id must be String if present, got ${id::class.java.simpleName}")
+            }
+        }
+
         return createValidationResult(errors)
     }
-    
+
     /**
      * Validate session finalized event payload
      */

@@ -72,7 +72,7 @@ fun TrackComposeScreen(
         )
         
         // Track navigation event — child of a recent interaction (tap→nav) else a new trace root (#59).
-        val trace = TraceManager.onNavigation(System.currentTimeMillis()) ?: emptyMap()
+        val trace = TraceManager.onNavigation() ?: emptyMap()
         EdgeTelemetry.getInstance().recordEvent("navigation", eventData + trace)
         
         onDispose {

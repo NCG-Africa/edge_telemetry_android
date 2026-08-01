@@ -619,6 +619,14 @@ class IdGeneratorTest {
     }
 
     @Test
+    fun `generated trace and span ids are never all-zero`() {
+        repeat(5000) {
+            assertFalse(IdGenerator.traceId().all { c -> c == '0' })
+            assertFalse(IdGenerator.spanId().all { c -> c == '0' })
+        }
+    }
+
+    @Test
     fun `fresh install - device user session all mint new format`() {
         `when`(mockPrefs.getString("device_id", null)).thenReturn(null)
         `when`(mockPrefs.getString("edge_rum_user_id", null)).thenReturn(null)
