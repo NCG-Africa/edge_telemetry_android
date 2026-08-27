@@ -10,7 +10,7 @@ plugins {
 
 // Single source of truth for the SDK version. Surfaces in BuildConfig.SDK_VERSION (used by the
 // network transport for the User-Agent and X-SDK-Version headers) and the JitPack publication.
-val sdkVersion = "2.2.1"
+val sdkVersion = "2.2.2"
 
 detekt {
     buildUponDefaultConfig = true
