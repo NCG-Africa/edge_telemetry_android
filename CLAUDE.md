@@ -49,8 +49,11 @@ edge_telemetry_android/
 │           ├── TelemetryConfig.kt        # Configuration data class
 │           ├── TelemetryHttpClient.kt    # HTTP transport layer
 │           ├── TelemetryInterceptor.kt   # OkHttp interceptor for network tracking
+│           ├── TelemetryTime.kt          # Single source of truth for wire timestamps (ISO-8601 UTC)
 │           ├── OfflineBatchStorage.kt    # SharedPreferences offline persistence (200-envelope cap)
+│           ├── CountedEventQueue.kt      # Bounded event buffer with eviction counters
 │           ├── ScreenTimingTracker.kt    # Screen duration measurement
+│           ├── PerformanceTracker.kt     # Frame/performance tracking facade
 │           ├── MemoryTracker.kt          # Memory pressure monitoring
 │           ├── DeviceCapabilities.kt     # Runtime capability detection
 │           ├── services/                 # Service-based architecture (Phase 2)
@@ -60,19 +63,21 @@ edge_telemetry_android/
 │           │   ├── CrashReportingService.kt
 │           │   └── BatchProcessingService.kt
 │           ├── models/                   # Data models (TelemetryBatch, TelemetryEvent, etc.)
-│           ├── crash/                    # CrashReporter, CrashFingerprinter
+│           ├── trace/                    # TraceManager (W3C traceparent, spans on events)
+│           ├── crash/                    # CrashFingerprinter, FatalCrashStore
+│           ├── anr/                      # AnrWatchdog (ANR + sub-5s hang detection)
+│           ├── exit/                     # ExitInfoReader, ApplicationExitHarvester (app.exit)
+│           ├── startup/                  # AppStartTracker (cold-start timing)
+│           ├── interaction/              # UserInteractionTracker (tap/swipe → ui.interaction)
 │           ├── breadcrumbs/              # BreadcrumbManager (circular buffer, max 50)
 │           ├── session/                  # SessionManager
 │           ├── user/                     # UserProfileManager
-│           ├── ids/                      # IdGenerator (device, session, user IDs)
-│           ├── navigation/              # NavigationStackTracker
-│           ├── device/                   # DeviceInfoCollector
-│           ├── location/                # IpLocationProvider (opt-in)
-│           ├── events/                  # JsonEventTracker
-│           ├── validation/              # EventPayloadValidator, RuntimeEventValidator
-│           ├── interceptors/            # ApiKeyRedactionInterceptor
-│           ├── retry/                   # CrashRetryManager
-│           └── payload/                 # FlutterCompatiblePayload (backend compat)
+│           ├── ids/                      # IdGenerator (device, session, user, W3C trace/span IDs)
+│           ├── navigation/               # NavigationStackTracker
+│           ├── device/                   # DeviceInfoCollector, DeviceStateSnapshot
+│           ├── validation/               # EventPayloadValidator, AttributeValidator, RuntimeEventValidator
+│           ├── interceptors/             # ApiKeyRedactionInterceptor
+│           └── retry/                    # CrashRetryManager
 ├── gradle/libs.versions.toml            # Version catalog
 ├── settings.gradle.kts                  # Single module: :telemetry_library
 └── docs/                                # Documentation (migration guides, schemas, etc.)
@@ -109,7 +114,7 @@ These features work out of the box after `TelemetryManager.initialize()`:
 
 | Feature | Config flag |
 |---|---|
-| Location tracking | `enableLocationTracking = true` |
+| `traceparent` propagation | `traceHostAllowlist = listOf("api.example.com")` — empty (the default) injects on **no** host |
 
 ## Key APIs for Developers
 
