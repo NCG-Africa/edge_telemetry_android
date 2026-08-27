@@ -5,6 +5,91 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-08-27
+
+Large feature + conformance release: everything merged to `master` since 2.1.13. Brings the wire
+format onto one envelope, replaces several event firehoses with windowed/unified signals, adds four
+new fault and startup signals, and ships distributed tracing.
+
+**Minor bump, not a patch:** two public config/API symbols were removed and several event payloads
+changed shape. Read the migration notes at the bottom before upgrading.
+
+### ✨ Distributed Tracing (#59, #107, #109)
+
+- Outbound W3C `traceparent` injection on requests flowing through
+  `TelemetryManager.createNetworkInterceptor()`, stitching app action → network call → backend span.
+- **`traceHostAllowlist`** (new `TelemetryConfig` field, default `emptyList()`): bare hosts allowed to
+  receive the header. Tracing is **dark on upgrade** — nothing is injected until you enumerate your
+  backend hosts. There is deliberately no "inject everywhere" option.
+- Context is per-thread (`ThreadLocal`) and crosses a `Dispatchers.IO` hop via the opt-in
+  `TelemetryManager.traceElement()` coroutine element.
+- An inbound `traceparent` is **adopted**, never overwritten; malformed headers fall to the mint path.
+- Traced `http.request` events carry `trace.id`, `span.id`, `parent.span.id`, `rum.action.id`, and a
+  `traceparent.outcome` enum (`injected_attributed`, `injected_unattributed`, `adopted`,
+  `skipped_off_allowlist`).
+- New `traceSampleRate` config field; fixed at `1.0` in v2.
+
+### ✨ New Signals
+
+- **`app.anr`** (#60): main-thread watchdog with an all-thread dump, frozen to the durable `filesDir`
+  rail before the system can kill the process, replayed on next launch.
+- **`app.hang`** (#61): sub-ANR stalls (2s band) off the same watchdog; the terminal ANR does not
+  suppress its own precursor hang.
+- **`app.exit`** (#94): harvests `ApplicationExitInfo` on API 30+ — one event per abnormal historical
+  death, including system ANR/OOM/kill the in-process watchdog cannot see. Watermarked, so each death
+  reports once.
+- **`app.start`** (#95): cold/warm start duration anchored at `Process.getStartUptimeMillis()`, fired
+  on the first `onResume`. Background-started processes are suppressed.
+- **`ui.interaction`** (#58): automatic tap / long-press / fling capture with secure-surface
+  suppression; roots a distributed trace.
+- **Device context** (#93, #96): static bundle minted once at init (`device.cpu_abi`,
+  `device.cpu_cores`, `device.low_ram`, `device.screen_*`, `device.dark_mode`, `device.locale`,
+  `device.timezone`) plus freeze-on-fault dynamic state (`device.battery_level`,
+  `device.battery_charging`, `device.power_save`, `device.thermal_status`, `device.orientation`).
+  Unreadable or below-min-API keys are **omitted**, never sentinel-filled.
+
+### 🔄 Wire Format & Event Shape
+
+- **Unified envelope** (#48): all telemetry ships in one `telemetry_batch` envelope with `sdk.*`
+  common attributes. Previously two non-conformant envelope shapes were in use.
+- **Self-describing IDs** (#52): `<kind>_<epochMs>_<16hex>_android` for device, session, and user IDs.
+- **One network event** (#57): all network capture unified onto `http.request`.
+- **Windowed frames** (#54): `frame.summary` replaces the per-frame `frame_drop` firehose.
+- **One crash pipeline** (#56): crash "Path B" retired — `app.crash` rides the same enrichment and
+  sink as every other event, frozen to a durable `filesDir` rail.
+- **Session/screen correctness** (#53): single session lifecycle (`session.started` /
+  `session.finalized`) and one screen-duration signal (`screen.duration`).
+
+### 🛡️ Reliability
+
+- **Bounded buffers** (#51): offline store capped at 200 envelopes, in-memory queue at 500, both
+  drop-oldest — no unbounded growth on a long offline stretch.
+- **Timed flush fixed** (#50): the flush timer now force-sends partial batches; a low-activity session
+  no longer holds telemetry indefinitely. An empty queue still no-ops (no heartbeat traffic).
+- `CrashRetryManager` backoff uses `Long` millis (lint `NewApi` fix).
+
+### 🧹 Removed
+
+- **`enableLocationTracking`** and **`TelemetryManager.testConnectivity()`** deleted along with
+  ~1040 LOC of dead code (#55). A CI static fence keeps the deleted symbols deleted (#62).
+
+### 📚 Documentation
+
+- README rewritten against the actual public API. The previous version documented a
+  `TelemetryConfig.builder()` and `trackEvent` / `trackMetric` / `trackScreen` /
+  `recordNetworkRequest` methods that do not exist, and listed config parameters (`debugMode`,
+  `globalAttributes`, `enableUserProfiles`) that are not fields of `TelemetryConfig`.
+- New per-feature specs under `docs/specs/`.
+
+### ⬆️ Upgrading from 2.1.13
+
+- **Backend first.** The collector must speak the unified `telemetry_batch` envelope, the new ID
+  format, and the renamed events (`http.request`, `screen.duration`, `frame.summary`,
+  `session.started` / `session.finalized`) before clients roll out.
+- **Remove** any use of `enableLocationTracking` or `testConnectivity()` — they no longer compile.
+- **Tracing stays off** until you set `traceHostAllowlist`; upgrading alone injects no headers.
+- The `-java8` line stays at `2.1.13-java8` and does **not** include any of the above.
+
 ## [2.1.13] - 2026-06-16
 
 Backend-alignment hotfix release. The SDK was silently misaligned with the EdgeTelemetryProcessor
