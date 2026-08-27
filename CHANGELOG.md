@@ -5,6 +5,22 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.2] - 2026-08-27
+
+Patch release. Fixes the self-request guard swallowing app traffic on `telemetry.*` hosts — present
+since the guard was introduced, and the reason distributed tracing looked dead in 2.2.0/2.2.1.
+
+### 🐛 Fixed
+
+- **No `traceparent` and no `http.request` events for apps on a `telemetry.*` host**:
+  `TelemetryInterceptor.isTelemetryRequest()` tested `url.contains("/telemetry")` against the whole
+  URL string, which also matches the `//` in `https://telemetry.example.com/anything`. Every request
+  to such a host returned early — untraced and unrecorded. The guard now matches the parsed URL
+  against the configured endpoint's **host + path prefix**, so an app sharing an origin with the
+  collector (`/voting-api/...` vs `/collector/telemetry`) is instrumented normally while the SDK's
+  own export calls are still skipped. The `/telemetry` and `/collector` path heuristics and the
+  hardcoded default-host check are gone.
+
 ## [2.2.1] - 2026-08-27
 
 Patch release. Fixes a crash on every activity resume, introduced with the windowed frame collector

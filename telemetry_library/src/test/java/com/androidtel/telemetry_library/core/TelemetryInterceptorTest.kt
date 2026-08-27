@@ -21,6 +21,7 @@ class TelemetryInterceptorTest {
     private lateinit var server: MockWebServer
     private lateinit var client: OkHttpClient
     private lateinit var host: String
+    private var appClient: OkHttpClient? = null
     private val telemetryManager: TelemetryManager = mockk(relaxed = true)
     private val recorded = slot<Map<String, Any>>()
 
@@ -46,6 +47,8 @@ class TelemetryInterceptorTest {
         // Release non-daemon OkHttp threads so the suite doesn't hang (see takerequest gotcha).
         client.dispatcher.executorService.shutdown()
         client.connectionPool.evictAll()
+        appClient?.dispatcher?.executorService?.shutdown()
+        appClient?.connectionPool?.evictAll()
         TraceManager.traceSampleRate = 1.0
         TraceManager.traceHostAllowlist = emptySet()
         TraceManager.onBackground()
@@ -162,5 +165,45 @@ class TelemetryInterceptorTest {
         assertTrue("replaced with a valid header", Regex("^00-[0-9a-f]{32}-[0-9a-f]{16}-01$").matches(sent))
         assertTrue("not the malformed one", sent != malformed)
         assertEquals("injected_unattributed", recorded.captured["traceparent.outcome"])
+    }
+    /**
+     * App client whose SDK interceptor is configured with a collector endpoint on the SAME origin as
+     * the app's own API — the shape that broke in 2.2.0/2.2.1 (issue: `telemetry.ncgafrica.com` hosts
+     * both `/collector/telemetry` and `/voting-api/...`).
+     */
+    private fun appClientSharingOriginWithCollector(): OkHttpClient =
+        OkHttpClient.Builder()
+            .addInterceptor(
+                TelemetryInterceptor(telemetryManager, server.url("/collector/telemetry").toString())
+            )
+            .connectTimeout(1, TimeUnit.SECONDS)
+            .readTimeout(1, TimeUnit.SECONDS)
+            .build()
+
+    @Test
+    fun `app call on the collector's own host is still traced`() {
+        allowServer()
+        appClient = appClientSharingOriginWithCollector()
+        server.enqueue(MockResponse().setResponseCode(200))
+
+        appClient!!.newCall(Request.Builder().url(server.url("/voting-api/auth/refresh")).build())
+            .execute().close()
+
+        val sent = server.takeRequest().getHeader("traceparent")
+        assertTrue("app path must not hit the self-request guard", Regex("^00-[0-9a-f]{32}-[0-9a-f]{16}-01$").matches(sent ?: ""))
+        assertTrue("http.request still emitted", recorded.isCaptured)
+    }
+
+    @Test
+    fun `the SDK's own export call is skipped`() {
+        allowServer()
+        appClient = appClientSharingOriginWithCollector()
+        server.enqueue(MockResponse().setResponseCode(200))
+
+        appClient!!.newCall(Request.Builder().url(server.url("/collector/telemetry")).build())
+            .execute().close()
+
+        assertNull("no header on our own export", server.takeRequest().getHeader("traceparent"))
+        assertFalse("no http.request event for our own export", recorded.isCaptured)
     }
 }

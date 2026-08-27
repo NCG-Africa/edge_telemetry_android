@@ -1,6 +1,8 @@
 package com.androidtel.telemetry_library.core
 
 import com.androidtel.telemetry_library.core.trace.TraceManager
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
 import okhttp3.Response
 import java.util.concurrent.TimeUnit
@@ -9,13 +11,16 @@ class TelemetryInterceptor(
     private val telemetryManager: TelemetryManager = TelemetryManager.getInstance(),
     private val telemetryEndpoint: String? = null
 ) : Interceptor {
-    
+
+    /** Parsed collector URL; the self-request guard matches host + path prefix against it. */
+    private val collectorUrl: HttpUrl? = telemetryEndpoint?.toHttpUrlOrNull()
+
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         val requestUrl = request.url.toString()
         
         // Skip tracking if this is the SDK's own telemetry request to avoid infinite loop
-        if (isTelemetryRequest(requestUrl)) {
+        if (isTelemetryRequest(request.url)) {
             return chain.proceed(request)
         }
         
@@ -56,20 +61,17 @@ class TelemetryInterceptor(
     }
     
     /**
-     * Check if the request URL is a telemetry endpoint to avoid tracking SDK's own requests
+     * True only for the SDK's own export calls, so instrumenting a client that also posts telemetry
+     * can't loop. Matched on the parsed URL — host plus the collector's path prefix — because an app
+     * may host its API on the same origin as the collector (`/voting-api/...` vs `/collector/...`).
+     *
+     * Not a substring test: `url.contains("/telemetry")` also matched the `//` in
+     * `https://telemetry.example.com/anything`, so every request to a `telemetry.*` host was skipped
+     * — no `traceparent` injected and no `http.request` event emitted (fixed in 2.2.2).
      */
-    private fun isTelemetryRequest(url: String): Boolean {
-        // Check against configured endpoint
-        telemetryEndpoint?.let { endpoint ->
-            if (url.startsWith(endpoint)) return true
-        }
-        
-        // Check against default SDK endpoint
-        if (url.contains("edgetelemetry.ncgafrica.com/collector/telemetry")) {
-            return true
-        }
-        
-        // Check for common telemetry endpoint patterns
-        return url.contains("/telemetry") || url.contains("/collector")
+    private fun isTelemetryRequest(url: HttpUrl): Boolean {
+        val collector = collectorUrl ?: return false
+        return url.host.equals(collector.host, ignoreCase = true) &&
+            url.encodedPath.startsWith(collector.encodedPath)
     }
 }
