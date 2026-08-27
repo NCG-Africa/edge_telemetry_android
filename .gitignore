@@ -7,6 +7,7 @@
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
+temp_auto_push.bat
 .DS_Store
 /build
 /captures
@@ -16,3 +17,5 @@ local.properties
 /.idea
 
 node_modules/
+.gitignore
+branch_structure.json
