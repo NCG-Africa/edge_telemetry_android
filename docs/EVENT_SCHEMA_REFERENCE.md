@@ -1,5 +1,21 @@
 # Event Schema Reference
 
+> ## ⚠️ Stale — do not use as a backend contract
+>
+> This document was last updated **2026-03-23** against SDK **2.1.0** (`6a23c4e`). The SDK is now **2.2.2**.
+> Its "Backend Alignment: ✅ Complete" claim has not been true since.
+>
+> **Everything below postdates it and is missing here:** the unified `telemetry_batch` envelope (#30),
+> the entire v2/v3 distributed-trace contract (#109), `ui.interaction`, ANR and hang detection,
+> app-start timing, `ApplicationExitInfo` harvesting, static device context, and dynamic device state.
+> It also documents an `error.*` attribute vocabulary that **the SDK does not emit** — see
+> [`specs/backend-wire-contract.md` §4.14](./specs/backend-wire-contract.md).
+>
+> | If you are… | Read |
+> |---|---|
+> | **Building the backend schema / processor** | **[`specs/backend-wire-contract.md`](./specs/backend-wire-contract.md)** — the authoritative, `file:line`-grounded inventory of all 146 keys the Android SDK emits |
+> | **Integrating the SDK into an app** | This document, with the caveat that it is 2.1.0-era. Rewriting it is tracked separately. |
+
 ## Overview
 
 This document provides a comprehensive reference for all telemetry events supported by the EdgeRum Android SDK. Each event type includes:
@@ -11,9 +27,9 @@ This document provides a comprehensive reference for all telemetry events suppor
 - JSON payload examples
 - Backend compatibility notes
 
-**SDK Version:** 2.1.0+  
+**SDK Version:** 2.1.0+ (stale — current SDK is 2.2.2)  
 **Last Updated:** March 23, 2026  
-**Backend Alignment:** ✅ Complete
+**Backend Alignment:** ⚠️ superseded by [`specs/backend-wire-contract.md`](./specs/backend-wire-contract.md)
 
 ---
 
