@@ -2,6 +2,8 @@ package com.androidtel.telemetry_library.core
 
 import android.app.Activity
 import android.os.Build
+import android.os.Handler
+import android.os.HandlerThread
 import android.os.SystemClock
 import android.util.Log
 import android.view.FrameMetrics
@@ -33,6 +35,11 @@ class TelemetryFrameDropCollector(
     // Store listener reference to enable removal
     private var frameMetricsListener: Window.OnFrameMetricsAvailableListener? = null
 
+    // Window.addOnFrameMetricsAvailableListener rejects a null Handler (NPE: "handler and its looper
+    // cannot be null"). Dispatch on our own thread, not the main looper — measuring jank on the main
+    // thread adds to it. Mirrors androidx JankStats / FrameMetricsAggregator.
+    private var callbackThread: HandlerThread? = null
+
     // Store current activity reference to track state (using WeakReference to prevent memory leaks)
     private var currentActivityRef: WeakReference<Activity>? = null
 
@@ -50,6 +57,9 @@ class TelemetryFrameDropCollector(
 
     @Synchronized
     fun start(activity: Activity) {
+        // Honour the config flag here, not just at emit time: no flag, no listener, no thread.
+        if (!telemetryManager.isFrameTrackingEnabled()) return
+
         // Prevent duplicate listeners - stop existing listener first
         if (frameMetricsListener != null) {
             stop()
@@ -84,7 +94,9 @@ class TelemetryFrameDropCollector(
 
         // Add listener to window
         frameMetricsListener?.let { listener ->
-            window.addOnFrameMetricsAvailableListener(listener, null)
+            val thread = HandlerThread(TAG).also { it.start() }
+            callbackThread = thread
+            window.addOnFrameMetricsAvailableListener(listener, Handler(thread.looper))
         }
 
         Log.d(TAG, "Frame metrics listener started for ${activity.javaClass.simpleName}")
@@ -188,6 +200,9 @@ class TelemetryFrameDropCollector(
                 Log.w(TAG, "Failed to remove frame metrics listener: ${e.localizedMessage}")
             }
         }
+
+        callbackThread?.quitSafely()
+        callbackThread = null
 
         // Clear references to prevent memory leaks
         frameMetricsListener = null

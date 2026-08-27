@@ -5,6 +5,22 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] - 2026-08-27
+
+Patch release. Fixes a crash on every activity resume, introduced with the windowed frame collector
+(#54) and present in all 2.1.x and 2.2.0 builds.
+
+### 🐛 Fixed
+
+- **Crash on activity resume**: `TelemetryFrameDropCollector` passed a literal `null` Handler to
+  `Window.addOnFrameMetricsAvailableListener`, which Android rejects with
+  `NullPointerException: handler and its looper cannot be null`. The collector now dispatches frame
+  metrics on its own `HandlerThread` (torn down in `stop()`) rather than the main looper, so
+  measuring jank does not add to it.
+- **`enableFrameTracking` was inert**: the listener was registered regardless of the flag — only
+  event emission was gated. `TelemetryFrameDropCollector.start()` now returns early when the flag is
+  off, so no listener and no thread are created.
+
 ## [2.2.0] - 2026-08-27
 
 Large feature + conformance release: everything merged to `master` since 2.1.13. Brings the wire
