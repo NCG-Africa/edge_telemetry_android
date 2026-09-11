@@ -12,9 +12,12 @@ import io.mockk.slot
 import io.mockk.verify
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.androidtel.telemetry_library.core.trace.TraceManager
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
@@ -145,6 +148,110 @@ class UserInteractionTrackerTest {
         // plain View with no id falls back to class simple name
         val ctx = Robolectric.buildActivity(Activity::class.java).get()
         assertEquals("View", resolveTargetName(View(ctx)))
+    }
+
+    // --- Delta 12c: the mint/emit split ---
+
+    @Test
+    fun `mint opens the root before the event is emitted`() {
+        val manager = mockk<TelemetryManager>(relaxed = true)
+        val tracker = UserInteractionTracker(manager) { "VoteActivity" }
+        val ctx = Robolectric.buildActivity(Activity::class.java).get()
+        val activity = activityWith(FrameLayout(ctx))
+
+        TraceManager.resetForTesting()
+        val pending = tracker.mintRoot(activity.window, 100f, 100f)
+
+        // This is the whole point of Delta 12c: at ACTION_UP, before the ~300 ms double-tap timeout,
+        // Compose has already run onClick and fired its request. The root must exist by now.
+        val root = TraceManager.current()
+        assertNotNull("root is open at ACTION_UP, not at tap-confirm", root)
+        verify(exactly = 0) { manager.recordEvent(any(), any()) }
+
+        tracker.emitInteraction("tap", pending, null)
+        val attrs = slot<Map<String, Any>>()
+        verify(exactly = 1) { manager.recordEvent(eq("ui.interaction"), capture(attrs)) }
+        assertEquals(root!!.spanId, attrs.captured["rum.action.id"])
+        TraceManager.resetForTesting()
+    }
+
+    @Test
+    fun `a double tap mints two roots and emits no event`() {
+        val manager = mockk<TelemetryManager>(relaxed = true)
+        val tracker = UserInteractionTracker(manager) { "VoteActivity" }
+        val ctx = Robolectric.buildActivity(Activity::class.java).get()
+        val activity = activityWith(FrameLayout(ctx))
+
+        TraceManager.resetForTesting()
+        tracker.mintRoot(activity.window, 10f, 10f)
+        val first = TraceManager.current()!!.spanId
+        tracker.mintRoot(activity.window, 10f, 10f)   // onSingleTapConfirmed never fires
+
+        assertNotEquals("second tap mints its own root", first, TraceManager.current()!!.spanId)
+        verify(exactly = 0) { manager.recordEvent(any(), any()) }  // Delta 7's idle window reaps both
+        TraceManager.resetForTesting()
+    }
+
+    @Test
+    fun `suppression happens at mint, so a suppressed tap parents nothing`() {
+        val manager = mockk<TelemetryManager>(relaxed = true)
+        val tracker = UserInteractionTracker(manager) { "LoginActivity" }
+        val ctx = Robolectric.buildActivity(Activity::class.java).get()
+        val password = EditText(ctx).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        val activity = activityWith(FrameLayout(ctx).apply { addView(password) })
+        password.layout(0, 0, 1080, 1920)
+
+        TraceManager.resetForTesting()
+        val pending = tracker.mintRoot(activity.window, 540f, 1000f)
+
+        assertNull("no pending tap", pending)
+        assertNull("and crucially no root, or the next request would be parented by it",
+            TraceManager.current())
+        tracker.emitInteraction("tap", pending, null)
+        verify(exactly = 0) { manager.recordEvent(any(), any()) }
+        TraceManager.resetForTesting()
+    }
+
+    @Test
+    fun `trackUserInteraction renaming the open root wins at emit`() {
+        val manager = mockk<TelemetryManager>(relaxed = true)
+        val tracker = UserInteractionTracker(manager) { "VoteActivity" }
+        val ctx = Robolectric.buildActivity(Activity::class.java).get()
+        val activity = activityWith(FrameLayout(ctx))
+
+        TraceManager.resetForTesting()
+        val pending = tracker.mintRoot(activity.window, 10f, 10f)
+        TraceManager.nameCurrentRoot("vote")          // what the app's onClick handler does, mid-gesture
+        tracker.emitInteraction("tap", pending, null)
+
+        val attrs = slot<Map<String, Any>>()
+        verify(exactly = 1) { manager.recordEvent(eq("ui.interaction"), capture(attrs)) }
+        assertEquals("vote", attrs.captured["ui.target"])
+        assertEquals("track_tap", attrs.captured["ui.name_source"])
+        TraceManager.resetForTesting()
+    }
+
+    // --- Delta 12b: naming ---
+
+    @Test
+    fun `the View path reports its name source`() {
+        val ctx = Robolectric.buildActivity(Activity::class.java).get()
+        assertEquals("class_name", resolveTarget(View(ctx), 0f, 0f).source)
+        assertEquals(
+            "resource_id",
+            resolveTarget(View(ctx).apply { id = android.R.id.text1 }, 0f, 0f).source
+        )
+    }
+
+    @Test
+    fun `names normalize to the same snake_case shape the View path produces`() {
+        assertEquals("send_reset_link", ComposeSemanticsNamer.normalize("Send reset link"))
+        assertEquals("confirm_vote", ComposeSemanticsNamer.normalize("  Confirm vote!  "))
+        assertEquals("sign_in", ComposeSemanticsNamer.normalize("Sign-In"))
+        assertNull("nothing usable survives", ComposeSemanticsNamer.normalize("   ***   "))
+        assertEquals(64, ComposeSemanticsNamer.normalize("a".repeat(100))!!.length)
     }
 
     @Test

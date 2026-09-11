@@ -22,6 +22,7 @@ import com.androidtel.telemetry_library.core.exit.ExitInfoReader
 import com.androidtel.telemetry_library.core.ids.IdGenerator
 import com.androidtel.telemetry_library.core.startup.AppStartTracker
 import com.androidtel.telemetry_library.core.trace.TraceManager
+import com.androidtel.telemetry_library.core.trace.TracingCallFactory
 import com.androidtel.telemetry_library.core.models.AppInfo
 import com.androidtel.telemetry_library.core.services.EventTrackingService
 import com.androidtel.telemetry_library.core.services.SessionService
@@ -35,7 +36,9 @@ import com.androidtel.telemetry_library.core.models.UserInfo
 import com.androidtel.telemetry_library.core.session.SessionManager
 import com.androidtel.telemetry_library.core.user.UserProfileManager
 import kotlinx.coroutines.CoroutineScope
+import okhttp3.Call
 import okhttp3.Interceptor
+import okhttp3.OkHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -214,13 +217,42 @@ class TelemetryManager private constructor(
          * Creates a TelemetryInterceptor configured to avoid tracking SDK's own requests
          * Use this method to get a properly configured interceptor for your OkHttpClient
          */
-        fun createNetworkInterceptor(): TelemetryInterceptor {
+        @Deprecated(
+            "Async requests (Retrofit suspend/enqueue) lose trace attribution with a bare interceptor: " +
+                "the interceptor runs on OkHttp's dispatcher thread. Use TelemetryManager.instrument(client) " +
+                "and pass the result to Retrofit's .callFactory(). " +
+                "See docs/specs/distributed-trace-span.md (v3, Δ6).",
+            ReplaceWith("TelemetryManager.instrument(client)")
+        )
+        fun createNetworkInterceptor(): TelemetryInterceptor = buildNetworkInterceptor()
+
+        /** The interceptor itself, undeprecated, for [instrument] and the SDK's own wiring. */
+        private fun buildNetworkInterceptor(): TelemetryInterceptor {
             val manager = getInstance()
             return TelemetryInterceptor(
                 telemetryManager = manager,
                 telemetryEndpoint = manager.telemetryEndpoint
             )
         }
+
+        /**
+         * Δ6 — wires the interceptor and the `newCall()` trace capture together, so half-wiring is
+         * unrepresentable. Pass the result to Retrofit's `.callFactory()`:
+         *
+         * ```
+         * Retrofit.Builder()
+         *     .baseUrl(BASE_URL)
+         *     .callFactory(TelemetryManager.instrument(client))   // was: .client(client)
+         *     .build()
+         * ```
+         *
+         * A bare interceptor cannot attribute asynchronous calls: OkHttp runs interceptors on its
+         * dispatcher pool, where the thread-local trace context is gone. The `Call.Factory` captures it
+         * at `newCall()`, on the caller's thread — which for the common
+         * `viewModelScope.launch { api.get() }` pattern is the main thread the tap's root lives on.
+         */
+        fun instrument(client: OkHttpClient): Call.Factory =
+            TracingCallFactory(client.newBuilder().addInterceptor(buildNetworkInterceptor()).build())
 
         /**
          * Opt-in trace seam (#109 Δ1) for app-owned coroutine calls the SDK's listeners can't reach.
@@ -276,6 +308,17 @@ class TelemetryManager private constructor(
             // Δ2 — build the normalized allowlist once; the interceptor's gate reads it via TraceManager.
             TraceManager.traceHostAllowlist =
                 config.traceHostAllowlist.map { it.trim().lowercase() }.toSet()
+            // Δ9 — the empty default is safe but silently dark. The server-side signal exists (every
+            // request reports skipped_off_allowlist), but nothing told a developer on-device that they
+            // had wired everything correctly and still propagated nothing.
+            if (TraceManager.traceHostAllowlist.isEmpty()) {
+                Log.w(
+                    "TelemetryManager",
+                    "traceHostAllowlist is empty — NO traceparent header will be injected on any " +
+                        "request. Enumerate your API hosts to enable distributed tracing " +
+                        "(see README § Distributed Tracing)."
+                )
+            }
             
             // Step 2: Restore or generate deviceId
             idGenerator = IdGenerator()
@@ -309,6 +352,9 @@ class TelemetryManager private constructor(
             crashReportingService = CrashReportingService(context, config, httpClient)
             crashReportingService.initialize(
                 buildAttributesFn = { attrs -> buildAttributes(attrs) },
+                // Δ11's terminal annotation is applied inside CrashReportingService (buildCrashAttributes
+                // / recordHang), so the frozen-fatal rail — which bypasses this sink entirely — carries
+                // it too.
                 recordCrashEventFn = { attrs -> recordEvent("app.crash", attrs) },
                 recordHangEventFn = { attrs -> recordEvent("app.hang", attrs) }
             )
@@ -361,13 +407,28 @@ class TelemetryManager private constructor(
                     // first resume simply never fires it → no app.start that process (documented).
                     val memoryState = ActivityManager.RunningAppProcessInfo()
                     ActivityManager.getMyMemoryState(memoryState)
+
+                    // Δ8 — the launch trace root, anchored to the same true fork time and gated by the
+                    // same importance line the cold-start sample uses. Startup requests (token refresh,
+                    // remote config, splash prefetch) fire before any Activity resume, so without this
+                    // they have no action to attribute to. getStartElapsedRealtime() shares a timebase
+                    // with TraceManager's lifetime clock, so no cross-clock arithmetic is needed.
+                    TraceManager.onLaunch(
+                        startElapsedRealtimeMs = Process.getStartElapsedRealtime(),
+                        importanceAtInit = memoryState.importance
+                    )
+
                     appStartTracker = AppStartTracker(
                         startUptimeMs = Process.getStartUptimeMillis(),
                         importanceAtInit = memoryState.importance,
                         emit = { type, durationMs ->
                             recordEvent(
                                 "app.start",
-                                mapOf("app.start.type" to type, "app.start.duration_ms" to durationMs)
+                                mapOf("app.start.type" to type, "app.start.duration_ms" to durationMs) +
+                                    // Δ8/Δ10 — app.start becomes a span-carrying event: the launch
+                                    // root's ids, root_type = launch, and span.start_time = the fork
+                                    // instant. app.start.duration_ms stays the cold-start measure.
+                                    (TraceManager.launchRootAttrs() ?: emptyMap())
                             )
                         }
                     )

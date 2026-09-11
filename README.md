@@ -116,15 +116,26 @@ TelemetryManager.initialize(this, config);
 <application android:name=".MyApplication" ... />
 ```
 
-### 3. Add the OkHttp interceptor (for `http.request` + `traceparent`)
+### 3. Instrument your OkHttpClient (for `http.request` + `traceparent`)
 
 ```kotlin
-val client = OkHttpClient.Builder()
-    .addInterceptor(TelemetryManager.createNetworkInterceptor())  // application interceptor
+val client = OkHttpClient.Builder().build()
+
+Retrofit.Builder()
+    .baseUrl(BASE_URL)
+    .callFactory(TelemetryManager.instrument(client))   // wires the interceptor AND trace capture
     .build()
 ```
 
 The SDK skips its own collector requests, so there is no feedback loop.
+
+> **Upgrading from 2.2.x:** `TelemetryManager.createNetworkInterceptor()` is deprecated. It still
+> records `http.request` and still injects `traceparent`, but it **cannot attribute asynchronous
+> requests** (Retrofit `suspend`, `enqueue`, callbacks) to the user action that caused them — OkHttp
+> runs interceptors on its dispatcher pool, where the captured action is no longer visible. Those calls
+> report `traceparent.outcome = injected_unwired`. Switch `.client(client)` to
+> `.callFactory(TelemetryManager.instrument(client))`. Calls made after an explicit
+> `withContext(Dispatchers.IO)` hop still need `TelemetryManager.traceElement()`.
 
 ---
 
@@ -149,8 +160,8 @@ The SDK skips its own collector requests, so there is no feedback loop.
 | `enableUserInteractionEvents` | `Boolean` | `true` | `ui.interaction` |
 | `enableCapabilityEvents` | `Boolean` | `true` | `telemetry.capabilities_initialized` |
 | `enableSessionTracking` | `Boolean` | `true` | Session lifecycle events |
-| `traceSampleRate` | `Double` | `1.0` | Head-based sampling; fixed at `1.0` in v2 |
-| `traceHostAllowlist` | `List<String>` | `emptyList()` | Bare hosts that receive `traceparent` |
+| `traceSampleRate` | `Double` | `1.0` | Head-based sampling; fixed at `1.0` in v3 |
+| `traceHostAllowlist` | `List<String>` | `emptyList()` | Hosts that receive `traceparent`; exact or `.suffix.example.com` |
 
 Invalid values fail fast at construction (`IllegalArgumentException`).
 
@@ -159,10 +170,15 @@ Outbound batches carry `X-API-Key`, `X-SDK-Version`, `X-SDK-Platform: android`, 
 
 ---
 
-## Distributed tracing (v2)
+## Distributed tracing (v3 — launch-to-request)
 
 The SDK stitches an app action → the network calls it triggers → backend spans into one W3C trace by
-injecting a `traceparent` header on outbound requests.
+injecting a `traceparent` header on outbound requests. v3 extends that from taps to **app launch**, so
+startup requests (token refresh, remote config, splash prefetch) belong to a trace too.
+
+A root is opened by app launch, a tap, or a navigation, and closes after **2 s idle** or **10 s**
+absolute — extended each time a child span starts or a request completes, so a chained flow stays under
+one root while a background poll minutes later does not.
 
 ### `traceHostAllowlist` — ⚠️ dark on upgrade
 
@@ -175,8 +191,17 @@ val config = TelemetryConfig(
 ```
 
 `List<String>`, default `emptyList()`. Bare hosts only — **no scheme, port, or path** (a mis-formatted
-entry fails fast at `initialize()`). Match is exact host, case-insensitive; `api.example.com` matches
-that host **only** — not `example.com`, not `api.example.com.evil.com`.
+entry fails fast at `initialize()`). Matching is case-insensitive and takes two forms:
+
+- **Exact** — `api.example.com` matches that host **only**: not `example.com`, not
+  `api.example.com.evil.com`.
+- **Dot-anchored suffix** — `.example.com` matches `api.example.com` and `api-v2.example.com`. It is a
+  true suffix test, not a substring one: it does **not** match `api.example.com.evil.com` (which ends in
+  `.evil.com`), `evil-example.com`, or the apex `example.com`. A suffix entry needs at least two labels,
+  so `.com` throws at `initialize()`.
+
+The SDK logs a one-time warning at init when the list is empty, so a correctly-wired integration that
+still propagates nothing is visible on-device rather than only in a dashboard.
 
 > **⚠️ Upgrading to v2:** distributed tracing goes **dark** on upgrade — **no** `traceparent` is
 > injected on any request — until you enumerate your backend hosts in `traceHostAllowlist`. There is
@@ -184,7 +209,7 @@ that host **only** — not `example.com`, not `api.example.com.evil.com`.
 > Off-allowlist calls are still recorded locally (you keep `trace.id`/`span.id` on your own
 > `http.request` events); only the outbound header is withheld.
 
-Sampling is fixed — `traceSampleRate` stays `1.0`; it is **not** a v2 knob.
+Sampling is fixed — `traceSampleRate` stays `1.0`; it is **not** a v3 knob.
 
 ### `traceparent.outcome`
 
@@ -194,11 +219,17 @@ absence means "not traced."
 
 | Value | Meaning |
 |---|---|
-| `injected_attributed` | header injected; call belongs to a known RUM action |
-| `injected_unattributed` | header injected; no active action (parentless trace) |
-| `adopted` | inbound `traceparent` mirrored; header + trace left as the caller set them |
 | `skipped_off_allowlist` | host not in `traceHostAllowlist`; recorded locally, no header sent |
+| `adopted` | inbound `traceparent` mirrored; header + trace left as the caller set them |
+| `injected_attributed` | header injected; call belongs to a known, live RUM action |
+| `injected_unwired` | header injected; **no request tag** — `instrument()` was never wired, or the deprecated `createNetworkInterceptor()` path with no active action |
+| `injected_expired` | header injected; an action existed but aged out (2 s idle / 10 s cap) |
+| `injected_unattributed` | header injected; wiring is correct and genuinely no action was open |
 | *(absent)* | request not traced |
+
+A high `injected_unwired` share means an integration to fix; a high `injected_expired` share means the
+lifetime windows are truncating real flows. Both exist so those failures are measurable rather than
+silently pooled into `injected_unattributed`.
 
 ### Attributing app-owned coroutine calls
 
@@ -209,6 +240,44 @@ main thread:
 ```kotlin
 withContext(TelemetryManager.traceElement()) { api.get() }
 ```
+
+With `instrument(client)` wired, the common `viewModelScope.launch { api.get() }` pattern needs nothing
+extra: `viewModelScope` is `Dispatchers.Main.immediate`, so the call is created on the same thread the
+action lives on. Only an explicit `withContext(Dispatchers.IO)` hop needs `traceElement()`.
+
+### Naming Compose taps
+
+Taps on Material components (`Button`, `TextButton`, `IconButton`, tabs, switches) are named
+automatically from their labels — `"Send reset link"` becomes `ui.target = send_reset_link`. Taps on a
+bare `Modifier.clickable` report `ui.target = unnamed`, deliberately: that node usually wraps rendered
+data, and auto-naming it would ship user data as an attribute. Name those explicitly:
+
+```kotlin
+NcgCard(modifier = Modifier.fillMaxWidth().clickable { onCandidate(candidate) }.trackTap("candidate_card"))
+```
+
+Taps that hit no component at all (background, padding, a `Spacer`) report `compose_surface` — noise,
+not a gap. `ui.name_source` tells the two apart: `track_tap`, `test_tag`, `content_description`, `text`,
+`resource_id`, `class_name`, or `none`.
+
+`trackUserInteraction(action, target)` no longer emits its own `user.interaction` event — it renames the
+root the SDK already opened for that tap, so one tap produces exactly one `ui.interaction`.
+
+### Span attributes on the wire
+
+| Attribute | On | Notes |
+|---|---|---|
+| `trace.id` | every span-carrying event, `app.crash`, `app.hang` | 32 hex |
+| `span.id` | every span-carrying event | 16 hex; adopted ⇒ the mirrored foreign parent id |
+| `parent.span.id` | children only | omitted on roots, adopted, unattributed, unwired, expired |
+| `rum.action.id` | action + child events, `app.crash`, `app.hang` | the root's `span.id` — the join key |
+| `trace.root_type` | every span-carrying event + `app.crash`/`app.hang` | `launch`/`interaction`/`navigation`/`request`, denormalized onto children |
+| `span.start_time` | every span-carrying event | ISO-8601 ms UTC. `http.request`'s own event timestamp is the span **end**, so both ends are explicit |
+| `span.duration_ms` | children only | roots carry none — a root's envelope is derived at query time from its children |
+
+Two consequences of query-time envelopes worth stating: a childless root has no duration at all, and an
+envelope is never final — it widens whenever an offline batch replays hours or days late, so a dashboard
+caching one needs a recompute window.
 
 ---
 

@@ -54,12 +54,14 @@ object AttributeValidator {
         REQUIRED_USER_SESSION_ATTRIBUTES
 
     /**
-     * Distributed-trace v2 (#109) optional keys — recognized/known, never required. Listed so a
+     * Distributed-trace v3 (#120) optional keys - recognized/known, never required. Listed so a
      * maintainer sees they sit deliberately outside the required sets; enrichment must not flag them.
      * (No known-key whitelist rejects attributes today, so this is documentation of intent.)
      */
     val KNOWN_OPTIONAL_TRACE_ATTRIBUTES = setOf(
-        "trace.id", "span.id", "parent.span.id", "rum.action.id", "traceparent.outcome"
+        "trace.id", "span.id", "parent.span.id", "rum.action.id", "traceparent.outcome",
+        // v3 additions: root discrimination (Delta 13) and explicit span timing (Delta 10).
+        "trace.root_type", "span.start_time", "span.duration_ms", "ui.name_source"
     )
     
     /**

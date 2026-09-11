@@ -43,8 +43,76 @@ class UserInteractionTracker(
         if (cb is InteractionCallback) window.callback = cb.delegate
     }
 
+    /** What a mint resolved, held until the matching emit ~300 ms later. */
+    internal data class PendingTap(val target: String, val nameSource: String, val x: Float, val y: Float)
+
     /**
-     * Resolve target, suppress secure surfaces, and emit the event + breadcrumb.
+     * Delta 12c, mint half - runs at ACTION_UP, BEFORE the delegate dispatches to Compose.
+     *
+     * Compose's `clickable` fires on ACTION_UP, so an app's Retrofit call goes out there. The root used
+     * to mint ~300 ms later at onSingleTapConfirmed (GestureDetector withholds it for the double-tap
+     * timeout), which meant every Compose tap's own request was stamped with the PREVIOUS action's root
+     * or none at all. That was launch-to-request attribution misattributing every tap, and it stayed
+     * invisible because every root was named `compose_surface` -- misattribution and correct
+     * attribution looked identical.
+     *
+     * Suppression happens here, at mint, not at emit: a secure window or a password field must open no
+     * root at all, or a suppressed tap would still parent the requests that follow it.
+     *
+     * Returns null when suppressed; otherwise the resolved tap, for the emit half to stamp.
+     */
+    internal fun mintRoot(window: Window, x: Float, y: Float): PendingTap? {
+        // Secure surfaces: suppress everything. FLAG_SECURE is a window flag here (view-level
+        // FLAG_SECURE on a SurfaceView is not readable via public API - window + password field
+        // are the detectable surfaces, per spec §Privacy residual).
+        if (isWindowSecure(window)) return null
+
+        // x/y are window-relative pixels - the same space the decorView is hit-tested in, so the
+        // recorded point always aligns with the resolved target (no screen-vs-window skew).
+        val target = hitTest(window.decorView, x, y)
+        if (target is EditText && isPasswordInputType(target.inputType)) return null // secure input
+
+        val named = target?.let { resolveTarget(it, x, y) } ?: Named("unknown", "none")
+        TraceManager.onInteractionStart(named.target)
+        return PendingTap(named.target, named.source, x, y)
+    }
+
+    /**
+     * Delta 12c, emit half - runs at gesture confirmation, attached to the root already opened at mint.
+     * [pending] carries the name resolved at mint; a null [pending] means the tap was suppressed, so
+     * nothing is emitted.
+     */
+    internal fun emitInteraction(type: String, pending: PendingTap?, direction: String?) {
+        if (pending == null) return
+        val attrs = mutableMapOf<String, Any>(
+            "ui.type" to type,
+            "ui.target" to pending.target,
+            "ui.name_source" to pending.nameSource,
+            "ui.x" to pending.x.toInt(),
+            "ui.y" to pending.y.toInt()
+        )
+        if (direction != null) attrs["ui.direction"] = direction
+        currentScreen()?.let { attrs["ui.screen"] = it }
+
+        // The root was minted at ACTION_UP; this stamps its ids and its MINT time as span.start_time,
+        // so the event never starts after the request it parents. Null (unsampled, or the root already
+        // expired) leaves the event with no trace attrs.
+        TraceManager.onInteractionEmit()?.let { attrs.putAll(it) }
+
+        // Delta 12a - trackUserInteraction() may have renamed the root inside onClick, between mint and
+        // emit. The root's name is authoritative when it differs: manual wins, exactly as trackTap
+        // outranks the automatic chain.
+        TraceManager.currentRootName()?.takeIf { it != pending.target }?.let {
+            attrs["ui.target"] = it
+            attrs["ui.name_source"] = ComposeSemanticsNamer.SOURCE_TRACK_TAP
+        }
+
+        telemetryManager.recordEvent("ui.interaction", attrs)
+        telemetryManager.addBreadcrumb("$type ${attrs["ui.target"]}", category = "ui")
+    }
+
+    /**
+     * Mint-then-emit in one call, for the gestures GestureDetector reports once (long press, fling).
      * Internal seam: exercised directly by tests without driving GestureDetector timing.
      */
     internal fun handleGesture(
@@ -54,42 +122,28 @@ class UserInteractionTracker(
         y: Float,
         direction: String?
     ) {
-        // Secure surfaces: suppress everything. FLAG_SECURE is a window flag here (view-level
-        // FLAG_SECURE on a SurfaceView is not readable via public API — window + password field
-        // are the detectable surfaces, per spec §Privacy residual).
-        if (isWindowSecure(window)) return
-
-        // x/y are window-relative pixels — the same space the decorView is hit-tested in, so the
-        // recorded point always aligns with the resolved target (no screen-vs-window skew).
-        val target = hitTest(window.decorView, x, y)
-        if (target is EditText && isPasswordInputType(target.inputType)) return // secure input: suppress
-
-        val name = target?.let { resolveTargetName(it) } ?: "unknown"
-        val attrs = mutableMapOf<String, Any>(
-            "ui.type" to type,
-            "ui.target" to name,
-            "ui.x" to x.toInt(),
-            "ui.y" to y.toInt()
-        )
-        if (direction != null) attrs["ui.direction"] = direction
-        currentScreen()?.let { attrs["ui.screen"] = it }
-
-        // A user interaction always opens a fresh trace root (#59). Stamp trace.id/span.id when
-        // sampled; null (unsampled) leaves the event with no trace attrs.
-        TraceManager.onInteraction()?.let { attrs.putAll(it) }
-
-        telemetryManager.recordEvent("ui.interaction", attrs)
-        telemetryManager.addBreadcrumb("$type $name", category = "ui")
+        emitInteraction(type, mintRoot(window, x, y), direction)
     }
 
     private inner class GestureListener(
         private val window: Window
     ) : GestureDetector.SimpleOnGestureListener() {
 
+        /** Delta 12c - the tap resolved at ACTION_UP, waiting for the double-tap timeout to confirm. */
+        private var pending: PendingTap? = null
+
         override fun onDown(e: MotionEvent): Boolean = true
 
+        // Delta 12c - fires on ACTION_UP, before the delegate dispatches the event to Compose, so the
+        // root is open by the time onClick runs and fires its request.
+        override fun onSingleTapUp(e: MotionEvent): Boolean {
+            pending = mintRoot(window, e.x, e.y)
+            return false
+        }
+
         override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-            handleGesture(window, "tap", e.x, e.y, null)
+            emitInteraction("tap", pending, null)
+            pending = null
             return false
         }
 
@@ -143,22 +197,39 @@ internal fun hitTest(root: View, x: Float, y: Float): View? {
 private fun contains(v: View, x: Float, y: Float): Boolean =
     x >= v.left && x < v.right && y >= v.top && y < v.bottom
 
-/** `getResourceEntryName` when the view has an id; else class simple name (compose surface mapped). */
-internal fun resolveTargetName(view: View): String {
+/** A resolved target name plus the source it came from, reported as `ui.name_source`. */
+internal data class Named(val target: String, val source: String)
+
+/**
+ * `getResourceEntryName` when the view has an id; else the Compose semantics chain (Delta 12b) for a
+ * Compose host, else the class simple name.
+ *
+ * `ui.name_source` exists because the v2 trace contract was write-only for two releases and nobody
+ * could measure whether it worked. Ship semantics naming without it and the identical failure repeats:
+ * you could not tell whether names come from real labels or whether the Role gate is silently eating
+ * half the app.
+ */
+internal fun resolveTarget(view: View, x: Float, y: Float): Named {
     val id = view.id
     if (id != View.NO_ID) {
         try {
-            return view.resources.getResourceEntryName(id)
+            return Named(view.resources.getResourceEntryName(id), "resource_id")
         } catch (_: Exception) {
-            // fall through to class name
+            // fall through
         }
     }
-    // ponytail: Compose renders its whole tree in one AndroidComposeView (no per-composable id in
-    // the View tree). v1 is coordinate-only — map that surface to a stable name. Per-composable
-    // identity graduates via opt-in Modifier.trackTap (fog).
+    // Compose renders its whole tree into one AndroidComposeView (no per-composable id in the View
+    // tree), so names come from the semantics tree instead - see ComposeSemanticsNamer.
     val simple = view.javaClass.simpleName
-    return if (simple == "AndroidComposeView") "compose_surface" else simple
+    if (simple == "AndroidComposeView") {
+        val named = ComposeSemanticsNamer.resolve(view, x, y)
+        return Named(named.target, named.source)
+    }
+    return Named(simple, "class_name")
 }
+
+/** Back-compat seam for existing callers/tests that only want the name. */
+internal fun resolveTargetName(view: View): String = resolveTarget(view, 0f, 0f).target
 
 internal fun swipeDirection(velocityX: Float, velocityY: Float): String =
     if (abs(velocityX) > abs(velocityY)) {

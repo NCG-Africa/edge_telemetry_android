@@ -17,8 +17,10 @@ data class TelemetryConfig(
     val enableCapabilityEvents: Boolean = true,
     val enableSessionTracking: Boolean = true,
     val traceSampleRate: Double = 1.0,
-    // Bare hosts (no scheme/port/path), exact-match case-insensitive. `traceparent` is injected ONLY
-    // to hosts in this list. Empty (the default) = inject nowhere — v2 is dark-on-upgrade (see README).
+    // Bare hosts (no scheme/port/path), case-insensitive. An entry matches a host exactly, or -- with a
+    // leading dot -- as a true suffix: `.example.com` matches `api.example.com` and `api-v2.example.com`
+    // but NOT `api.example.com.evil.com` or `evil-example.com`. `traceparent` is injected ONLY to hosts
+    // in this list. Empty (the default) = inject nowhere; the SDK logs a one-time warning at init.
     val traceHostAllowlist: List<String> = emptyList()
 ) {
     init {
@@ -34,6 +36,11 @@ data class TelemetryConfig(
             require(h.isNotBlank()) { "traceHostAllowlist entry must not be blank" }
             require(!h.contains("/") && !h.contains(":")) {
                 "traceHostAllowlist entry must be a bare host (no scheme, path, or port), got '$it'"
+            }
+            // Delta 9 - a suffix entry needs at least two labels after the dot, so `.com` (which would
+            // match every .com host on earth) fails fast the way a scheme or a port already does.
+            require(!h.startsWith(".") || h.drop(1).count { c -> c == '.' } >= 1) {
+                "traceHostAllowlist suffix entry must have at least two labels, got '$it'"
             }
         }
     }

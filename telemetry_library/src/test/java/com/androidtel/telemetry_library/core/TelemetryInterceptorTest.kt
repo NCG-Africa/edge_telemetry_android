@@ -1,6 +1,7 @@
 package com.androidtel.telemetry_library.core
 
 import com.androidtel.telemetry_library.core.trace.TraceManager
+import com.androidtel.telemetry_library.core.trace.TracingCallFactory
 import io.mockk.mockk
 import io.mockk.slot
 import okhttp3.OkHttpClient
@@ -36,9 +37,9 @@ class TelemetryInterceptorTest {
             .readTimeout(1, TimeUnit.SECONDS)
             .build()
         io.mockk.every { telemetryManager.recordEvent("http.request", capture(recorded)) } returns Unit
+        TraceManager.resetForTesting()
         TraceManager.traceSampleRate = 1.0
         TraceManager.traceHostAllowlist = emptySet()
-        TraceManager.onBackground()
     }
 
     @After
@@ -87,26 +88,29 @@ class TelemetryInterceptorTest {
     @Test
     fun `on-allowlist active root injects traceparent and stamps child span attrs`() {
         allowServer()
-        val root = TraceManager.onInteraction()!!
+        val root = TraceManager.onInteractionStart(null)!!
         server.enqueue(MockResponse().setResponseCode(200))
 
         client.newCall(Request.Builder().url(server.url("/x")).build()).execute().close()
 
         val sent = server.takeRequest().getHeader("traceparent")!!
         assertTrue("well-formed", Regex("^00-[0-9a-f]{32}-[0-9a-f]{16}-01$").matches(sent))
-        assertTrue("carries the root trace id", sent.contains(root["trace.id"] as String))
+        assertTrue("carries the root trace id", sent.contains(root.traceId))
 
         val a = recorded.captured
-        assertEquals(root["trace.id"], a["trace.id"])
-        assertEquals(root["span.id"], a["parent.span.id"])
+        assertEquals(root.traceId, a["trace.id"])
+        assertEquals(root.spanId, a["parent.span.id"])
         assertEquals("injected_attributed", a["traceparent.outcome"])
         assertTrue(sent.contains(a["span.id"] as String))
+        // Delta 10 - both ends of the span on the wire, since this event's timestamp is the END.
+        assertTrue(a.containsKey("span.start_time"))
+        assertTrue(a.containsKey("span.duration_ms"))
     }
 
     @Test
     fun `off-allowlist suppresses the header but still stamps trace attrs`() {
         // allowlist empty → server host off-allowlist
-        TraceManager.onInteraction()
+        TraceManager.onInteractionStart(null)
         server.enqueue(MockResponse().setResponseCode(200))
 
         client.newCall(Request.Builder().url(server.url("/x")).build()).execute().close()
@@ -118,8 +122,8 @@ class TelemetryInterceptorTest {
     }
 
     @Test
-    fun `no-action on-allowlist call injects an unattributed trace`() {
-        allowServer() // no root active
+    fun `bare interceptor with no action reports unwired, not unattributed`() {
+        allowServer() // no root active, and no Call.Factory wired
         server.enqueue(MockResponse().setResponseCode(200))
 
         client.newCall(Request.Builder().url(server.url("/x")).build()).execute().close()
@@ -128,8 +132,53 @@ class TelemetryInterceptorTest {
         assertTrue(Regex("^00-[0-9a-f]{32}-[0-9a-f]{16}-01$").matches(sent))
         val a = recorded.captured
         assertTrue(a.containsKey("trace.id"))
-        assertEquals("injected_unattributed", a["traceparent.outcome"])
+        // Delta 6 - no request tag AND no carrier means instrument() was never wired. That is a
+        // different fact from "tag present, genuinely no action open", and the enum keeps them apart
+        // so a misconfigured integration is visible rather than blamed on idle users.
+        assertEquals("injected_unwired", a["traceparent.outcome"])
         assertFalse(a.containsKey("rum.action.id"))
+    }
+
+    @Test
+    fun `instrumented factory with no action reports genuinely unattributed`() {
+        allowServer()
+        server.enqueue(MockResponse().setResponseCode(200))
+
+        TracingCallFactory(client).newCall(Request.Builder().url(server.url("/x")).build())
+            .execute().close()
+
+        assertEquals("injected_unattributed", recorded.captured["traceparent.outcome"])
+    }
+
+    /**
+     * Delta 6, the case that would have caught G1: a real dispatcher hop. The v2 tests called
+     * onNetworkCall directly on the coroutine thread, which is exactly why the gap survived to
+     * production -- they never crossed OkHttp's pool boundary.
+     */
+    @Test
+    fun `enqueued call attributes to the action that started it`() {
+        allowServer()
+        val root = TraceManager.onInteractionStart("checkout")!!
+        server.enqueue(MockResponse().setResponseCode(200))
+
+        val latch = java.util.concurrent.CountDownLatch(1)
+        // newCall() on THIS thread (where the root lives); the interceptor then runs on the pool.
+        TracingCallFactory(client).newCall(Request.Builder().url(server.url("/x")).build())
+            .enqueue(object : okhttp3.Callback {
+                override fun onFailure(call: okhttp3.Call, e: java.io.IOException) = latch.countDown()
+                override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
+                    response.close()
+                    latch.countDown()
+                }
+            })
+        assertTrue("request completed", latch.await(5, TimeUnit.SECONDS))
+
+        // Assert on the RECORDED request, never the one we built: a header on the outgoing Request
+        // object proves only that we asked.
+        val sent = server.takeRequest().getHeader("traceparent")!!
+        assertEquals(root.traceId, sent.split("-")[1])
+        assertEquals("injected_attributed", recorded.captured["traceparent.outcome"])
+        assertEquals(root.spanId, recorded.captured["rum.action.id"])
     }
 
     @Test
@@ -164,7 +213,7 @@ class TelemetryInterceptorTest {
         val sent = server.takeRequest().getHeader("traceparent")!!
         assertTrue("replaced with a valid header", Regex("^00-[0-9a-f]{32}-[0-9a-f]{16}-01$").matches(sent))
         assertTrue("not the malformed one", sent != malformed)
-        assertEquals("injected_unattributed", recorded.captured["traceparent.outcome"])
+        assertEquals("injected_unwired", recorded.captured["traceparent.outcome"])
     }
     /**
      * App client whose SDK interceptor is configured with a collector endpoint on the SAME origin as

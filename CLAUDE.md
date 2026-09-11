@@ -30,7 +30,7 @@ Android telemetry library (AAR) published via JitPack as `com.github.NCG-Africa:
 - **Kotlin:** 2.1.0 | **AGP:** 8.7.1
 - **Java:** 11 (source + target)
 - **Gradle:** 8.4+
-- **Current version:** 2.2.2
+- **Current version:** 2.3.0
 
 ## Project Structure
 
@@ -80,7 +80,13 @@ edge_telemetry_android/
 │           └── retry/                    # CrashRetryManager
 ├── gradle/libs.versions.toml            # Version catalog
 ├── settings.gradle.kts                  # Single module: :telemetry_library
-└── docs/                                # Documentation (migration guides, schemas, etc.)
+├── CONTEXT.md                           # Domain glossary (ubiquitous language)
+└── docs/
+    ├── EVENT_SCHEMA_REFERENCE.md        # Wire format per event type
+    ├── API_KEY_GUIDE.md                 # API key setup for consumers
+    ├── MIGRATION_GUIDE_V2.md            # v1 → v2 consumer migration
+    ├── specs/                           # Per-feature design specs (tracked via GitHub issues, see wayfinder #29)
+    └── agents/issue-tracker.md          # Issue-tracker conventions for agent skills
 ```
 
 ## Architecture
@@ -114,7 +120,7 @@ These features work out of the box after `TelemetryManager.initialize()`:
 
 | Feature | Config flag |
 |---|---|
-| `traceparent` propagation | `traceHostAllowlist = listOf("api.example.com")` — empty (the default) injects on **no** host |
+| `traceparent` propagation | `traceHostAllowlist = listOf("api.example.com", ".example.com")` — empty (the default) injects on **no** host; a leading dot is a suffix match |
 
 ## Key APIs for Developers
 
@@ -128,13 +134,18 @@ val config = TelemetryConfig(
 TelemetryManager.initialize(application, config)
 ```
 
-### Network Tracking (add interceptor to OkHttpClient)
+### Network Tracking (instrument the OkHttpClient)
 
 ```kotlin
-val client = OkHttpClient.Builder()
-    .addInterceptor(TelemetryManager.createNetworkInterceptor())
+val client = OkHttpClient.Builder().build()
+
+Retrofit.Builder()
+    .callFactory(TelemetryManager.instrument(client))   // interceptor + newCall() trace capture
     .build()
 ```
+
+`createNetworkInterceptor()` is deprecated (v3 Δ6): OkHttp runs interceptors on its dispatcher pool, so
+a bare interceptor cannot attribute async calls to the action that caused them.
 
 ### Custom Events & Metrics
 

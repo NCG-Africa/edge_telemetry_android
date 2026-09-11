@@ -1,6 +1,7 @@
 package com.androidtel.telemetry_library.core
 
 import com.androidtel.telemetry_library.core.trace.TraceManager
+import com.androidtel.telemetry_library.core.trace.TraceTag
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
@@ -24,14 +25,23 @@ class TelemetryInterceptor(
             return chain.proceed(request)
         }
         
-        // Distributed trace v2 (#109): thin adapter. Hand TraceManager the two request facts (host +
-        // any inbound traceparent); it resolves the whole outcome ladder (allowlist gate, adoption,
-        // unattributed, attributed) and returns the header action + the attrs to stamp on http.request.
-        val decision = TraceManager.onNetworkCall(request.url.host, request.header("traceparent"))
+        // Distributed trace v3 (#120): thin adapter. Hand TraceManager the three request facts (host,
+        // any inbound traceparent, and the Δ6 tag stamped at newCall()); it resolves the whole outcome
+        // ladder (allowlist gate, adoption, unwired, expired, unattributed, attributed) and returns the
+        // header action, the attrs to stamp on http.request, and the root to extend on completion.
+        val decision = TraceManager.onNetworkCall(
+            request.url.host,
+            request.header("traceparent"),
+            request.tag(TraceTag::class.java)
+        )
         val outgoing = decision?.newHeader?.let {
             request.newBuilder().header("traceparent", it).build()
         } ?: request
 
+        // Δ10 — the span's START, captured as a real epoch instant. nanoTime is monotonic and NOT a
+        // wall clock, so span.start_time can never be back-computed from the delta; the delta is still
+        // the right clock for the duration.
+        val startEpochMs = System.currentTimeMillis()
         val startTime = System.nanoTime()
         var response: Response? = null
 
@@ -53,8 +63,19 @@ class TelemetryInterceptor(
                 // "optional pair", so the backend column stays null rather than a false 0.
                 request.body?.contentLength()?.takeIf { it >= 0 }?.let { put("http.request_size", it) }
                 response?.body?.contentLength()?.takeIf { it >= 0 }?.let { put("http.response_size", it) }
-                decision?.let { putAll(it.attrs) }
+                decision?.let {
+                    putAll(it.attrs)
+                    // Δ10 — this event's timestamp is the span's END (it is emitted after the response),
+                    // so both ends go on the wire explicitly. No consumer has to know the convention.
+                    put("span.start_time", TelemetryTime.isoOf(startEpochMs))
+                    put("span.duration_ms", durationMs)
+                }
             }
+
+            // Δ7 — completion-extension, written from OkHttp's pool thread. This is why the root's
+            // last-activity field is an AtomicLong rather than anything ThreadLocal: a chained flow
+            // (tap → A takes 4 s → B fires on A's success) must keep both calls under one root.
+            decision?.root?.touch(TraceManager.clock())
 
             telemetryManager.recordEvent(eventName = "http.request", attributes = attributes)
         }

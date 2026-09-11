@@ -43,6 +43,12 @@ class TelemetryActivityLifecycleObserver(
         // Cold-start end marker (issue #95): first observed resume times app.start; later ones no-op.
         telemetryManager.notifyActivityResumed()
 
+        // Delta 8 - the first resume ends the launch root's idle EXEMPTION, not the root itself. Both
+        // Delta 7 clocks reset and the launch root decays normally from here. Closing it outright would
+        // leave the navigation below minting its own root, stopping the launch trace short of the first
+        // screen -- and the first screen's data fetches are usually the requests you most wanted.
+        TraceManager.onFirstResume()
+
         // Start tracking screen duration
         screenTimingTracker.startScreen(screenName)
 
