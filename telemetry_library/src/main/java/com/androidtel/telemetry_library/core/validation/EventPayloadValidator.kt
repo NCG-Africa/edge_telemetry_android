@@ -76,6 +76,18 @@ object EventPayloadValidator {
                 errors.add("rum.action.id must be String if present, got ${id::class.java.simpleName}")
             }
         }
+        // v3 Delta 13 - root discrimination, denormalized onto every span-carrying event.
+        attributes["trace.root_type"]?.let { rootType ->
+            val valid = com.androidtel.telemetry_library.core.trace.TraceManager.ROOT_TYPES
+            if (rootType !is String || rootType !in valid) {
+                errors.add("trace.root_type must be one of $valid, got '$rootType'")
+            }
+        }
+        // v3 Delta 10 - the span's START, so no consumer has to infer whether this event's own
+        // timestamp means start or end. (It means end: http.request is emitted after the response.)
+        attributes["span.start_time"]?.let { start ->
+            validateTimestamp(start, "span.start_time", errors)
+        }
 
         return createValidationResult(errors)
     }

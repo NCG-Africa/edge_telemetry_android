@@ -166,8 +166,20 @@ fun TrackScreen(
 }
 
 /**
- * Track user interactions within Compose UI
- * 
+ * Name the trace root for a Compose interaction, and drop a breadcrumb.
+ *
+ * Delta 12a - this used to emit its own `user.interaction` event. By the time an app calls it from a
+ * tap handler, the window callback has already emitted `ui.interaction` for the same tap, so a Compose
+ * app adopting this helper got TWO events for one tap: the coordinate-derived one carrying the trace
+ * but no usable name, and this one carrying the real name but no trace. Split identity, double
+ * counting, two differently-named event schemas.
+ *
+ * It now renames the root the window callback opened at ACTION_UP (Delta 12c guarantees it exists by
+ * the time `onClick` runs). One root, one name, one event -- and manual naming wins, consistently with
+ * `Modifier.trackTap` outranking the automatic chain.
+ *
+ * **Wire-breaking for anyone consuming `user.interaction`**: that event is no longer emitted.
+ *
  * @param action The action performed (e.g., "button_click", "swipe", "scroll")
  * @param target The target of the action (e.g., "login_button", "product_card")
  * @param attributes Optional additional attributes
@@ -192,10 +204,8 @@ fun trackUserInteraction(
         data = interactionData
     )
     
-    // Track user interaction event (only if user interaction events are enabled)
-    if (EdgeTelemetry.getInstance().isUserInteractionEventsEnabled()) {
-        EdgeTelemetry.getInstance().recordEvent("user.interaction", interactionData)
-    }
+    // Delta 12a - rename the open root instead of emitting a rival event.
+    TraceManager.nameCurrentRoot(target)
 }
 
 /**

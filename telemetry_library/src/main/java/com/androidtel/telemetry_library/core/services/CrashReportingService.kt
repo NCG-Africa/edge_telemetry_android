@@ -10,6 +10,7 @@ import com.androidtel.telemetry_library.core.breadcrumbs.BreadcrumbManager
 import com.androidtel.telemetry_library.core.crash.FatalCrashStore
 import com.androidtel.telemetry_library.core.device.DeviceStateSnapshot
 import com.androidtel.telemetry_library.core.navigation.NavigationStackTracker
+import com.androidtel.telemetry_library.core.trace.TraceManager
 import com.androidtel.telemetry_library.core.models.EventAttributes
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.androidtel.telemetry_library.core.models.TelemetryEvent
@@ -184,6 +185,10 @@ internal class CrashReportingService(
                 "screen.name" to (NavigationStackTracker.currentScreen() ?: ""),
                 "hang.stack" to stack
             ) + DeviceStateSnapshot.read(context)
+                // Delta 11 - the watchdog detects from its OWN thread and can never read the main
+                // thread's carrier, so without this cross-thread annotation a hang carries no action at
+                // all -- and a hang is exactly where "what was the user doing" matters most.
+                + TraceManager.annotateTerminal()
         ) ?: Log.w(TAG, "Hang event sink not wired")
     }
 
@@ -256,6 +261,11 @@ internal class CrashReportingService(
         )
         (userAction ?: lastUserAction)?.let { attrs["user_action"] = it.take(500) }
         errorCode?.let { attrs["error_code"] = it.take(100) }
+        // Delta 11 - join keys for the action that was live at crash time. Applied here rather than at
+        // the sink so the frozen-fatal rail (freezeFatalCrash, which builds its own event) carries them
+        // too. A background-thread crash reads an empty carrier; this reference does not care which
+        // thread crashed. Annotation only: no span is minted and no parent.span.id is set.
+        attrs.putAll(TraceManager.annotateTerminal())
         attrs.putAll(extra)
         return attrs
     }
