@@ -3,7 +3,9 @@ package com.androidtel.telemetry_library.core
 import android.util.Log
 import com.androidtel.telemetry_library.BuildConfig
 import com.androidtel.telemetry_library.core.interceptors.ApiKeyRedactionInterceptor
+import com.androidtel.telemetry_library.core.models.AppOut
 import com.androidtel.telemetry_library.core.models.EventAttributes
+import com.androidtel.telemetry_library.core.models.SdkOut
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.androidtel.telemetry_library.core.models.TelemetryDataOut
 import com.androidtel.telemetry_library.core.models.TelemetryEventOut
@@ -58,6 +60,9 @@ class TelemetryHttpClient(
     // User profile is snapshotted into each event at recordEvent() time; the backend backfills
     // rum_users from event attributes so there's no need to override at serialization.
     suspend fun sendBatch(batch: TelemetryBatch): Result<Unit> {
+        // A batch that can't serialize (blank device_id, no events) fails the same way every time:
+        // fail fast instead of backing off through the retries.
+        runCatching { batch.toJson() }.onFailure { return Result.failure(it) }
         return sendWithRetry(batch, maxRetries = 3)
     }
 
@@ -130,11 +135,29 @@ class TelemetryHttpClient(
 
 
     // --- Extension: Convert Batch -> Outgoing JSON ---
-    // Serializes the single unified `telemetry_batch` envelope (issue #48). device.id lives per
-    // event in `attributes` (guarded in flattenAttributes); no top-level device_id/location.
+    // Serializes the contract 4.0.0 envelope (#135). Identity is derived from the batch's own first
+    // event, never the live process, so an offline-stored or frozen-crash batch is sent under the
+    // build that recorded it (R14) and a 2.x-stored TelemetryBatch re-serializes without migration.
     fun TelemetryBatch.toJson(): String {
+        val identity = events.first().attributes
+        // CRITICAL: device_id is required at the root (R9); never send without it.
+        check(identity.device.deviceId.isNotBlank()) {
+            "CRITICAL ERROR: device_id is blank. IDs were not properly validated before sending."
+        }
         val out = TelemetryDataOut(
-            type = "telemetry_batch",
+            // Stamped at each send attempt, never the stored time, so a replayed batch carries its
+            // send time (R13). Event timestamps are untouched.
+            timestamp = TelemetryTime.now(),
+            batch_size = this.batchSize,
+            device_id = identity.device.deviceId,
+            sdk = SdkOut(name = "android", version = BuildConfig.SDK_VERSION),
+            app = AppOut(
+                name = known(identity.app.appName),
+                package_name = identity.app.appPackageName,
+                platform = "android",
+                version = known(identity.app.appVersion),
+                build_number = known(identity.app.appBuildNumber)
+            ),
             events = this.events.map { event ->
                 TelemetryEventOut(
                     type = event.type,
@@ -144,36 +167,22 @@ class TelemetryHttpClient(
                     timestamp = event.timestamp,
                     attributes = flattenAttributes(event.attributes)
                 )
-            },
-            batch_size = this.batchSize,
-            timestamp = this.timestamp
+            }
         )
         return Gson().toJson(out)
     }
+
+    // Null for blank or 2.x's "unknown" placeholder, so it's omitted, never sent (R15).
+    private fun known(value: String?): String? = value?.takeUnless { it.isBlank() || it == "unknown" }
+
+    private fun isIdentityKey(key: String): Boolean =
+        key.startsWith("sdk.") || key == "device.id" || key in APP_IDENTITY_KEYS
 
     // ---- Helper: Flatten attributes into map ----
     private fun flattenAttributes(attrs: EventAttributes): Map<String, Any?> {
         val flat = mutableMapOf<String, Any?>()
 
-        // SDK identity — required common attrs on every event (issue #48). Replaces the X-SDK-* headers.
-        flat["sdk.version"] = BuildConfig.SDK_VERSION
-        flat["sdk.platform"] = "android"
-
-        // App
-        flat["app.name"] = attrs.app.appName
-        flat["app.version"] = attrs.app.appVersion
-        flat["app.build_number"] = attrs.app.appBuildNumber
-        flat["app.package_name"] = attrs.app.appPackageName
-
-        // Device - CRITICAL: device.id must never be null or empty
-        // This should never happen due to validation in TelemetryManager.sendBatch()
-        if (attrs.device.deviceId.isBlank()) {
-            throw IllegalStateException(
-                "CRITICAL ERROR: device.id is blank in event attributes. " +
-                "This indicates IDs were not properly validated before sending."
-            )
-        }
-        flat["device.id"] = attrs.device.deviceId
+        // No sdk.*, app.* or device.id here: identity lives in the envelope only (#135 R1).
         flat["device.platform"] = attrs.device.platform
         flat["device.platform_version"] = attrs.device.platformVersion
         flat["device.model"] = attrs.device.model
@@ -219,10 +228,16 @@ class TelemetryHttpClient(
 
 
 
-        // Custom
-        flat.putAll(attrs.customAttributes)
+        // Custom — identity keys are stripped, never sent: the envelope wins (R1). Exact app.* keys
+        // only, so event attrs like app.start.type survive.
+        attrs.customAttributes.filterKeys { !isIdentityKey(it) }.let(flat::putAll)
 
         return flat
     }
 
+    private companion object {
+        val APP_IDENTITY_KEYS = setOf(
+            "app.name", "app.version", "app.build_number", "app.package_name", "app.platform", "app.environment"
+        )
+    }
 }

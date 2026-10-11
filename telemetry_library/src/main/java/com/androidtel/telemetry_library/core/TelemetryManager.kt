@@ -23,7 +23,6 @@ import com.androidtel.telemetry_library.core.ids.IdGenerator
 import com.androidtel.telemetry_library.core.startup.AppStartTracker
 import com.androidtel.telemetry_library.core.trace.TraceManager
 import com.androidtel.telemetry_library.core.trace.TracingCallFactory
-import com.androidtel.telemetry_library.core.models.AppInfo
 import com.androidtel.telemetry_library.core.services.EventTrackingService
 import com.androidtel.telemetry_library.core.services.SessionService
 import com.androidtel.telemetry_library.core.services.UserProfileService
@@ -93,7 +92,7 @@ class TelemetryManager private constructor(
 
     // Core attributes for every event
     private lateinit var deviceId: String
-    private val appInfo = collectAppInfo()
+    private val appInfo = DeviceInfoCollector.collectAppInfo(context)
     private lateinit var deviceInfo: DeviceInfo
     
     // Device capabilities for runtime feature detection
@@ -743,15 +742,13 @@ class TelemetryManager private constructor(
             getNetworkType(context)
         )
         
-        return appInfo?.let {
-            EventAttributes(
-                app = it,
-                device = deviceInfo,
-                user = userInfo,
-                session = sessionInfo,
-                customAttributes = eventAttributes
-            )
-        }
+        return EventAttributes(
+            app = appInfo,
+            device = deviceInfo,
+            user = userInfo,
+            session = sessionInfo,
+            customAttributes = eventAttributes
+        )
     }
 
     // Checks the queue size and sends a batch if the threshold is met.
@@ -898,25 +895,6 @@ class TelemetryManager private constructor(
      */
     fun getMemoryCapabilityTracker(): MemoryCapabilityTracker? {
         return if (::memoryCapabilityTracker.isInitialized) memoryCapabilityTracker else null
-    }
-
-    // Gathers and formats app-related information.
-    private fun collectAppInfo(): AppInfo? {
-        val packageManager = context.packageManager
-        val packageName = context.packageName
-        val packageInfo = packageManager.getPackageInfo(packageName, 0)
-        return packageInfo.versionName?.let {
-            AppInfo(
-                appName = context.getString(context.applicationInfo.labelRes),
-                appVersion = it,
-                appBuildNumber = if (::deviceCapabilities.isInitialized && deviceCapabilities.supportsLongVersionCode) {
-                    packageInfo.longVersionCode.toString()
-                } else {
-                    packageInfo.versionCode.toString()
-                },
-                appPackageName = packageName
-            )
-        }
     }
 
     // Gathers and formats device-related information.

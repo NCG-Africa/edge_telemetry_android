@@ -4,27 +4,17 @@ import android.util.Log
 
 /**
  * Validator for Standard Attributes
- * Ensures all events have required app, device, user, and session attributes
+ * Ensures all events have required device, user, and session attributes
  */
 object AttributeValidator {
     
     private const val TAG = "AttributeValidator"
     
     /**
-     * Required App Attributes (must be present on ALL events)
-     */
-    private val REQUIRED_APP_ATTRIBUTES = setOf(
-        "app.name",
-        "app.version",
-        "app.build_number",
-        "app.package_name"
-    )
-    
-    /**
-     * Required Device Attributes (must be present on ALL events)
+     * Required Device Attributes (must be present on ALL events). No app.*, sdk.* or device.id:
+     * identity lives in the batch envelope only (#135 R1).
      */
     private val REQUIRED_DEVICE_ATTRIBUTES = setOf(
-        "device.id",
         "device.platform",
         "device.platform_version",
         "device.model",
@@ -49,8 +39,7 @@ object AttributeValidator {
     /**
      * All required standard attributes combined
      */
-    private val ALL_REQUIRED_ATTRIBUTES = REQUIRED_APP_ATTRIBUTES +
-        REQUIRED_DEVICE_ATTRIBUTES +
+    private val ALL_REQUIRED_ATTRIBUTES = REQUIRED_DEVICE_ATTRIBUTES +
         REQUIRED_USER_SESSION_ATTRIBUTES
 
     /**
@@ -97,13 +86,6 @@ object AttributeValidator {
             Log.w(TAG, "Standard attributes validation failed$eventInfo. Missing: $missingAttributes, Empty: $emptyAttributes")
             ValidationResult.Failure(missingAttributes, emptyAttributes)
         }
-    }
-    
-    /**
-     * Validate app attributes specifically
-     */
-    fun validateAppAttributes(attributes: Map<String, Any?>): ValidationResult {
-        return validateAttributeSet(attributes, REQUIRED_APP_ATTRIBUTES, "App")
     }
     
     /**

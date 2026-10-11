@@ -2,14 +2,32 @@ package com.androidtel.telemetry_library.core.models
 
 import java.util.UUID
 
-// Unified wire envelope (issue #48). Top-level is exactly {type, timestamp, batch_size, events}.
-// device_id/location/tenant_id/data-wrapper are gone: device.id is a per-event attr, geo is
-// collector-derived, tenant is identified server-side by X-API-Key.
+// Contract version of the batch envelope (#135). Its own constant, not derived from SDK_VERSION —
+// the two coincide only at 4.0.0.
+internal const val CONTRACT_VERSION = "4.0.0"
+
+// Contract 4.0.0 batch envelope (#135): closed at exactly these 8 keys. Identity (device_id, sdk,
+// app) lives here once per batch, never on events. Gson drops nulls, so an unknown app.name /
+// version / build_number is omitted, never sent as "" (R15).
 data class TelemetryDataOut(
     val type: String = "telemetry_batch",
-    val events: List<TelemetryEventOut>,
+    val contract_version: String = CONTRACT_VERSION,
+    val timestamp: String,
     val batch_size: Int,
-    val timestamp: String
+    val device_id: String,
+    val sdk: SdkOut,
+    val app: AppOut,
+    val events: List<TelemetryEventOut>
+)
+
+data class SdkOut(val name: String, val version: String)
+
+data class AppOut(
+    val name: String?,
+    val package_name: String,
+    val platform: String,
+    val version: String?,
+    val build_number: String?
 )
 
 // ---- Flattened Event ----
@@ -51,10 +69,11 @@ data class EventAttributes(
     val customAttributes: Map<String, Any>
 )
 
+// Null = unknown; omitted from the envelope, never sent as "" or "unknown" (#135 R15).
 data class AppInfo(
-    val appName: String,
-    val appVersion: String,
-    val appBuildNumber: String,
+    val appName: String?,
+    val appVersion: String?,
+    val appBuildNumber: String?,
     val appPackageName: String
 )
 

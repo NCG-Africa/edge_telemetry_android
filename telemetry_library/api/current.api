@@ -9,6 +9,10 @@ package com.androidtel.telemetry_library.compose {
     method public static void trackWithEdgeTelemetry(androidx.navigation.NavController);
   }
 
+  public final class EdgeTelemetryTrackTapKt {
+    method public static androidx.compose.ui.Modifier trackTap(androidx.compose.ui.Modifier, String name);
+  }
+
 }
 
 package com.androidtel.telemetry_library.core {
@@ -27,6 +31,22 @@ package com.androidtel.telemetry_library.core {
 
   public final class ClientException extends java.io.IOException {
     ctor public ClientException(int code, String message);
+  }
+
+  public final class CountedEventQueue {
+    ctor public CountedEventQueue();
+    method public void enqueue(com.androidtel.telemetry_library.core.models.TelemetryEvent event);
+    method public int getSize();
+    method public boolean isEmpty();
+    method public boolean isNotEmpty();
+    method public com.androidtel.telemetry_library.core.models.TelemetryEvent? peek();
+    method public com.androidtel.telemetry_library.core.models.TelemetryEvent? poll();
+    property public final int size;
+    field public static final com.androidtel.telemetry_library.core.CountedEventQueue.Companion Companion;
+    field public static final int MAX_EVENTS = 500; // 0x1f4
+  }
+
+  public static final class CountedEventQueue.Companion {
   }
 
   public final class DeviceCapabilities {
@@ -113,26 +133,6 @@ package com.androidtel.telemetry_library.core {
   public static final class EnhancedMemoryTracker.Companion {
   }
 
-  public final class LegacyPerformanceTracker {
-    ctor public LegacyPerformanceTracker(optional com.androidtel.telemetry_library.core.TelemetryManager telemetryManager);
-    method public java.util.Map<java.lang.String,java.lang.Object> getCurrentMetrics();
-    method public boolean isActive();
-    method @kotlin.jvm.Synchronized public void start(android.app.Activity activity);
-    method @kotlin.jvm.Synchronized public void stop();
-    field public static final com.androidtel.telemetry_library.core.LegacyPerformanceTracker.Companion Companion;
-  }
-
-  public static final class LegacyPerformanceTracker.Companion {
-  }
-
-  public final class LegacyPerformanceTrackerWrapper implements com.androidtel.telemetry_library.core.PerformanceTracker {
-    ctor public LegacyPerformanceTrackerWrapper(com.androidtel.telemetry_library.core.TelemetryManager telemetryManager);
-    method public java.util.Map<java.lang.String,java.lang.Object> getCurrentMetrics();
-    method public boolean isActive();
-    method public void start(android.app.Activity activity);
-    method public void stop();
-  }
-
   public final class MemoryCapabilityTracker {
     ctor public MemoryCapabilityTracker(android.content.Context context, com.androidtel.telemetry_library.core.DeviceCapabilities deviceCapabilities);
     method public java.util.Map<java.lang.String,java.lang.Object> getMemoryInfo();
@@ -185,6 +185,7 @@ package com.androidtel.telemetry_library.core {
     method public suspend Object? removeBatch(String batchId, kotlin.coroutines.Continuation<? super kotlin.Unit>);
     method public suspend Object? storeBatch(com.androidtel.telemetry_library.core.models.TelemetryBatch batch, kotlin.coroutines.Continuation<? super kotlin.Unit>);
     field public static final com.androidtel.telemetry_library.core.OfflineBatchStorage.Companion Companion;
+    field public static final int MAX_ENVELOPES = 200; // 0xc8
   }
 
   public static final class OfflineBatchStorage.Companion {
@@ -200,10 +201,6 @@ package com.androidtel.telemetry_library.core {
   public final class PerformanceTrackerFactory {
     method public com.androidtel.telemetry_library.core.PerformanceTracker createPerformanceTracker(com.androidtel.telemetry_library.core.TelemetryManager telemetryManager);
     field public static final com.androidtel.telemetry_library.core.PerformanceTrackerFactory INSTANCE;
-  }
-
-  public final class ScreenLifecycleObserver extends androidx.fragment.app.FragmentManager.FragmentLifecycleCallbacks {
-    ctor public ScreenLifecycleObserver(optional com.androidtel.telemetry_library.core.TelemetryManager telemetryManager);
   }
 
   public final class ScreenTimingTracker {
@@ -228,7 +225,7 @@ package com.androidtel.telemetry_library.core {
   }
 
   public final class TelemetryConfig {
-    ctor public TelemetryConfig(String apiKey, String endpoint, optional int batchSize, optional long flushIntervalMs, optional long sessionTimeoutMs, optional boolean enableScreenTracking, optional boolean enableCrashReporting, optional boolean enableNetworkTracking, optional boolean enableLifecycleTracking, optional boolean enableMemoryTracking, optional boolean enableStorageTracking, optional boolean enableFrameTracking, optional boolean enableLegacyScreenEvents, optional boolean enableUserInteractionEvents, optional boolean enableCapabilityEvents, optional boolean enableSessionTracking, optional boolean enableLocationTracking);
+    ctor public TelemetryConfig(String apiKey, String endpoint, optional int batchSize, optional long flushIntervalMs, optional long sessionTimeoutMs, optional boolean enableScreenTracking, optional boolean enableCrashReporting, optional boolean enableNetworkTracking, optional boolean enableLifecycleTracking, optional boolean enableMemoryTracking, optional boolean enableStorageTracking, optional boolean enableFrameTracking, optional boolean enableUserInteractionEvents, optional boolean enableCapabilityEvents, optional boolean enableSessionTracking, optional double traceSampleRate, optional java.util.List<java.lang.String> traceHostAllowlist);
     method public String component1();
     method public boolean component10();
     method public boolean component11();
@@ -236,8 +233,8 @@ package com.androidtel.telemetry_library.core {
     method public boolean component13();
     method public boolean component14();
     method public boolean component15();
-    method public boolean component16();
-    method public boolean component17();
+    method public double component16();
+    method public java.util.List<java.lang.String> component17();
     method public String component2();
     method public int component3();
     method public long component4();
@@ -246,15 +243,13 @@ package com.androidtel.telemetry_library.core {
     method public boolean component7();
     method public boolean component8();
     method public boolean component9();
-    method public com.androidtel.telemetry_library.core.TelemetryConfig copy(String apiKey, String endpoint, int batchSize, long flushIntervalMs, long sessionTimeoutMs, boolean enableScreenTracking, boolean enableCrashReporting, boolean enableNetworkTracking, boolean enableLifecycleTracking, boolean enableMemoryTracking, boolean enableStorageTracking, boolean enableFrameTracking, boolean enableLegacyScreenEvents, boolean enableUserInteractionEvents, boolean enableCapabilityEvents, boolean enableSessionTracking, boolean enableLocationTracking);
+    method public com.androidtel.telemetry_library.core.TelemetryConfig copy(String apiKey, String endpoint, int batchSize, long flushIntervalMs, long sessionTimeoutMs, boolean enableScreenTracking, boolean enableCrashReporting, boolean enableNetworkTracking, boolean enableLifecycleTracking, boolean enableMemoryTracking, boolean enableStorageTracking, boolean enableFrameTracking, boolean enableUserInteractionEvents, boolean enableCapabilityEvents, boolean enableSessionTracking, double traceSampleRate, java.util.List<java.lang.String> traceHostAllowlist);
     method public String getApiKey();
     method public int getBatchSize();
     method public boolean getEnableCapabilityEvents();
     method public boolean getEnableCrashReporting();
     method public boolean getEnableFrameTracking();
-    method public boolean getEnableLegacyScreenEvents();
     method public boolean getEnableLifecycleTracking();
-    method public boolean getEnableLocationTracking();
     method public boolean getEnableMemoryTracking();
     method public boolean getEnableNetworkTracking();
     method public boolean getEnableScreenTracking();
@@ -264,14 +259,14 @@ package com.androidtel.telemetry_library.core {
     method public String getEndpoint();
     method public long getFlushIntervalMs();
     method public long getSessionTimeoutMs();
+    method public java.util.List<java.lang.String> getTraceHostAllowlist();
+    method public double getTraceSampleRate();
     property public final String apiKey;
     property public final int batchSize;
     property public final boolean enableCapabilityEvents;
     property public final boolean enableCrashReporting;
     property public final boolean enableFrameTracking;
-    property public final boolean enableLegacyScreenEvents;
     property public final boolean enableLifecycleTracking;
-    property public final boolean enableLocationTracking;
     property public final boolean enableMemoryTracking;
     property public final boolean enableNetworkTracking;
     property public final boolean enableScreenTracking;
@@ -281,6 +276,8 @@ package com.androidtel.telemetry_library.core {
     property public final String endpoint;
     property public final long flushIntervalMs;
     property public final long sessionTimeoutMs;
+    property public final java.util.List<java.lang.String> traceHostAllowlist;
+    property public final double traceSampleRate;
   }
 
   public final class TelemetryFragmentLifecycleObserver extends androidx.fragment.app.FragmentManager.FragmentLifecycleCallbacks {
@@ -288,14 +285,18 @@ package com.androidtel.telemetry_library.core {
   }
 
   public final class TelemetryFrameDropCollector {
-    ctor public TelemetryFrameDropCollector(optional com.androidtel.telemetry_library.core.TelemetryManager telemetryManager);
+    ctor public TelemetryFrameDropCollector(optional com.androidtel.telemetry_library.core.TelemetryManager telemetryManager, optional kotlin.jvm.functions.Function0<java.lang.Long> clock, optional kotlin.jvm.functions.Function0<java.lang.String>? screenOverride, optional kotlin.jvm.functions.Function0<java.lang.Float>? refreshRateOverride);
     method public boolean isActive();
     method @kotlin.jvm.Synchronized public void start(android.app.Activity activity);
     method @kotlin.jvm.Synchronized public void stop();
+    field public static final double FROZEN_THRESHOLD_MS = 700.0;
+    field public static final double SLOW_THRESHOLD_MS = 16.0;
+    field public static final String TAG = "TelemetryFrameDropCollector";
+    field public static final long WINDOW_CAP_MS = 10000L; // 0x2710L
   }
 
   public final class TelemetryHttpClient {
-    ctor public TelemetryHttpClient(String telemetryUrl, String apiKey, boolean debugMode);
+    ctor public TelemetryHttpClient(String telemetryUrl, String apiKey, boolean debugMode, optional java.util.Map<java.lang.String,?> staticDeviceContext);
     method public okhttp3.OkHttpClient getOkHttpClient();
     method public suspend Object? sendBatch(com.androidtel.telemetry_library.core.models.TelemetryBatch batch, kotlin.coroutines.Continuation<? super kotlin.Result<? extends kotlin.Unit>>);
     method public String toJson(com.androidtel.telemetry_library.core.models.TelemetryBatch);
@@ -311,7 +312,6 @@ package com.androidtel.telemetry_library.core {
     method public void clearUserProfile();
     method public void endCurrentSession();
     method public android.content.Context getApplicationContext();
-    method public java.text.SimpleDateFormat getDateFormat();
     method public com.androidtel.telemetry_library.core.DeviceCapabilities? getDeviceCapabilities();
     method public String getDeviceId();
     method public okhttp3.Interceptor getInterceptor();
@@ -325,27 +325,26 @@ package com.androidtel.telemetry_library.core {
     method public void recordEvent(String eventName, optional java.util.Map<java.lang.String,?> attributes);
     method public void recordMetric(String metricName, double value, optional java.util.Map<java.lang.String,?> attributes);
     method public void recordScreenDuration(String screenName, long durationMs, String exitMethod);
-    method @Deprecated public void recordScreenView(String screenName);
     method public void setLastUserAction(String action);
     method public void setProductContext(String productId);
     method public void setUserProfile(String? name, String? email, optional String? phone);
     method public void startNewSession();
-    method public void testConnectivity();
     method public void testCrashReporting(optional String? customMessage);
     method @androidx.compose.runtime.Composable public void trackComposeScreens(androidx.navigation.NavController navController);
     method public void trackError(String message, optional String? stackTrace, optional java.util.Map<java.lang.String,java.lang.String>? attributes);
     method public void trackError(Throwable error, optional String? errorCode, optional String? productId, optional String? userAction, optional java.util.Map<java.lang.String,java.lang.String>? attributes);
     method public void trackError(Throwable error, optional java.util.Map<java.lang.String,java.lang.String>? attributes);
     property public final android.content.Context applicationContext;
-    property public final java.text.SimpleDateFormat dateFormat;
     field public static final com.androidtel.telemetry_library.core.TelemetryManager.Companion Companion;
   }
 
   public static final class TelemetryManager.Companion {
-    method public com.androidtel.telemetry_library.core.TelemetryInterceptor createNetworkInterceptor();
+    method @Deprecated public com.androidtel.telemetry_library.core.TelemetryInterceptor createNetworkInterceptor();
     method public com.androidtel.telemetry_library.core.TelemetryManager getInstance();
     method public com.androidtel.telemetry_library.core.TelemetryManager initialize(android.app.Application application, com.androidtel.telemetry_library.core.TelemetryConfig config);
     method @Deprecated public com.androidtel.telemetry_library.core.TelemetryManager initialize(android.app.Application application, String apiKey, optional int batchSize, optional String endpoint);
+    method public okhttp3.Call.Factory instrument(okhttp3.OkHttpClient client);
+    method public kotlin.coroutines.CoroutineContext traceElement();
   }
 
   public final class TelemetryMemoryUsage {
@@ -358,12 +357,52 @@ package com.androidtel.telemetry_library.core {
   public static final class TelemetryMemoryUsage.Companion {
   }
 
+  public final class TelemetryTime {
+    method public String isoOf(long epochMs);
+    method public String now();
+    field public static final com.androidtel.telemetry_library.core.TelemetryTime INSTANCE;
+  }
+
   public final class TrackComposeScreenKt {
     method @androidx.compose.runtime.Composable public static void TrackComposeScreen(androidx.navigation.NavController navController, optional String? screenName, optional java.util.Map<java.lang.String,java.lang.String>? additionalData, optional com.androidtel.telemetry_library.core.TelemetryManager telemetryManager);
   }
 
   public final class UnknownException extends java.io.IOException {
     ctor public UnknownException(int code);
+  }
+
+}
+
+package com.androidtel.telemetry_library.core.anr {
+
+  public final class AnrWatchdog {
+    ctor public AnrWatchdog(kotlin.jvm.functions.Function2<? super java.lang.Long,? super java.util.List<com.androidtel.telemetry_library.core.anr.ThreadDump>,kotlin.Unit> onAnr, kotlin.jvm.functions.Function2<? super java.lang.Long,? super java.lang.String,kotlin.Unit> onHang, optional android.os.Handler mainHandler, optional kotlin.jvm.functions.Function0<java.lang.Long> clock);
+    method public void start();
+    method public void stop();
+    field public static final long ANR_THRESHOLD_MS = 5000L; // 0x1388L
+    field public static final com.androidtel.telemetry_library.core.anr.AnrWatchdog.Companion Companion;
+    field public static final long HANG_THRESHOLD_MS = 2000L; // 0x7d0L
+    field public static final long INTERVAL_MS = 1000L; // 0x3e8L
+  }
+
+  public static final class AnrWatchdog.Companion {
+  }
+
+  public final class ThreadDump {
+    ctor public ThreadDump(String name, String state, boolean main, String stack);
+    method public String component1();
+    method public String component2();
+    method public boolean component3();
+    method public String component4();
+    method public com.androidtel.telemetry_library.core.anr.ThreadDump copy(String name, String state, boolean main, String stack);
+    method public boolean getMain();
+    method public String getName();
+    method public String getStack();
+    method public String getState();
+    property public final boolean main;
+    property public final String name;
+    property public final String stack;
+    property public final String state;
   }
 
 }
@@ -445,55 +484,20 @@ package com.androidtel.telemetry_library.core.crash {
     field public static final com.androidtel.telemetry_library.core.crash.CrashFingerprinter INSTANCE;
   }
 
-  public final class CrashReporter {
-    ctor public CrashReporter(android.content.Context context, com.androidtel.telemetry_library.core.TelemetryManager? telemetryManager, com.androidtel.telemetry_library.core.breadcrumbs.BreadcrumbManager breadcrumbManager, com.androidtel.telemetry_library.core.ids.IdGenerator idGenerator, String apiKey, String telemetryEndpoint, optional boolean enabled, optional boolean debugMode);
-    method public void installGlobalExceptionHandler();
-    method public void setLastUserAction(String action);
-    method public void setLocation(String? location);
-    method public void setProductContext(String productId);
-    method public void testCrashReporting(optional String? customMessage);
-    method public void trackError(String message, optional String? stackTrace, optional java.util.Map<java.lang.String,java.lang.String>? attributes);
-    method public void trackError(Throwable error, optional String? errorCode, optional String? productId, optional String? userAction, optional java.util.Map<java.lang.String,java.lang.String>? attributes);
-    method public void trackError(Throwable error, optional java.util.Map<java.lang.String,java.lang.String>? attributes);
-    field public static final com.androidtel.telemetry_library.core.crash.CrashReporter.Companion Companion;
-  }
-
-  public static final class CrashReporter.Companion {
-  }
-
 }
 
 package com.androidtel.telemetry_library.core.device {
 
   public final class DeviceInfoCollector {
     ctor public DeviceInfoCollector(android.content.Context context, com.androidtel.telemetry_library.core.ids.IdGenerator idGenerator);
-    method public java.util.Map<java.lang.String,java.lang.String> collectAppInfo();
     method public java.util.Map<java.lang.String,java.lang.String> collectDeviceInfo();
-    method public java.util.Map<java.lang.String,java.lang.String> getCrashAttributes();
     method public String getNetworkType();
     field public static final com.androidtel.telemetry_library.core.device.DeviceInfoCollector.Companion Companion;
   }
 
   public static final class DeviceInfoCollector.Companion {
-  }
-
-}
-
-package com.androidtel.telemetry_library.core.events {
-
-  public final class JsonEventTracker {
-    ctor public JsonEventTracker(com.androidtel.telemetry_library.core.TelemetryManager telemetryManager, com.androidtel.telemetry_library.core.session.SessionManager sessionManager, com.androidtel.telemetry_library.core.user.UserProfileManager userProfileManager, com.androidtel.telemetry_library.core.breadcrumbs.BreadcrumbManager breadcrumbManager, com.androidtel.telemetry_library.core.ids.IdGenerator idGenerator, optional int batchSize, optional java.time.Duration batchTimeout);
-    method public void addGlobalAttribute(String key, String value);
-    method public void cleanup();
-    method public void setGlobalAttributes(java.util.Map<java.lang.String,java.lang.String> attributes);
-    method public void testConnectivity();
-    method public void trackError(Throwable error, String stackTrace, optional java.util.Map<java.lang.String,java.lang.String>? attributes);
-    method public void trackEvent(String eventName, optional java.util.Map<java.lang.String,java.lang.String>? attributes);
-    method public void trackMetric(String metricName, double value, optional java.util.Map<java.lang.String,java.lang.String>? attributes);
-    field public static final com.androidtel.telemetry_library.core.events.JsonEventTracker.Companion Companion;
-  }
-
-  public static final class JsonEventTracker.Companion {
+    method public com.androidtel.telemetry_library.core.models.AppInfo collectAppInfo(android.content.Context context);
+    method public java.util.Map<java.lang.String,java.lang.Object> collectStaticDeviceContext(android.content.Context context);
   }
 
 }
@@ -511,6 +515,18 @@ package com.androidtel.telemetry_library.core.ids {
   }
 
   public static final class IdGenerator.Companion {
+    method public String spanId();
+    method public String traceId();
+  }
+
+}
+
+package com.androidtel.telemetry_library.core.interaction {
+
+  public final class UserInteractionTracker {
+    ctor public UserInteractionTracker(com.androidtel.telemetry_library.core.TelemetryManager telemetryManager, kotlin.jvm.functions.Function0<java.lang.String> currentScreen);
+    method public void attach(android.app.Activity activity);
+    method public void detach(android.app.Activity activity);
   }
 
 }
@@ -528,44 +544,43 @@ package com.androidtel.telemetry_library.core.interceptors {
 
 }
 
-package com.androidtel.telemetry_library.core.location {
-
-  public final class IpLocationProvider implements com.androidtel.telemetry_library.core.location.LocationProvider {
-    ctor public IpLocationProvider(okhttp3.OkHttpClient httpClient, optional String apiEndpoint, optional long cacheDuration, optional boolean fallbackToIp);
-    method public void clearCache();
-    method public String? getCachedLocation();
-    method public suspend Object? getLocation(kotlin.coroutines.Continuation<? super java.lang.String>);
-    field public static final com.androidtel.telemetry_library.core.location.IpLocationProvider.Companion Companion;
-  }
-
-  public static final class IpLocationProvider.Companion {
-  }
-
-  public interface LocationProvider {
-    method public void clearCache();
-    method public String? getCachedLocation();
-    method public suspend Object? getLocation(kotlin.coroutines.Continuation<? super java.lang.String>);
-  }
-
-}
-
 package com.androidtel.telemetry_library.core.models {
 
   public final class AppInfo {
-    ctor public AppInfo(String appName, String appVersion, String appBuildNumber, String appPackageName);
-    method public String component1();
+    ctor public AppInfo(String? appName, String? appVersion, String? appBuildNumber, String appPackageName);
+    method public String? component1();
+    method public String? component2();
+    method public String? component3();
+    method public String component4();
+    method public com.androidtel.telemetry_library.core.models.AppInfo copy(String? appName, String? appVersion, String? appBuildNumber, String appPackageName);
+    method public String? getAppBuildNumber();
+    method public String? getAppName();
+    method public String getAppPackageName();
+    method public String? getAppVersion();
+    property public final String? appBuildNumber;
+    property public final String? appName;
+    property public final String appPackageName;
+    property public final String? appVersion;
+  }
+
+  public final class AppOut {
+    ctor public AppOut(String? name, String package_name, String platform, String? version, String? build_number);
+    method public String? component1();
     method public String component2();
     method public String component3();
-    method public String component4();
-    method public com.androidtel.telemetry_library.core.models.AppInfo copy(String appName, String appVersion, String appBuildNumber, String appPackageName);
-    method public String getAppBuildNumber();
-    method public String getAppName();
-    method public String getAppPackageName();
-    method public String getAppVersion();
-    property public final String appBuildNumber;
-    property public final String appName;
-    property public final String appPackageName;
-    property public final String appVersion;
+    method public String? component4();
+    method public String? component5();
+    method public com.androidtel.telemetry_library.core.models.AppOut copy(String? name, String package_name, String platform, String? version, String? build_number);
+    method public String? getBuild_number();
+    method public String? getName();
+    method public String getPackage_name();
+    method public String getPlatform();
+    method public String? getVersion();
+    property public final String? build_number;
+    property public final String? name;
+    property public final String package_name;
+    property public final String platform;
+    property public final String? version;
   }
 
   public final class DeviceInfo {
@@ -654,6 +669,17 @@ package com.androidtel.telemetry_library.core.models {
     property public final String unit;
   }
 
+  public final class SdkOut {
+    ctor public SdkOut(String name, String version);
+    method public String component1();
+    method public String component2();
+    method public com.androidtel.telemetry_library.core.models.SdkOut copy(String name, String version);
+    method public String getName();
+    method public String getVersion();
+    property public final String name;
+    property public final String version;
+  }
+
   public final class SessionInfo {
     ctor public SessionInfo(String sessionId, optional String? startTime, optional Long? durationMs, optional Integer? eventCount, optional Integer? metricCount, optional Integer? screenCount, optional String? visitedScreens, optional Boolean? isFirstSession, optional Integer? totalSessions, optional String? networkType);
     method public String component1();
@@ -713,24 +739,30 @@ package com.androidtel.telemetry_library.core.models {
   }
 
   public final class TelemetryDataOut {
-    ctor public TelemetryDataOut(optional String type, java.util.List<com.androidtel.telemetry_library.core.models.TelemetryEventOut> events, int batch_size, String timestamp, String device_id, optional String? location);
+    ctor public TelemetryDataOut(optional String type, optional String contract_version, String timestamp, int batch_size, String device_id, com.androidtel.telemetry_library.core.models.SdkOut sdk, com.androidtel.telemetry_library.core.models.AppOut app, java.util.List<com.androidtel.telemetry_library.core.models.TelemetryEventOut> events);
     method public String component1();
-    method public java.util.List<com.androidtel.telemetry_library.core.models.TelemetryEventOut> component2();
-    method public int component3();
-    method public String component4();
+    method public String component2();
+    method public String component3();
+    method public int component4();
     method public String component5();
-    method public String? component6();
-    method public com.androidtel.telemetry_library.core.models.TelemetryDataOut copy(String type, java.util.List<com.androidtel.telemetry_library.core.models.TelemetryEventOut> events, int batch_size, String timestamp, String device_id, String? location);
+    method public com.androidtel.telemetry_library.core.models.SdkOut component6();
+    method public com.androidtel.telemetry_library.core.models.AppOut component7();
+    method public java.util.List<com.androidtel.telemetry_library.core.models.TelemetryEventOut> component8();
+    method public com.androidtel.telemetry_library.core.models.TelemetryDataOut copy(String type, String contract_version, String timestamp, int batch_size, String device_id, com.androidtel.telemetry_library.core.models.SdkOut sdk, com.androidtel.telemetry_library.core.models.AppOut app, java.util.List<com.androidtel.telemetry_library.core.models.TelemetryEventOut> events);
+    method public com.androidtel.telemetry_library.core.models.AppOut getApp();
     method public int getBatch_size();
+    method public String getContract_version();
     method public String getDevice_id();
     method public java.util.List<com.androidtel.telemetry_library.core.models.TelemetryEventOut> getEvents();
-    method public String? getLocation();
+    method public com.androidtel.telemetry_library.core.models.SdkOut getSdk();
     method public String getTimestamp();
     method public String getType();
+    property public final com.androidtel.telemetry_library.core.models.AppOut app;
     property public final int batch_size;
+    property public final String contract_version;
     property public final String device_id;
     property public final java.util.List<com.androidtel.telemetry_library.core.models.TelemetryEventOut> events;
-    property public final String? location;
+    property public final com.androidtel.telemetry_library.core.models.SdkOut sdk;
     property public final String timestamp;
     property public final String type;
   }
@@ -779,21 +811,6 @@ package com.androidtel.telemetry_library.core.models {
     property public final String timestamp;
     property public final String type;
     property public final Double? value;
-  }
-
-  public final class TelemetryPayload {
-    ctor public TelemetryPayload(String timestamp, String device_id, com.androidtel.telemetry_library.core.models.TelemetryDataOut data);
-    method public String component1();
-    method public String component2();
-    method public com.androidtel.telemetry_library.core.models.TelemetryDataOut component3();
-    method public com.androidtel.telemetry_library.core.models.TelemetryPayload copy(String timestamp, String device_id, com.androidtel.telemetry_library.core.models.TelemetryDataOut data);
-    method public com.androidtel.telemetry_library.core.models.TelemetryDataOut getData();
-    method public String getDevice_id();
-    method public String getTimestamp();
-    method public String toJson();
-    property public final com.androidtel.telemetry_library.core.models.TelemetryDataOut data;
-    property public final String device_id;
-    property public final String timestamp;
   }
 
   public final class UserInfo {
@@ -850,228 +867,20 @@ package com.androidtel.telemetry_library.core.navigation {
     method public com.androidtel.telemetry_library.core.navigation.NavigationEvent? pop();
     method public com.androidtel.telemetry_library.core.navigation.NavigationEvent push(String screenName);
     method public com.androidtel.telemetry_library.core.navigation.NavigationEvent replace(String screenName);
+    field public static final com.androidtel.telemetry_library.core.navigation.NavigationStackTracker.Companion Companion;
   }
 
-}
-
-package com.androidtel.telemetry_library.core.payload {
-
-  public final class CrashBatchData {
-    ctor public CrashBatchData(optional String? tenant_id, optional String? location, String timestamp, optional int batch_size, java.util.List<com.androidtel.telemetry_library.core.payload.CrashEventData> events);
-    method public String? component1();
-    method public String? component2();
-    method public String component3();
-    method public int component4();
-    method public java.util.List<com.androidtel.telemetry_library.core.payload.CrashEventData> component5();
-    method public com.androidtel.telemetry_library.core.payload.CrashBatchData copy(String? tenant_id, String? location, String timestamp, int batch_size, java.util.List<com.androidtel.telemetry_library.core.payload.CrashEventData> events);
-    method public int getBatch_size();
-    method public java.util.List<com.androidtel.telemetry_library.core.payload.CrashEventData> getEvents();
-    method public String? getLocation();
-    method public String? getTenant_id();
-    method public String getTimestamp();
-    property public final int batch_size;
-    property public final java.util.List<com.androidtel.telemetry_library.core.payload.CrashEventData> events;
-    property public final String? location;
-    property public final String? tenant_id;
-    property public final String timestamp;
-  }
-
-  public final class CrashBatchEnvelope {
-    ctor public CrashBatchEnvelope(String timestamp, String device_id, com.androidtel.telemetry_library.core.payload.CrashBatchData data);
-    method public String component1();
-    method public String component2();
-    method public com.androidtel.telemetry_library.core.payload.CrashBatchData component3();
-    method public com.androidtel.telemetry_library.core.payload.CrashBatchEnvelope copy(String timestamp, String device_id, com.androidtel.telemetry_library.core.payload.CrashBatchData data);
-    method public com.androidtel.telemetry_library.core.payload.CrashBatchData getData();
-    method public String getDevice_id();
-    method public String getTimestamp();
-    method public String toJson();
-    property public final com.androidtel.telemetry_library.core.payload.CrashBatchData data;
-    property public final String device_id;
-    property public final String timestamp;
-  }
-
-  public final class CrashData {
-    ctor public CrashData(optional String type, String error, String timestamp, String stackTrace, String fingerprint, java.util.Map<java.lang.String,java.lang.String> attributes);
-    method public String component1();
-    method public String component2();
-    method public String component3();
-    method public String component4();
-    method public String component5();
-    method public java.util.Map<java.lang.String,java.lang.String> component6();
-    method public com.androidtel.telemetry_library.core.payload.CrashData copy(String type, String error, String timestamp, String stackTrace, String fingerprint, java.util.Map<java.lang.String,java.lang.String> attributes);
-    method public java.util.Map<java.lang.String,java.lang.String> getAttributes();
-    method public String getError();
-    method public String getFingerprint();
-    method public String getStackTrace();
-    method public String getTimestamp();
-    method public String getType();
-    property public final java.util.Map<java.lang.String,java.lang.String> attributes;
-    property public final String error;
-    property public final String fingerprint;
-    property public final String stackTrace;
-    property public final String timestamp;
-    property public final String type;
-  }
-
-  public final class CrashEventAttributes {
-    ctor public CrashEventAttributes(String message, String stacktrace, String exception_type, optional String? error_context, optional String? product_id, optional String? cause, optional boolean is_fatal, optional String? user_action, optional String? error_code);
-    method public String component1();
-    method public String component2();
-    method public String component3();
-    method public String? component4();
-    method public String? component5();
-    method public String? component6();
-    method public boolean component7();
-    method public String? component8();
-    method public String? component9();
-    method public com.androidtel.telemetry_library.core.payload.CrashEventAttributes copy(String message, String stacktrace, String exception_type, String? error_context, String? product_id, String? cause, boolean is_fatal, String? user_action, String? error_code);
-    method public String? getCause();
-    method public String? getError_code();
-    method public String? getError_context();
-    method public String getException_type();
-    method public String getMessage();
-    method public String? getProduct_id();
-    method public String getStacktrace();
-    method public String? getUser_action();
-    method public boolean is_fatal();
-    property public final String? cause;
-    property public final String? error_code;
-    property public final String? error_context;
-    property public final String exception_type;
-    property public final boolean is_fatal;
-    property public final String message;
-    property public final String? product_id;
-    property public final String stacktrace;
-    property public final String? user_action;
-  }
-
-  public final class CrashEventData {
-    ctor public CrashEventData(optional String type, optional String eventName, String timestamp, java.util.Map<java.lang.String,java.lang.String> attributes);
-    method public String component1();
-    method public String component2();
-    method public String component3();
-    method public java.util.Map<java.lang.String,java.lang.String> component4();
-    method public com.androidtel.telemetry_library.core.payload.CrashEventData copy(String type, String eventName, String timestamp, java.util.Map<java.lang.String,java.lang.String> attributes);
-    method public java.util.Map<java.lang.String,java.lang.String> getAttributes();
-    method public String getEventName();
-    method public String getTimestamp();
-    method public String getType();
-    property public final java.util.Map<java.lang.String,java.lang.String> attributes;
-    property public final String eventName;
-    property public final String timestamp;
-    property public final String type;
-  }
-
-  public final class CrashPayload {
-    ctor public CrashPayload(String timestamp, String device_id, com.androidtel.telemetry_library.core.payload.CrashData data);
-    method public String component1();
-    method public String component2();
-    method public com.androidtel.telemetry_library.core.payload.CrashData component3();
-    method public com.androidtel.telemetry_library.core.payload.CrashPayload copy(String timestamp, String device_id, com.androidtel.telemetry_library.core.payload.CrashData data);
-    method public com.androidtel.telemetry_library.core.payload.CrashData getData();
-    method public String getDevice_id();
-    method public String getTimestamp();
-    method public String toJson();
-    property public final com.androidtel.telemetry_library.core.payload.CrashData data;
-    property public final String device_id;
-    property public final String timestamp;
-  }
-
-  public final class EventBatchData {
-    ctor public EventBatchData(optional String type, java.util.List<com.androidtel.telemetry_library.core.payload.EventData> events, int batch_size, String timestamp, optional String? location);
-    method public String component1();
-    method public java.util.List<com.androidtel.telemetry_library.core.payload.EventData> component2();
-    method public int component3();
-    method public String component4();
-    method public String? component5();
-    method public com.androidtel.telemetry_library.core.payload.EventBatchData copy(String type, java.util.List<com.androidtel.telemetry_library.core.payload.EventData> events, int batch_size, String timestamp, String? location);
-    method public int getBatch_size();
-    method public java.util.List<com.androidtel.telemetry_library.core.payload.EventData> getEvents();
-    method public String? getLocation();
-    method public String getTimestamp();
-    method public String getType();
-    property public final int batch_size;
-    property public final java.util.List<com.androidtel.telemetry_library.core.payload.EventData> events;
-    property public final String? location;
-    property public final String timestamp;
-    property public final String type;
-  }
-
-  public final class EventBatchPayload {
-    ctor public EventBatchPayload(String timestamp, String device_id, com.androidtel.telemetry_library.core.payload.EventBatchData data);
-    method public String component1();
-    method public String component2();
-    method public com.androidtel.telemetry_library.core.payload.EventBatchData component3();
-    method public com.androidtel.telemetry_library.core.payload.EventBatchPayload copy(String timestamp, String device_id, com.androidtel.telemetry_library.core.payload.EventBatchData data);
-    method public com.androidtel.telemetry_library.core.payload.EventBatchData getData();
-    method public String getDevice_id();
-    method public String getTimestamp();
-    method public String toJson();
-    property public final com.androidtel.telemetry_library.core.payload.EventBatchData data;
-    property public final String device_id;
-    property public final String timestamp;
-  }
-
-  public final class EventData {
-    ctor public EventData(String type, optional String? eventName, optional String? metricName, optional Double? value, String timestamp, java.util.Map<java.lang.String,java.lang.String> attributes);
-    method public String component1();
-    method public String? component2();
-    method public String? component3();
-    method public Double? component4();
-    method public String component5();
-    method public java.util.Map<java.lang.String,java.lang.String> component6();
-    method public com.androidtel.telemetry_library.core.payload.EventData copy(String type, String? eventName, String? metricName, Double? value, String timestamp, java.util.Map<java.lang.String,java.lang.String> attributes);
-    method public java.util.Map<java.lang.String,java.lang.String> getAttributes();
-    method public String? getEventName();
-    method public String? getMetricName();
-    method public String getTimestamp();
-    method public String getType();
-    method public Double? getValue();
-    property public final java.util.Map<java.lang.String,java.lang.String> attributes;
-    property public final String? eventName;
-    property public final String? metricName;
-    property public final String timestamp;
-    property public final String type;
-    property public final Double? value;
-  }
-
-  public final class FlutterPayloadFactory {
-    method public java.util.Map<java.lang.String,java.lang.String> createCrashAttributes(java.util.Map<java.lang.String,java.lang.String> baseAttributes, String fingerprint, String breadcrumbs, int breadcrumbCount, optional java.util.Map<java.lang.String,java.lang.String> additionalAttributes);
-    method public com.androidtel.telemetry_library.core.payload.CrashBatchEnvelope createCrashBatchEnvelope(String message, String stackTrace, String deviceId, java.util.Map<java.lang.String,java.lang.String> baseAttributes, optional String? location, optional String? productId, optional String? userAction, optional String? errorCode, optional java.util.Map<java.lang.String,java.lang.String> additionalAttributes);
-    method public com.androidtel.telemetry_library.core.payload.CrashBatchEnvelope createCrashBatchEnvelope(Throwable throwable, String deviceId, java.util.Map<java.lang.String,java.lang.String> baseAttributes, optional String? location, optional String? productId, optional String? userAction, optional String? errorCode, optional java.util.Map<java.lang.String,java.lang.String> additionalAttributes);
-    method public com.androidtel.telemetry_library.core.payload.CrashPayload createCrashPayload(String error, String stackTrace, String fingerprint, java.util.Map<java.lang.String,java.lang.String> attributes, String deviceId);
-    method public java.util.Map<java.lang.String,java.lang.String> createEnrichedAttributes(java.util.Map<java.lang.String,java.lang.String> deviceAttributes, java.util.Map<java.lang.String,java.lang.String> appAttributes, java.util.Map<java.lang.String,java.lang.String> sessionAttributes, java.util.Map<java.lang.String,java.lang.String> userAttributes, String networkType, optional java.util.Map<java.lang.String,java.lang.String> customAttributes);
-    method public com.androidtel.telemetry_library.core.payload.EventBatchPayload createEventBatchPayload(java.util.List<com.androidtel.telemetry_library.core.payload.EventData> events, String deviceId, optional String? location);
-    method public com.androidtel.telemetry_library.core.payload.EventData createEventData(String type, optional String? eventName, optional String? metricName, optional Double? value, optional java.util.Map<java.lang.String,java.lang.String> attributes);
-    field public static final com.androidtel.telemetry_library.core.payload.FlutterPayloadFactory INSTANCE;
+  public static final class NavigationStackTracker.Companion {
+    method public String? currentScreen();
   }
 
 }
 
 package com.androidtel.telemetry_library.core.retry {
 
-  public final class CrashRetryManager {
-    ctor public CrashRetryManager(android.content.Context context, String apiKey, String telemetryEndpoint, optional boolean debugMode, optional boolean enableWorkManager);
-    method public suspend Object? retryOfflineCrashes(kotlin.coroutines.Continuation<? super kotlin.Unit>);
-    method public suspend Object? sendCrashWithRetry(java.util.Map<java.lang.String,?> crashData, kotlin.coroutines.Continuation<? super kotlin.Unit>);
-    field public static final com.androidtel.telemetry_library.core.retry.CrashRetryManager.Companion Companion;
-  }
-
-  public static final class CrashRetryManager.Companion {
-  }
-
-  public final class CrashRetryWorker extends androidx.work.CoroutineWorker {
-    ctor public CrashRetryWorker(android.content.Context context, androidx.work.WorkerParameters params);
+  public final class CrashReplayWorker extends androidx.work.CoroutineWorker {
+    ctor public CrashReplayWorker(android.content.Context context, androidx.work.WorkerParameters params);
     method public suspend Object? doWork(kotlin.coroutines.Continuation<? super androidx.work.ListenableWorker.Result>);
-    field public static final com.androidtel.telemetry_library.core.retry.CrashRetryWorker.Companion Companion;
-  }
-
-  public static final class CrashRetryWorker.Companion {
-  }
-
-  public final class RateLimitException extends java.io.IOException {
-    ctor public RateLimitException(String message);
   }
 
 }
@@ -1093,6 +902,107 @@ package com.androidtel.telemetry_library.core.session {
   }
 
   public static final class SessionManager.Companion {
+  }
+
+}
+
+package com.androidtel.telemetry_library.core.startup {
+
+  public final class AppStartTracker {
+    ctor public AppStartTracker(long startUptimeMs, int importanceAtInit, kotlin.jvm.functions.Function2<? super java.lang.String,? super java.lang.Integer,kotlin.Unit> emit, optional kotlin.jvm.functions.Function0<java.lang.Long> clock);
+    method public void onFirstResume();
+    field public static final com.androidtel.telemetry_library.core.startup.AppStartTracker.Companion Companion;
+    field public static final int IMPORTANCE_VISIBLE = 200; // 0xc8
+    field public static final long MAX_DURATION_MS = 60000L; // 0xea60L
+    field public static final String TYPE_COLD = "cold";
+  }
+
+  public static final class AppStartTracker.Companion {
+  }
+
+}
+
+package com.androidtel.telemetry_library.core.trace {
+
+  public final class TraceContext {
+    ctor public TraceContext(String traceId, String spanId, boolean sampled, String rootType, long startTimeEpochMs, long openedAt);
+    method public java.util.concurrent.atomic.AtomicBoolean getIdleExempt();
+    method public java.util.concurrent.atomic.AtomicLong getLastActivity();
+    method public String? getName();
+    method public long getOpenedAt();
+    method public String getRootType();
+    method public boolean getSampled();
+    method public String getSpanId();
+    method public long getStartTimeEpochMs();
+    method public String getTraceId();
+    method public boolean isLive(long now);
+    method public void setName(String?);
+    method public void touch(long now);
+    property public final java.util.concurrent.atomic.AtomicBoolean idleExempt;
+    property public final java.util.concurrent.atomic.AtomicLong lastActivity;
+    property public final String? name;
+    property public final long openedAt;
+    property public final String rootType;
+    property public final boolean sampled;
+    property public final String spanId;
+    property public final long startTimeEpochMs;
+    property public final String traceId;
+  }
+
+  public final class TraceManager {
+    method public java.util.Map<java.lang.String,java.lang.Object> annotateTerminal();
+    method public kotlinx.coroutines.ThreadContextElement<com.androidtel.telemetry_library.core.trace.TraceContext> asElement(com.androidtel.telemetry_library.core.trace.TraceContext ctx);
+    method public com.androidtel.telemetry_library.core.trace.TraceContext? current();
+    method public String? currentRootName();
+    method public kotlin.jvm.functions.Function0<java.lang.Long> getClock();
+    method public kotlin.jvm.functions.Function0<java.lang.Long> getEpochClock();
+    method public error.NonExistentClass! getOUTCOMES();
+    method public error.NonExistentClass! getROOT_TYPES();
+    method public java.util.Set<java.lang.String> getTraceHostAllowlist();
+    method public double getTraceSampleRate();
+    method public java.util.Map<java.lang.String,java.lang.Object>? launchRootAttrs();
+    method public void nameCurrentRoot(String name);
+    method public void onBackground();
+    method public void onFirstResume();
+    method public java.util.Map<java.lang.String,java.lang.Object>? onInteractionEmit();
+    method public com.androidtel.telemetry_library.core.trace.TraceContext? onInteractionStart(String? name);
+    method public com.androidtel.telemetry_library.core.trace.TraceContext? onLaunch(long startElapsedRealtimeMs, int importanceAtInit);
+    method public java.util.Map<java.lang.String,java.lang.Object>? onNavigation();
+    method public void setClock(kotlin.jvm.functions.Function0<java.lang.Long>);
+    method public void setEpochClock(kotlin.jvm.functions.Function0<java.lang.Long>);
+    method public void setTraceHostAllowlist(java.util.Set<java.lang.String>);
+    method public void setTraceSampleRate(double);
+    property public final error.NonExistentClass! OUTCOMES;
+    property public final error.NonExistentClass! ROOT_TYPES;
+    property public final kotlin.jvm.functions.Function0<java.lang.Long> clock;
+    property public final kotlin.jvm.functions.Function0<java.lang.Long> epochClock;
+    property public final java.util.Set<java.lang.String> traceHostAllowlist;
+    property public final double traceSampleRate;
+    field public static final com.androidtel.telemetry_library.core.trace.TraceManager INSTANCE;
+    field public static final String OUTCOME_ADOPTED = "adopted";
+    field public static final String OUTCOME_INJECTED_ATTRIBUTED = "injected_attributed";
+    field public static final String OUTCOME_INJECTED_EXPIRED = "injected_expired";
+    field public static final String OUTCOME_INJECTED_UNATTRIBUTED = "injected_unattributed";
+    field public static final String OUTCOME_INJECTED_UNWIRED = "injected_unwired";
+    field public static final String OUTCOME_SKIPPED_OFF_ALLOWLIST = "skipped_off_allowlist";
+    field public static final String ROOT_INTERACTION = "interaction";
+    field public static final String ROOT_LAUNCH = "launch";
+    field public static final String ROOT_NAVIGATION = "navigation";
+    field public static final String ROOT_REQUEST = "request";
+  }
+
+  public static final class TraceManager.Decision {
+    ctor public TraceManager.Decision(String? newHeader, java.util.Map<java.lang.String,?> attrs, com.androidtel.telemetry_library.core.trace.TraceContext? root);
+    method public String? component1();
+    method public java.util.Map<java.lang.String,java.lang.Object> component2();
+    method public com.androidtel.telemetry_library.core.trace.TraceContext? component3();
+    method public com.androidtel.telemetry_library.core.trace.TraceManager.Decision copy(String? newHeader, java.util.Map<java.lang.String,?> attrs, com.androidtel.telemetry_library.core.trace.TraceContext? root);
+    method public java.util.Map<java.lang.String,java.lang.Object> getAttrs();
+    method public String? getNewHeader();
+    method public com.androidtel.telemetry_library.core.trace.TraceContext? getRoot();
+    property public final java.util.Map<java.lang.String,java.lang.Object> attrs;
+    property public final String? newHeader;
+    property public final com.androidtel.telemetry_library.core.trace.TraceContext? root;
   }
 
 }
@@ -1131,11 +1041,12 @@ package com.androidtel.telemetry_library.core.user {
 package com.androidtel.telemetry_library.core.validation {
 
   public final class AttributeValidator {
+    method public error.NonExistentClass! getKNOWN_OPTIONAL_TRACE_ATTRIBUTES();
     method public String getValidationReport(com.androidtel.telemetry_library.core.validation.ValidationResult result);
-    method public com.androidtel.telemetry_library.core.validation.ValidationResult validateAppAttributes(java.util.Map<java.lang.String,?> attributes);
     method public com.androidtel.telemetry_library.core.validation.ValidationResult validateDeviceAttributes(java.util.Map<java.lang.String,?> attributes);
     method public com.androidtel.telemetry_library.core.validation.ValidationResult validateStandardAttributes(java.util.Map<java.lang.String,?> attributes, optional String? eventName);
     method public com.androidtel.telemetry_library.core.validation.ValidationResult validateUserSessionAttributes(java.util.Map<java.lang.String,?> attributes);
+    property public final error.NonExistentClass! KNOWN_OPTIONAL_TRACE_ATTRIBUTES;
     field public static final com.androidtel.telemetry_library.core.validation.AttributeValidator INSTANCE;
   }
 
@@ -1252,7 +1163,6 @@ package com.androidtel.telemetry_library.testing {
     method public void runComprehensiveTest();
     method public void testApiKeyValidation();
     method public void testBreadcrumbs();
-    method public void testConnectivity();
     method public void testCrashReporting(optional String? customMessage);
     method public void testErrorTracking();
     method public void testEventTracking();

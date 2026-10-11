@@ -1,6 +1,7 @@
 package com.androidtel.telemetry_library
 
 import com.androidtel.telemetry_library.core.TelemetryHttpClient
+import com.androidtel.telemetry_library.BuildConfig
 import com.androidtel.telemetry_library.core.models.*
 import com.google.gson.JsonParser
 import kotlinx.coroutines.runBlocking
@@ -51,34 +52,82 @@ class UnifiedEnvelopeTest {
     }
 
     @Test
-    fun `envelope has exactly the unified top-level keys and no legacy fields`() {
-        val body = sendAndCaptureBody(createTestBatch())
-        val json = JsonParser.parseString(body).asJsonObject
+    fun `envelope is the closed 8-key contract 4_0_0 shape`() {
+        val json = JsonParser.parseString(sendAndCaptureBody(createTestBatch())).asJsonObject
 
+        assertEquals(
+            setOf("type", "contract_version", "timestamp", "batch_size", "device_id", "sdk", "app", "events"),
+            json.keySet()
+        )
         assertEquals("telemetry_batch", json.get("type").asString)
-        assertEquals(setOf("type", "timestamp", "batch_size", "events"), json.keySet())
+        assertEquals("4.0.0", json.get("contract_version").asString)
+        assertEquals(1, json.get("batch_size").asInt)
+        assertEquals("test_device_123", json.get("device_id").asString)
 
-        // Removed legacy fields (Path A + Path B leftovers).
-        assertFalse("device_id must not be top-level", json.has("device_id"))
-        assertFalse("location must not be top-level", json.has("location"))
-        assertFalse("data wrapper must be gone", json.has("data"))
-        assertFalse("tenant_id must be gone", json.has("tenant_id"))
+        val sdk = json.getAsJsonObject("sdk")
+        assertEquals(setOf("name", "version"), sdk.keySet())
+        assertEquals("android", sdk.get("name").asString)
+        assertEquals(BuildConfig.SDK_VERSION, sdk.get("version").asString)
+
+        val app = json.getAsJsonObject("app")
+        assertEquals(setOf("name", "package_name", "platform", "version", "build_number"), app.keySet())
+        assertEquals("TestApp", app.get("name").asString)
+        assertEquals("com.test.app", app.get("package_name").asString)
+        assertEquals("android", app.get("platform").asString)
+        assertEquals("1.0.0", app.get("version").asString)
+        assertEquals("100", app.get("build_number").asString)
     }
 
     @Test
-    fun `every event carries sdk and identity common attrs`() {
-        val body = sendAndCaptureBody(createTestBatch(events = 2))
-        val events = JsonParser.parseString(body).asJsonObject.getAsJsonArray("events")
-        assertTrue(events.size() > 0)
+    fun `blank device id is never sent and fails without retrying`() {
+        val started = System.currentTimeMillis()
+        val result = runBlocking { httpClient.sendBatch(createTestBatch(deviceId = " ")) }
+        assertTrue(result.isFailure)
+        assertTrue("deterministic failure must not back off", System.currentTimeMillis() - started < 500)
+        assertEquals(0, mockWebServer.requestCount)
+    }
 
-        events.forEach { el ->
+    @Test
+    fun `events carry no identity copies and custom identity keys are stripped`() {
+        val custom = mapOf<String, Any>(
+            "app.package_name" to "com.evil", "app.version" to "9.9", "app.name" to "x",
+            "app.build_number" to "9", "app.platform" to "ios", "app.environment" to "prod",
+            "sdk.version" to "0.0.1", "sdk.platform" to "flutter-android", "device.id" to "spoofed",
+            "app.start.type" to "cold", "screen.name" to "Home"
+        )
+        val json = JsonParser.parseString(sendAndCaptureBody(createTestBatch(events = 2, custom = custom))).asJsonObject
+
+        assertFalse("no environment at the root", json.has("environment"))
+        assertEquals("envelope wins", "com.test.app", json.getAsJsonObject("app").get("package_name").asString)
+        assertFalse(json.getAsJsonObject("app").has("environment"))
+        json.getAsJsonArray("events").forEach { el ->
             val attrs = el.asJsonObject.getAsJsonObject("attributes")
-            assertTrue("sdk.version present", attrs.has("sdk.version"))
-            assertFalse(attrs.get("sdk.version").asString.isBlank())
-            assertEquals("android", attrs.get("sdk.platform").asString)
-            assertTrue("device.id present", attrs.has("device.id"))
+            val leaked = attrs.keySet().filter {
+                it.startsWith("sdk.") || it == "device.id" || it in setOf(
+                    "app.name", "app.version", "app.build_number", "app.package_name", "app.platform", "app.environment"
+                )
+            }
+            assertEquals(emptyList<String>(), leaked)
+            // Non-identity attrs are untouched.
+            assertEquals("cold", attrs.get("app.start.type").asString)
+            assertEquals("Home", attrs.get("screen.name").asString)
+            assertEquals("android", attrs.get("device.platform").asString)
             assertTrue("session.id present", attrs.has("session.id"))
             assertTrue("user.id present", attrs.has("user.id"))
+            assertEquals("wifi", attrs.get("network.type").asString)
+        }
+    }
+
+    @Test
+    fun `unknown app name version and build are omitted never empty`() {
+        listOf(
+            AppInfo(null, null, null, "com.test.app"),       // 4.x: unknown is null
+            AppInfo("", "", "", "com.test.app"),             // defensive
+            AppInfo("unknown", "unknown", "unknown", "com.test.app") // 2.x-stored placeholder
+        ).forEach { appInfo ->
+            val app = JsonParser.parseString(sendAndCaptureBody(createTestBatch(app = appInfo)))
+                .asJsonObject.getAsJsonObject("app")
+            assertEquals("for $appInfo", setOf("package_name", "platform"), app.keySet())
         }
     }
 
@@ -157,11 +206,16 @@ class UnifiedEnvelopeTest {
         assertNull(request.getHeader("X-SDK-Platform"))
     }
 
-    private fun createTestBatch(events: Int = 1): TelemetryBatch {
+    private fun createTestBatch(
+        events: Int = 1,
+        deviceId: String = "test_device_123",
+        custom: Map<String, Any> = emptyMap(),
+        app: AppInfo = AppInfo("TestApp", "1.0.0", "100", "com.test.app")
+    ): TelemetryBatch {
         val attributes = EventAttributes(
-            app = AppInfo("TestApp", "1.0.0", "100", "com.test.app"),
+            app = app,
             device = DeviceInfo(
-                deviceId = "test_device_123", platform = "android", platformVersion = "13",
+                deviceId = deviceId, platform = "android", platformVersion = "13",
                 model = "TestModel", manufacturer = "TestManufacturer", brand = "TestBrand",
                 androidSdk = "33", androidRelease = "13", fingerprint = "fp",
                 hardware = "hw", product = "prod"
@@ -173,7 +227,7 @@ class UnifiedEnvelopeTest {
                 visitedScreens = "TestScreen", isFirstSession = false, totalSessions = 5,
                 networkType = "wifi"
             ),
-            customAttributes = emptyMap()
+            customAttributes = custom
         )
         val evList = (1..events).map { i ->
             TelemetryEvent(

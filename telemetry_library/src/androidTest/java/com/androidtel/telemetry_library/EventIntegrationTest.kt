@@ -124,17 +124,11 @@ class EventIntegrationTest {
     @Test
     fun testAllEventsHaveStandardAttributes() {
         // This test verifies that the TelemetryManager attaches standard attributes
-        // to all events (app, device, user, session)
+        // to all events (device, user, session). App/SDK identity and device_id live in the batch
+        // envelope only (#135), never per event.
         
         val requiredStandardAttributes = setOf(
-            // App attributes
-            "app.name",
-            "app.version",
-            "app.build_number",
-            "app.package_name",
-            
             // Device attributes
-            "device.id",
             "device.platform",
             "device.platform_version",
             "device.model",
@@ -155,7 +149,7 @@ class EventIntegrationTest {
         // These attributes should be automatically attached by TelemetryManager
         // The test verifies the contract that all events will have them
         assertTrue("Standard attributes set should not be empty", requiredStandardAttributes.isNotEmpty())
-        assertEquals("Should have 18 required standard attributes", 18, requiredStandardAttributes.size)
+        assertEquals("Should have 13 required standard attributes", 13, requiredStandardAttributes.size)
     }
     
     @Test

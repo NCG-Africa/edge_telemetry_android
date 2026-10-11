@@ -167,16 +167,13 @@ class StandardAttributesIntegrationTest {
     }
     
     @Test
-    fun `Missing app attributes - validation fails`() {
-        val incompleteAttributes = standardAttributes - "app.version"
-        
-        val result = EventPayloadValidator.validateStandardAttributes(incompleteAttributes)
-        
-        assertFalse("Missing app.version should fail validation", result.isValid)
-        assertTrue(
-            "Error should mention missing attribute",
-            (result as EventValidationResult.Invalid).errors.any { it.contains("app.version") }
-        )
+    fun `Event without per-event identity is valid - identity lives in the envelope`() {
+        // #135 R1: app.*, sdk.* and device.id are envelope-only, never required per event.
+        val withoutIdentity = standardAttributes.filterKeys { !it.startsWith("app.") && it != "device.id" }
+
+        val result = EventPayloadValidator.validateStandardAttributes(withoutIdentity)
+
+        assertTrue("Identity must not be required per event: $result", result.isValid)
     }
     
     @Test

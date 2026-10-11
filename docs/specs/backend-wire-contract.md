@@ -170,19 +170,39 @@ The rule exists so the backend can classify keys the SDK has **not written yet**
 
 Legend: **Call** is `COL` (promote to a typed column) or `bag` (JSONB only). **Now** is what `extract.go@b9bf1b5` does today: ✅ read, ❌ dropped.
 
-### 4.1 Common envelope — on **every** event
+### 4.1 Batch envelope + common attributes on **every** event
 
-Written by `TelemetryHttpClient.flattenAttributes()` (`TelemetryHttpClient.kt:155-226`). 40 keys.
+> **Contract 4.0.0 (#135).** Identity moved out of the events into the batch envelope, read once per
+> batch by the collector. The envelope is closed at 8 keys:
+>
+> | Envelope key | Was (per event) | Notes |
+> |---|---|---|
+> | `type` | — | `"telemetry_batch"` |
+> | `contract_version` | — | `"4.0.0"`, its own constant |
+> | `timestamp` | — | UTC `Z`, stamped at **send** (replays re-stamped) |
+> | `batch_size` | — | |
+> | `device_id` | `device.id` | required; UUIDv4 fallback if the stored id is unreadable |
+> | `sdk.name` / `sdk.version` | `sdk.platform` / `sdk.version` | `name` is always `"android"`; `sdk.platform` is gone |
+> | `app.name` / `app.package_name` / `app.version` / `app.build_number` | same keys per event | `name`, `version`, `build_number` omitted when unknown, never `""`/`"unknown"` |
+> | `app.platform` | — | `"android"` |
+> | `events` | — | |
+>
+> Events no longer carry `sdk.*`, the four `app.*` identity keys or `device.id`; caller attributes with
+> those names are stripped. A replayed crash/ANR is sent alone, its envelope `app.*` from the crashed
+> build. No `environment` is sent (the API key sets it).
+
+Written by `TelemetryHttpClient.flattenAttributes()`. 33 keys per event (the 7 identity rows struck
+through below now live in the envelope).
 
 | Key | Type | Null? | Cardinality | Call | Now | Source |
 |---|---|---|---|---|---|---|
-| `sdk.version` | String | never | ~10s | COL (dim) | ❌ | `TelemetryHttpClient.kt:159` |
-| `sdk.platform` | String | never | 1 (`android`) | COL (dim) | ❌ | `:160` |
-| `app.name` | String | never | ~10s | COL (exists) | ✅ | `:163` |
-| `app.version` | String | never | ~100s | COL (exists) | ✅ | `:164` |
-| `app.build_number` | String | never | ~1000s | COL (exists) | ✅ | `:165` |
-| `app.package_name` | String | never | ~10s | COL (exists) | ✅ | `:166` |
-| `device.id` | String | never (throws) | high (per install) | **COL (join key)** | ❌ | `:176`, guard `:170-175` |
+| ~~`sdk.version`~~ → envelope | String | never | ~10s | COL (dim) | ❌ | `TelemetryHttpClient.kt:159` |
+| ~~`sdk.platform`~~ → envelope | String | never | 1 (`android`) | COL (dim) | ❌ | `:160` |
+| ~~`app.name`~~ → envelope | String | never | ~10s | COL (exists) | ✅ | `:163` |
+| ~~`app.version`~~ → envelope | String | never | ~100s | COL (exists) | ✅ | `:164` |
+| ~~`app.build_number`~~ → envelope | String | never | ~1000s | COL (exists) | ✅ | `:165` |
+| ~~`app.package_name`~~ → envelope | String | never | ~10s | COL (exists) | ✅ | `:166` |
+| ~~`device.id`~~ → envelope | String | never (throws) | high (per install) | **COL (join key)** | ❌ | `:176`, guard `:170-175` |
 | `device.platform` | String | never | 1 | COL (exists) | ✅ | `:177` |
 | `device.platform_version` | String | never | ~20 | COL (exists) | ✅ | `:178` |
 | `device.model` | String | never | ~1000s | COL (exists) | ✅ | `:179` |
@@ -219,7 +239,7 @@ Written by `TelemetryHttpClient.flattenAttributes()` (`TelemetryHttpClient.kt:15
 
 The nine `device.*` keys at `DeviceInfoCollector.kt:53-61` are a launch-time bundle merged in at `TelemetryHttpClient.kt:189`; they carry **native types** (Int/Bool), not strings.
 
-**Envelope score: 25 of 40 read, 15 dropped** — `sdk.version`, `sdk.platform`, `device.id`, the nine static `device.*` keys, and the three `user.*` PII keys.
+**Envelope score (pre-4.0.0): 25 of 40 read, 15 dropped** — `sdk.version`, `sdk.platform`, `device.id`, the nine static `device.*` keys, and the three `user.*` PII keys. Under 4.0.0 the identity keys arrive once per batch in the envelope instead.
 
 ### 4.2 Dynamic device state — on `app.crash`, `app.anr`, `app.hang` only
 

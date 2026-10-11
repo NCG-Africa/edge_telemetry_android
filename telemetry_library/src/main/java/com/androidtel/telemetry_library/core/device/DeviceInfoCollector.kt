@@ -2,7 +2,6 @@ package com.androidtel.telemetry_library.core.device
 
 import android.app.ActivityManager
 import android.content.Context
-import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -11,6 +10,7 @@ import android.util.DisplayMetrics
 import android.util.Log
 import android.view.WindowManager
 import com.androidtel.telemetry_library.core.ids.IdGenerator
+import com.androidtel.telemetry_library.core.models.AppInfo
 import java.util.Locale
 import java.util.TimeZone
 
@@ -25,6 +25,28 @@ class DeviceInfoCollector(
     
     companion object {
         private const val TAG = "DeviceInfoCollector"
+
+        /**
+         * App identity for the envelope (#135). Each field is read on its own so one failure can't
+         * blank the rest; an unknown name/version/build is null — omitted on the wire, never
+         * "unknown" (R15). Never null itself, so a missing versionName no longer drops events.
+         */
+        fun collectAppInfo(context: Context): AppInfo {
+            val pm = context.packageManager
+            val packageInfo = runCatching { pm.getPackageInfo(context.packageName, 0) }
+                .onFailure { Log.e(TAG, "Failed to read package info", it) }
+                .getOrNull()
+            return AppInfo(
+                appName = runCatching { pm.getApplicationLabel(context.applicationInfo).toString() }
+                    .getOrNull()?.takeIf { it.isNotBlank() },
+                appVersion = packageInfo?.versionName?.takeIf { it.isNotBlank() },
+                appBuildNumber = packageInfo?.let {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) it.longVersionCode.toString()
+                    else @Suppress("DEPRECATION") it.versionCode.toString()
+                },
+                appPackageName = context.packageName
+            )
+        }
 
         /**
          * Static device-context bundle (issue #93, spec `docs/specs/static-device-context.md`).
@@ -89,33 +111,6 @@ class DeviceInfoCollector(
     }
     
     /**
-     * Collect app information
-     */
-    fun collectAppInfo(): Map<String, String> {
-        return try {
-            val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            val appName = context.packageManager.getApplicationLabel(
-                context.applicationInfo
-            ).toString()
-            
-            mapOf(
-                "app.name" to appName,
-                "app.version" to (packageInfo.versionName ?: "unknown"),
-                "app.build_number" to getBuildNumber(packageInfo).toString(),
-                "app.package_name" to context.packageName
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to collect app info", e)
-            mapOf(
-                "app.name" to "unknown",
-                "app.version" to "unknown",
-                "app.build_number" to "unknown",
-                "app.package_name" to context.packageName
-            )
-        }
-    }
-    
-    /**
      * Get network type information
      */
     fun getNetworkType(): String {
@@ -133,18 +128,6 @@ class DeviceInfoCollector(
         } catch (e: Exception) {
             Log.e(TAG, "Failed to get network type", e)
             "unknown"
-        }
-    }
-    
-    /**
-     * Get build number with proper handling for different API levels
-     */
-    private fun getBuildNumber(packageInfo: android.content.pm.PackageInfo): String {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            packageInfo.longVersionCode.toString()
-        } else {
-            @Suppress("DEPRECATION")
-            packageInfo.versionCode.toString()
         }
     }
 }
