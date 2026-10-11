@@ -80,3 +80,11 @@ SharedPreferences persistence of unsent envelopes (200-envelope cap) for retry.
 **Eviction**:
 Dropping the oldest buffered items when a bounded buffer overflows, counted and reported.
 _Avoid_: Overflow, discard
+
+**Retryable failure**:
+A send that failed with 429, 5xx, another non-4xx code or a network error; retried, then kept in
+offline storage for replay.
+
+**Rejection**:
+A send the collector refused with any 4xx but 429; the batch is dropped, never stored or replayed.
+_Avoid_: Client error (429 is a 4xx but is retryable)

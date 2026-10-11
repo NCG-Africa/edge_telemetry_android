@@ -142,7 +142,7 @@ class TelemetryManager private constructor(
          * ```
          * val config = TelemetryConfig(
          *     apiKey = "edge_your_api_key",
-         *     endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry"
+         *     endpoint = "https://edgetelemetry.ncgafrica.com/telemetry"
          * )
          * TelemetryManager.initialize(application, config)
          * ```
@@ -188,7 +188,7 @@ class TelemetryManager private constructor(
             application: Application,
             apiKey: String,
             batchSize: Int = 50,
-            endpoint: String = "https://edgetelemetry.ncgafrica.com/collector/telemetry"
+            endpoint: String = "https://edgetelemetry.ncgafrica.com/telemetry"
         ): TelemetryManager {
             // Validate the API key up-front with user-friendly messages for this simple string API.
             // Runs before TelemetryConfig construction so callers of the string overload get these

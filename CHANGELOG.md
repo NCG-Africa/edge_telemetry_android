@@ -5,6 +5,62 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - Unreleased
+
+> ⚠️ **Install the EdgeTelemetry backend release (deployment, analytics, processor, collector) before
+> shipping this build.** 4.0 sends app, SDK and device identity once per batch instead of on every
+> event; a pre-4.0 backend loses that identity. 4.0 SDK on an old backend is unsupported.
+
+Major release: the shared batch contract `4.0.0` (one semver for every EdgeTelemetry SDK) and a new
+failed-send policy. The SDK version jumps from 2.3.0 to 4.0.0 to match the contract; there is no 3.x.
+Upgrade notes: [Migration guide v4](docs/MIGRATION_GUIDE_V4.md).
+
+### 💥 Breaking — batch envelope (contract 4.0.0, #135)
+
+- **Closed 8-key envelope**: `type`, `contract_version` (`"4.0.0"`), `timestamp`, `batch_size`,
+  `device_id`, `sdk {name, version}`, `app {name, package_name, platform, version, build_number}`,
+  `events`. See [Event schema reference](docs/EVENT_SCHEMA_REFERENCE.md#batch-envelope-contract-400).
+- **Identity leaves the events**: events no longer carry `app.*` (`app.name`, `app.version`,
+  `app.build_number`, `app.package_name`), `sdk.version`, `sdk.platform` or `device.id`. Caller
+  attributes with those keys are stripped — the envelope wins. Event attributes such as
+  `app.start.type` are untouched.
+- **`sdk.platform` dropped**; `sdk.name` is `"android"` and `app.platform` is `"android"`.
+- **`device_id` at the root, always present**: if the stored id can't be read, a UUIDv4 fallback is
+  persisted once (in-memory for the process if storage also fails).
+- **Envelope `timestamp` is stamped at send** (UTC, `Z`): an offline-replayed or frozen crash/ANR
+  batch carries its send time, not the time it was stored. Event timestamps are unchanged.
+- **Unknown `app.version` / `app.build_number` / `app.name` are omitted**, never sent as `""` or
+  `"unknown"`.
+- **Replayed crash/ANR** goes alone in its own batch under the build that crashed; `sdk` is current.
+- Batches stored offline or frozen by a 2.x build are re-serialized as 4.0.0 envelopes on replay — no
+  migration step.
+
+### 💥 Breaking — endpoint used exactly as given (R10)
+
+- The configured `endpoint` is the request URL; the SDK appends nothing (Android always behaved this
+  way — now pinned by a test). Samples and the deprecated `initialize(application, apiKey, endpoint)`
+  default now use the canonical route `https://edgetelemetry.ncgafrica.com/telemetry`;
+  `/collector/telemetry` remains a collector alias, so existing configs keep working.
+
+### 💥 Breaking — failed-send policy (R12, #138)
+
+| Response | 2.x | 4.0 |
+|---|---|---|
+| 2xx | delivered | delivered |
+| **429** | not retried, stored offline | **retried with backoff**, then stored offline |
+| 5xx, network error | retried, then stored offline | unchanged |
+| **Other 4xx** (400, 401, 403, 413…) | stored offline; replay stopped on it — one bad batch wedged the queue | **dropped**: not retried, never stored, logged |
+| Other codes (1xx, unfollowed 3xx) | stored offline | retried, then stored offline (when in doubt, keep) |
+
+- **`Retry-After`** (delta-seconds) on 429/503 is honoured as the wait before the next in-process
+  attempt, up to 30 s. A longer window stops retrying and queues the batch; the flush timer replays it.
+- **Offline replay** drops a stored batch the collector rejects and continues to the next; a
+  retryable failure still pauses replay until the next flush tick.
+- **Frozen crash/ANR**: a rejected one is deleted (no more endless `CrashReplayWorker` retries); a
+  retryable failure keeps it and reschedules as before.
+- A revoked/inactive key (401/403) now loses the batches sent with it instead of queuing them —
+  fix the key; they won't replay.
+
 ## [2.2.2] - 2026-08-27
 
 Patch release. Fixes the self-request guard swallowing app traffic on `telemetry.*` hosts — present

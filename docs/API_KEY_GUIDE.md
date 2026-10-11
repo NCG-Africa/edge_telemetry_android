@@ -119,7 +119,7 @@ class MyApplication : Application() {
         super.onCreate()
         
         val config = TelemetryConfig.builder(this, BuildConfig.TELEMETRY_API_KEY)
-            .endpoint("https://edgetelemetry.ncgafrica.com/collector/telemetry")
+            .endpoint("https://edgetelemetry.ncgafrica.com/telemetry")
             .build()
         
         TelemetryManager.initialize(config)
@@ -319,7 +319,7 @@ class MyApplication : Application() {
         val apiKey = secureStorage.getApiKey() ?: BuildConfig.TELEMETRY_API_KEY
         
         val config = TelemetryConfig.builder(this, apiKey)
-            .endpoint("https://edgetelemetry.ncgafrica.com/collector/telemetry")
+            .endpoint("https://edgetelemetry.ncgafrica.com/telemetry")
             .build()
         
         TelemetryManager.initialize(config)
@@ -359,7 +359,7 @@ class MyApplication : Application() {
         TelemetryManager.initialize(
             application = this,
             apiKey = BuildConfig.TELEMETRY_API_KEY,
-            endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry"
+            endpoint = "https://edgetelemetry.ncgafrica.com/telemetry"
         )
     }
 }
@@ -427,7 +427,7 @@ class MyApplication : Application() {
         
         try {
             val config = TelemetryConfig.builder(this, apiKey)
-                .endpoint("https://edgetelemetry.ncgafrica.com/collector/telemetry")
+                .endpoint("https://edgetelemetry.ncgafrica.com/telemetry")
                 .debugMode(BuildConfig.DEBUG)
                 .batchSize(30)
                 .enableCrashReporting(true)

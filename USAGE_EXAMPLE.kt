@@ -42,7 +42,7 @@ class MyApplication : Application() {
         // Initialize with TelemetryConfig
         val config = TelemetryConfig(
             apiKey = BuildConfig.TELEMETRY_API_KEY,
-            endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
+            endpoint = "https://edgetelemetry.ncgafrica.com/telemetry",
             batchSize = 30,
             flushIntervalMs = 30_000L,
             sessionTimeoutMs = 30 * 60 * 1000L,
