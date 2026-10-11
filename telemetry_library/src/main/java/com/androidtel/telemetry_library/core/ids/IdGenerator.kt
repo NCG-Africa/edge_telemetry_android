@@ -61,37 +61,39 @@ class IdGenerator {
     
     // Set once the primary id has failed; pins the fallback for this process so the id is stable.
     @Volatile
-    private var fallbackDeviceId: String? = null
+    private var pinnedFallbackId: String? = null
 
     /** Never throws: device_id is required on every batch (#135 R9). */
     fun getOrGenerateDeviceId(): String {
-        fallbackDeviceId?.let { return it }
+        pinnedFallbackId?.let { return it }
         return try {
             val sharedPrefs = prefs ?: throw IllegalStateException("IdGenerator not initialized")
             synchronized(lock) {
-                sharedPrefs.getString(KEY_DEVICE_ID, null) ?: run {
-                    val deviceId = generateId("device")
-                    sharedPrefs.edit().putString(KEY_DEVICE_ID, deviceId).apply()
-                    deviceId
-                }
+                // A persisted fallback wins over the primary slot, so a transient primary failure
+                // can't make device_id flip between processes.
+                sharedPrefs.getString(KEY_FALLBACK_DEVICE_ID, null)
+                    ?: sharedPrefs.getString(KEY_DEVICE_ID, null)
+                    ?: generateId("device").also {
+                        sharedPrefs.edit().putString(KEY_DEVICE_ID, it).apply()
+                    }
             }
         } catch (e: Exception) {
             Log.w(TAG, "Device id unavailable; using a UUID fallback", e)
-            fallbackDeviceId()
+            resolveFallbackId()
         }
     }
 
     // R9: a random UUIDv4 persisted once under its own key; if storage fails too, in-memory for
     // this process.
-    private fun fallbackDeviceId(): String = synchronized(lock) {
-        fallbackDeviceId ?: runCatching {
-            val p = prefs!!
-            p.getString(KEY_FALLBACK_DEVICE_ID, null) ?: UUID.randomUUID().toString().also {
-                check(p.edit().putString(KEY_FALLBACK_DEVICE_ID, it).commit()) { "fallback id write failed" }
+    private fun resolveFallbackId(): String = synchronized(lock) {
+        pinnedFallbackId ?: runCatching {
+            val sharedPrefs = checkNotNull(prefs) { "IdGenerator not initialized" }
+            sharedPrefs.getString(KEY_FALLBACK_DEVICE_ID, null) ?: UUID.randomUUID().toString().also {
+                check(sharedPrefs.edit().putString(KEY_FALLBACK_DEVICE_ID, it).commit()) { "fallback id write failed" }
             }
-        }.getOrElse { UUID.randomUUID().toString() }.also { fallbackDeviceId = it }
+        }.getOrElse { UUID.randomUUID().toString() }.also { pinnedFallbackId = it }
     }
-    
+
     fun getDeviceId(): String {
         return getOrGenerateDeviceId()
     }

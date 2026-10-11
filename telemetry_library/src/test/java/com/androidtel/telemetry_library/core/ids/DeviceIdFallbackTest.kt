@@ -55,6 +55,23 @@ class DeviceIdFallbackTest {
     }
 
     @Test
+    fun `once a fallback is persisted it wins even when the primary slot reads again`() {
+        val real = RuntimeEnvironment.getApplication()
+            .getSharedPreferences("fallback_flip_test", Context.MODE_PRIVATE).apply { edit().clear().commit() }
+        val broken = mockk<SharedPreferences> {
+            every { getString("device_id", any()) } throws ClassCastException("transient")
+            every { getString("device_id_fallback", any()) } answers { real.getString("device_id_fallback", null) }
+            every { edit() } answers { real.edit() }
+        }
+        val fallback = generatorWith(broken).getOrGenerateDeviceId()
+
+        // Next process: the primary slot is readable (and populated) again.
+        real.edit().putString("device_id", "device_primary_android").commit()
+
+        assertEquals("device_id must not flip between processes", fallback, generatorWith(real).getOrGenerateDeviceId())
+    }
+
+    @Test
     fun `read and write both failing falls back to an in-memory uuid stable across calls`() {
         val broken = mockk<SharedPreferences> {
             every { getString(any(), any()) } throws SecurityException("prefs unavailable")
