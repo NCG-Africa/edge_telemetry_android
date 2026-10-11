@@ -211,6 +211,19 @@ class TelemetryHttpClientTest {
         assertNotNull(request.getHeader("User-Agent"))
     }
 
+    // R10: the configured URL is the request URL — nothing appended, for canonical and legacy paths.
+    @Test
+    fun `posts to the configured URL exactly as given`() = runBlocking {
+        for (path in listOf("/telemetry", "/collector/telemetry", "/t/x?tenant=1")) {
+            val url = mockWebServer.url(path).toString()
+            val client = TelemetryHttpClient(url, testApiKey, debugMode = false)
+            mockWebServer.enqueue(MockResponse().setResponseCode(200))
+            client.sendBatch(createTestBatch())
+            assertEquals(path, mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!.path)
+            client.getOkHttpClient().release()
+        }
+    }
+
     private fun createTestBatch(): TelemetryBatch {
         val appInfo = AppInfo(
             appName = "TestApp",
