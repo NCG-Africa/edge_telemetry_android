@@ -1,5 +1,11 @@
 # Android spec — unified wire envelope + `sdk.*` attributes
 
+> **Superseded by contract 4.0.0 (#135).** The envelope is now closed at 8 keys
+> (`type`, `contract_version`, `timestamp`, `batch_size`, `device_id`, `sdk`, `app`, `events`);
+> `device_id` is back at the root, and the per-event `sdk.*`, `app.*` identity and `device.id`
+> attributes this spec added are gone. See [`backend-wire-contract.md` §4.1](./backend-wire-contract.md)
+> and [`../EVENT_SCHEMA_REFERENCE.md`](../EVENT_SCHEMA_REFERENCE.md). Kept for history.
+
 Resolves wayfinder ticket **#30** (audit #3 / #11). Hub decisions **D2** (envelope), **D11** (`sdk.*`), **D1** (crash) are fixed input — see `NCG-Africa/edge_rum_spec` `SEMANTIC_CONVENTIONS.md` / `SPEC_V1_DECISIONS.md`. Evidence for current state: `sdk-audit.yaml` (repo root) + file:line refs below.
 
 Plan-only. This is the implementation spec; no code is changed on this branch.

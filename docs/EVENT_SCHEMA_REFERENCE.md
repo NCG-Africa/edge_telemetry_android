@@ -33,22 +33,48 @@ This document provides a comprehensive reference for all telemetry events suppor
 
 ---
 
+## Batch Envelope (contract 4.0.0)
+
+Every POST is one `telemetry_batch` envelope, closed at exactly these 8 keys (#135). App, SDK and
+device identity live **here only** — events never repeat `app.*`, `sdk.*` or `device.id`, and any such
+caller-supplied attribute is stripped before send.
+
+```json
+{
+  "type": "telemetry_batch",
+  "contract_version": "4.0.0",
+  "timestamp": "2026-10-07T09:12:44.120Z",
+  "batch_size": 13,
+  "device_id": "device_1234567890_abc123_android",
+  "sdk": { "name": "android", "version": "4.0.0" },
+  "app": {
+    "name": "MyApp",
+    "package_name": "com.example.myapp",
+    "platform": "android",
+    "version": "1.2.3",
+    "build_number": "123"
+  },
+  "events": [ … ]
+}
+```
+
+| Key | Notes |
+|-----|-------|
+| `contract_version` | Fixed `"4.0.0"`; independent of the SDK version |
+| `timestamp` | UTC with `Z`, stamped at **send** — a replayed (offline / crash) batch carries its send time |
+| `device_id` | Required. If the stored id can't be read, a UUIDv4 fallback (persisted once, else per process) |
+| `app.name`, `app.version`, `app.build_number` | Omitted when unknown — never `""` or `"unknown"` |
+| `app` (replayed crash/ANR) | The crashed build's identity, sent alone in its own batch; `sdk` is current |
+
+No `environment` is ever sent — the API key sets it.
+
 ## Standard Attributes
 
 All events automatically include these standard attributes:
 
-### App Information (4 attributes)
+### Device Information (10 attributes)
 | Attribute | Type | Required | Description | Example |
 |-----------|------|----------|-------------|---------|
-| `app.name` | String | Yes | Application name | `"MyApp"` |
-| `app.version` | String | Yes | App version | `"1.2.3"` |
-| `app.build_number` | String | Yes | Build number | `"123"` |
-| `app.package_name` | String | Yes | Package identifier | `"com.example.myapp"` |
-
-### Device Information (11 attributes)
-| Attribute | Type | Required | Description | Example |
-|-----------|------|----------|-------------|---------|
-| `device.id` | String | Yes | Unique device identifier | `"device_1234567890_abc123_android"` |
 | `device.platform` | String | Yes | Platform | `"android"` |
 | `device.platform_version` | String | Yes | OS version | `"13.0"` |
 | `device.model` | String | Yes | Device model | `"Pixel 7"` |
@@ -112,11 +138,6 @@ All events automatically include these standard attributes:
     "http.success": true,
     "http.request_body_size": 0,
     "http.response_body_size": 1024,
-    "app.name": "MyApp",
-    "app.version": "1.2.3",
-    "app.build_number": "123",
-    "app.package_name": "com.example.myapp",
-    "device.id": "device_1234567890_abc123_android",
     "device.platform": "android",
     "device.platform_version": "13.0",
     "device.model": "Pixel 7",
@@ -194,10 +215,7 @@ TelemetryManager.getInstance()?.recordNetworkRequest(
     "session.is_first_session": false,
     "session.total_sessions": 23,
     "network.type": "wifi",
-    "app.name": "MyApp",
-    "app.version": "1.2.3",
     "user.id": "user_1234567890_xyz789",
-    "device.id": "device_1234567890_abc123_android",
     "device.platform": "android"
   }
 }
@@ -263,7 +281,6 @@ Session finalization is automatic - no code required. The SDK tracks:
     "navigation.route_type": "main_flow",
     "navigation.has_arguments": true,
     "navigation.timestamp": "2024-03-23T14:32:15.789Z",
-    "app.name": "MyApp",
     "user.id": "user_1234567890_xyz789",
     "session.id": "session_1234567890_abc123_android"
   }
@@ -337,7 +354,6 @@ fun ProfileScreen(navController: NavController) {
     "screen.exit_method": "navigation",
     "screen.timestamp": "2024-03-23T14:35:20.123Z",
     "metric.unit": "milliseconds",
-    "app.name": "MyApp",
     "user.id": "user_1234567890_xyz789",
     "session.id": "session_1234567890_abc123_android"
   }
@@ -411,8 +427,6 @@ Screen duration tracking is automatic - no code required. The SDK tracks:
     "error.code": "PROFILE_LOAD_ERROR",
     "error.product_id": "user_profile_module",
     "error.user_action": "Viewing user profile",
-    "app.name": "MyApp",
-    "app.version": "1.2.3",
     "user.id": "user_1234567890_xyz789",
     "session.id": "session_1234567890_abc123_android",
     "device.model": "Pixel 7",
