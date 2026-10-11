@@ -679,12 +679,9 @@ if (!result.isValid) {
 
 ## Additional Resources
 
-- [Phase 1 Migration Guide](PHASE_1_MIGRATION.md) - Event name alignment
-- [Phase 2 Implementation](PHASE_2_IMPLEMENTATION.md) - Standard attributes
-- [Phase 3 Summary](PHASE_3_SUMMARY.md) - Event cleanup
-- [Phase 4 Testing Guide](PHASE_4_TESTING_GUIDE.md) - Validation and testing
 - [API Key Guide](API_KEY_GUIDE.md) - Security best practices
-- [Integration Summary](INTEGRATION_SUMMARY.md) - Integration details
+- [Specs](specs/) - Per-feature design docs
+- [Changelog](../CHANGELOG.md)
 
 ---
 
