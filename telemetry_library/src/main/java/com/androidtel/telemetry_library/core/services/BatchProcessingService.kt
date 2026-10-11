@@ -119,7 +119,8 @@ internal class BatchProcessingService(
     /**
      * Replay stored offline batches, oldest-first.
      *
-     * Throttled to at most [REPLAY_BATCH_LIMIT] envelopes per call and stops on the first failure:
+     * Throttled to at most [REPLAY_BATCH_LIMIT] envelopes per call and stops on the first retryable
+     * failure (a rejected batch is dropped and replay moves on):
      * a device offline long enough to fill the store must not fire the whole store back-to-back on
      * reconnect, and a failure means the collector isn't ready for more. The flush timer paces the
      * rest across subsequent ticks. Replay goes offline-store → network directly (never back through
@@ -135,6 +136,10 @@ internal class BatchProcessingService(
             val result = httpClient.sendBatch(batch)
             if (result.isSuccess) {
                 Log.i(TAG, "Successfully re-sent stored batch.")
+                offlineStorage.removeBatch(batch.id)
+            } else if (result.isRejected()) {
+                // A rejection is about this batch, not the collector: drop it and keep draining (R12).
+                Log.e(TAG, "Stored batch rejected by the collector; dropped.")
                 offlineStorage.removeBatch(batch.id)
             } else {
                 Log.e(TAG, "Stored batch send failed; pausing replay until next flush tick.")

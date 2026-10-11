@@ -90,7 +90,40 @@ class FailedSendPolicyTest {
         dead.getOkHttpClient().release()
     }
 
+    @Test
+    fun `stored rejected batch is removed and replay continues past it`() = runBlocking {
+        listOf("a", "rejected", "c").forEach { storage.storeBatch(batchOf(it)) }
+        server.enqueue(MockResponse().setResponseCode(200))
+        server.enqueue(MockResponse().setResponseCode(401))
+        server.enqueue(MockResponse().setResponseCode(200))
+
+        service.sendStoredBatches()
+
+        assertEquals(listOf("a", "rejected", "c"), sentNames(3))
+        assertEquals(emptyList<String>(), storedNames())
+    }
+
+    @Test
+    fun `retryable failure on replay stops the tick and keeps the rest in order`() = runBlocking {
+        listOf("a", "b", "c").forEach { storage.storeBatch(batchOf(it)) }
+        server.enqueue(MockResponse().setResponseCode(200))
+        repeat(3) { server.enqueue(MockResponse().setResponseCode(503)) }
+
+        service.sendStoredBatches()
+
+        assertEquals(4, server.requestCount) // a, then b three times; c never tried
+        assertEquals(listOf("b", "c"), storedNames())
+    }
+
     // --- helpers ---
+
+    private fun sentNames(n: Int) = List(n) {
+        JsonParser.parseString(server.takeRequest(5, TimeUnit.SECONDS)!!.body.readUtf8()).asJsonObject
+            .getAsJsonArray("events")[0].asJsonObject.get("eventName").asString
+    }
+
+    private fun batchOf(name: String) =
+        TelemetryBatch(batchSize = 1, timestamp = "2026-10-11T00:00:00.000Z", events = listOf(event(name)))
 
     private suspend fun storedNames() = storage.getStoredBatches().map { it.events.single().eventName }
 
