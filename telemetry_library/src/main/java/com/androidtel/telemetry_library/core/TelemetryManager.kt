@@ -742,15 +742,13 @@ class TelemetryManager private constructor(
             getNetworkType(context)
         )
         
-        return appInfo?.let {
-            EventAttributes(
-                app = it,
-                device = deviceInfo,
-                user = userInfo,
-                session = sessionInfo,
-                customAttributes = eventAttributes
-            )
-        }
+        return EventAttributes(
+            app = appInfo,
+            device = deviceInfo,
+            user = userInfo,
+            session = sessionInfo,
+            customAttributes = eventAttributes
+        )
     }
 
     // Checks the queue size and sends a batch if the threshold is met.

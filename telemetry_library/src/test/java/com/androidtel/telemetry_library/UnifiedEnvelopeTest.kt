@@ -79,9 +79,11 @@ class UnifiedEnvelopeTest {
     }
 
     @Test
-    fun `blank device id is never sent`() {
+    fun `blank device id is never sent and fails without retrying`() {
+        val started = System.currentTimeMillis()
         val result = runBlocking { httpClient.sendBatch(createTestBatch(deviceId = " ")) }
         assertTrue(result.isFailure)
+        assertTrue("deterministic failure must not back off", System.currentTimeMillis() - started < 500)
         assertEquals(0, mockWebServer.requestCount)
     }
 

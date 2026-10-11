@@ -60,6 +60,9 @@ class TelemetryHttpClient(
     // User profile is snapshotted into each event at recordEvent() time; the backend backfills
     // rum_users from event attributes so there's no need to override at serialization.
     suspend fun sendBatch(batch: TelemetryBatch): Result<Unit> {
+        // A batch that can't serialize (blank device_id, no events) fails the same way every time:
+        // fail fast instead of backing off through the retries.
+        runCatching { batch.toJson() }.onFailure { return Result.failure(it) }
         return sendWithRetry(batch, maxRetries = 3)
     }
 
