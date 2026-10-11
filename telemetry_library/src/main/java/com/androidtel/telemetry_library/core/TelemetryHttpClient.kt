@@ -28,6 +28,10 @@ class ServerException(code: Int, message: String) : IOException("Server error $c
 class UnknownException(code: Int) : IOException("Unknown HTTP error code: $code")
 internal class RateLimitedException(code: Int, message: String) : IOException("Rate limited $code: $message")
 
+private const val TAG = "TelemetryHttpClient"
+// ponytail: delta-seconds Retry-After only; the HTTP-date form falls back to backoff.
+private const val MAX_RETRY_AFTER_MS = 30_000L
+
 /** True when the collector rejected the batch (non-429 4xx): resending can't succeed, so drop it (R12). */
 internal fun Result<*>.isRejected(): Boolean = exceptionOrNull() is ClientException
 
@@ -230,9 +234,6 @@ class TelemetryHttpClient(
     }
 
     private companion object {
-        const val TAG = "TelemetryHttpClient"
-        // ponytail: delta-seconds Retry-After only; the HTTP-date form falls back to backoff.
-        const val MAX_RETRY_AFTER_MS = 30_000L
         val APP_IDENTITY_KEYS = setOf(
             "app.name", "app.version", "app.build_number", "app.package_name", "app.platform", "app.environment"
         )
