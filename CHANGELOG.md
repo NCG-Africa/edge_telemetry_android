@@ -52,7 +52,7 @@ Upgrade notes: [Migration guide v4](docs/MIGRATION_GUIDE_V4.md).
 | **Other 4xx** (400, 401, 403, 413…) | stored offline; replay stopped on it — one bad batch wedged the queue | **dropped**: not retried, never stored, logged |
 | Other codes (1xx, unfollowed 3xx) | stored offline | retried, then stored offline (when in doubt, keep) |
 
-- **`Retry-After`** (delta-seconds) on 429/503 is honoured as the wait before the next in-process
+- **`Retry-After`** (delta-seconds) on any retryable response (429, 5xx) is honoured as the wait before the next in-process
   attempt, up to 30 s. A longer window stops retrying and queues the batch; the flush timer replays it.
 - **Offline replay** drops a stored batch the collector rejects and continues to the next; a
   retryable failure still pauses replay until the next flush tick.

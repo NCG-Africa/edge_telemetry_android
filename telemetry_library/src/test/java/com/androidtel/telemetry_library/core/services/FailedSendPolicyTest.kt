@@ -84,10 +84,12 @@ class FailedSendPolicyTest {
             dead, storage, CoroutineScope(Dispatchers.IO)
         ).apply { setIdsInitialized(true) }
 
-        deadService.sendBatch(queueOf("offline"), forceSend = true)
-
-        assertEquals(listOf("offline"), storedNames())
-        dead.getOkHttpClient().release()
+        try {
+            deadService.sendBatch(queueOf("offline"), forceSend = true)
+            assertEquals(listOf("offline"), storedNames())
+        } finally {
+            dead.getOkHttpClient().release()
+        }
     }
 
     @Test

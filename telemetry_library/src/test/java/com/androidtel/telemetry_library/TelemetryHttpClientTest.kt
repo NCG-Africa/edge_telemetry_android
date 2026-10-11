@@ -262,10 +262,13 @@ class TelemetryHttpClientTest {
         assertFalse(httpClient.sendBatch(createTestBatch()).isRejected())
 
         val dead = TelemetryHttpClient("http://127.0.0.1:1/telemetry", testApiKey, false).apply { sleep = {} }
-        val result = dead.sendBatch(createTestBatch())
-        assertTrue(result.isFailure)
-        assertFalse(result.isRejected())
-        dead.getOkHttpClient().release()
+        try {
+            val result = dead.sendBatch(createTestBatch())
+            assertTrue(result.isFailure)
+            assertFalse(result.isRejected())
+        } finally {
+            dead.getOkHttpClient().release()
+        }
     }
 
     @Test
@@ -298,10 +301,13 @@ class TelemetryHttpClientTest {
         for (path in listOf("/telemetry", "/collector/telemetry", "/t/x?tenant=1")) {
             val url = mockWebServer.url(path).toString()
             val client = TelemetryHttpClient(url, testApiKey, debugMode = false)
-            mockWebServer.enqueue(MockResponse().setResponseCode(200))
-            client.sendBatch(createTestBatch())
-            assertEquals(path, mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!.path)
-            client.getOkHttpClient().release()
+            try {
+                mockWebServer.enqueue(MockResponse().setResponseCode(200))
+                client.sendBatch(createTestBatch())
+                assertEquals(path, mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!.path)
+            } finally {
+                client.getOkHttpClient().release()
+            }
         }
     }
 

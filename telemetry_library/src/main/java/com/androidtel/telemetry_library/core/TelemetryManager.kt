@@ -276,6 +276,9 @@ class TelemetryManager private constructor(
         internal fun resetForTesting() {
             // Stop the daemon so it doesn't keep posting heartbeats across tests (issue #60).
             instance?.anrWatchdog?.stop()
+            // Stop the flush timer too: a stale instance would keep replaying the shared offline
+            // store under its own mutex, racing the next instance.
+            instance?.takeIf { it::batchProcessingService.isInitialized }?.batchProcessingService?.stopFlushTimer()
             instance = null
         }
     }
