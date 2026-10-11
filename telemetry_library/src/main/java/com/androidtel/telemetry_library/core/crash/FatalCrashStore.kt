@@ -2,6 +2,7 @@ package com.androidtel.telemetry_library.core.crash
 
 import android.util.Log
 import com.androidtel.telemetry_library.core.TelemetryHttpClient
+import com.androidtel.telemetry_library.core.isRejected
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.google.gson.Gson
 import java.io.File
@@ -59,8 +60,8 @@ internal object FatalCrashStore {
 
     /**
      * The exactly-once delivery invariant, in one place: send the frozen record as-is, delete only on
-     * a 2xx. Returns true when there's nothing to send or it was delivered; false when it must be
-     * retried. Every replay rail (crash init, ANR init, WorkManager) calls this so the invariant
+     * a 2xx — or on a rejection (non-429 4xx, R12), which no retry can turn into a delivery. Returns
+     * true when there's nothing left to send; false when it must be retried. Every replay rail (crash init, ANR init, WorkManager) calls this so the invariant
      * can't drift.
      */
     suspend fun replayOnce(
@@ -70,7 +71,9 @@ internal object FatalCrashStore {
         fileName: String = FILE_NAME
     ): Boolean {
         val batch = readBatch(filesDir, gson, fileName) ?: return true
-        return if (client.sendBatch(batch).isSuccess) {
+        val result = client.sendBatch(batch)
+        if (result.isRejected()) Log.e(TAG, "Frozen $fileName rejected by the collector — deleting")
+        return if (result.isSuccess || result.isRejected()) {
             delete(filesDir, fileName)
             true
         } else {

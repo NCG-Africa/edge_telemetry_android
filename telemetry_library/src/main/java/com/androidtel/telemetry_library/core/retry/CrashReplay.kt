@@ -19,7 +19,8 @@ import com.androidtel.telemetry_library.core.crash.FatalCrashStore
  * The frozen `app.crash` event on `filesDir` is replayed on every `TelemetryManager.initialize()`.
  * This worker covers the mid-session case: the init replay failed (offline) and the app keeps
  * running, so delivery isn't held hostage to the next cold start. Delete-only-after-2xx keeps the
- * crash exactly-once. Replay sends the frozen bytes as-is — no re-enrichment.
+ * crash exactly-once; a rejection (non-429 4xx) also deletes, since no retry can fix it (#138).
+ * Replay sends the frozen bytes as-is — no re-enrichment.
  */
 internal object CrashReplay {
     private const val TAG = "CrashReplay"

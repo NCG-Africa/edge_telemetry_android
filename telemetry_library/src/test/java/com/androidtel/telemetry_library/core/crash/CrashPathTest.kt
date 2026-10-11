@@ -256,4 +256,24 @@ class CrashPathTest {
         assertTrue(wire.get("is_fatal").asBoolean)
         assertFalse("file must be gone after 2xx", FatalCrashStore.file(filesDir).exists())
     }
+
+    // #138 R12: a rejected frozen crash/ANR can never be delivered — delete it and report done, so
+    // CrashReplay isn't rescheduled forever. Retryable (5xx) keeps the file for the next attempt.
+    @Test
+    fun `rejected frozen crash and ANR are deleted and reported done`() {
+        val filesDir = RuntimeEnvironment.getApplication().filesDir
+        val attrs = service.buildCrashAttributes(RuntimeException("fatal"), isFatal = true, handled = false)
+        httpClient.sleep = {}
+        for (slot in listOf(FatalCrashStore.FILE_NAME, FatalCrashStore.ANR_FILE_NAME)) {
+            FatalCrashStore.writeBlocking(filesDir, gson.toJson(crashBatch(attrs)), slot)
+
+            repeat(3) { mockWebServer.enqueue(MockResponse().setResponseCode(503)) }
+            assertFalse(runBlocking { FatalCrashStore.replayOnce(filesDir, httpClient, gson, slot) })
+            assertTrue("$slot kept on 503", FatalCrashStore.file(filesDir, slot).exists())
+
+            mockWebServer.enqueue(MockResponse().setResponseCode(403))
+            assertTrue("$slot done on 403", runBlocking { FatalCrashStore.replayOnce(filesDir, httpClient, gson, slot) })
+            assertFalse("$slot deleted on 403", FatalCrashStore.file(filesDir, slot).exists())
+        }
+    }
 }
