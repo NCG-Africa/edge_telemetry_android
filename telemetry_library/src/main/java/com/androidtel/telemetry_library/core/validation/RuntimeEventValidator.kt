@@ -116,16 +116,8 @@ class RuntimeEventValidator(
     private fun flattenAttributes(attributes: com.androidtel.telemetry_library.core.models.EventAttributes): Map<String, Any?> {
         val flattened = mutableMapOf<String, Any?>()
         
-        // App attributes
-        val app = attributes.app
-        flattened["app.name"] = app.appName
-        flattened["app.version"] = app.appVersion
-        flattened["app.build_number"] = app.appBuildNumber
-        flattened["app.package_name"] = app.appPackageName
-        
         // Device attributes
         val device = attributes.device
-        flattened["device.id"] = device.deviceId
         flattened["device.platform"] = device.platform
         flattened["device.platform_version"] = device.platformVersion
         flattened["device.model"] = device.model
