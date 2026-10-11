@@ -147,11 +147,11 @@ class TelemetryHttpClient(
             device_id = identity.device.deviceId,
             sdk = SdkOut(name = "android", version = BuildConfig.SDK_VERSION),
             app = AppOut(
-                name = identity.app.appName,
+                name = known(identity.app.appName),
                 package_name = identity.app.appPackageName,
                 platform = "android",
-                version = identity.app.appVersion,
-                build_number = identity.app.appBuildNumber
+                version = known(identity.app.appVersion),
+                build_number = known(identity.app.appBuildNumber)
             ),
             events = this.events.map { event ->
                 TelemetryEventOut(
@@ -166,6 +166,9 @@ class TelemetryHttpClient(
         )
         return Gson().toJson(out)
     }
+
+    // Null for blank or 2.x's "unknown" placeholder, so it's omitted, never sent (R15).
+    private fun known(value: String?): String? = value?.takeUnless { it.isBlank() || it == "unknown" }
 
     private fun isIdentityKey(key: String): Boolean =
         key.startsWith("sdk.") || key == "device.id" || key in APP_IDENTITY_KEYS

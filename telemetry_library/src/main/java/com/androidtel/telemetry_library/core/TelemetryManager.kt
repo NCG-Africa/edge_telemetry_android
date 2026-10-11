@@ -93,7 +93,7 @@ class TelemetryManager private constructor(
 
     // Core attributes for every event
     private lateinit var deviceId: String
-    private val appInfo = collectAppInfo()
+    private val appInfo = DeviceInfoCollector.collectAppInfo(context)
     private lateinit var deviceInfo: DeviceInfo
     
     // Device capabilities for runtime feature detection
@@ -898,25 +898,6 @@ class TelemetryManager private constructor(
      */
     fun getMemoryCapabilityTracker(): MemoryCapabilityTracker? {
         return if (::memoryCapabilityTracker.isInitialized) memoryCapabilityTracker else null
-    }
-
-    // Gathers and formats app-related information.
-    private fun collectAppInfo(): AppInfo? {
-        val packageManager = context.packageManager
-        val packageName = context.packageName
-        val packageInfo = packageManager.getPackageInfo(packageName, 0)
-        return packageInfo.versionName?.let {
-            AppInfo(
-                appName = context.getString(context.applicationInfo.labelRes),
-                appVersion = it,
-                appBuildNumber = if (::deviceCapabilities.isInitialized && deviceCapabilities.supportsLongVersionCode) {
-                    packageInfo.longVersionCode.toString()
-                } else {
-                    packageInfo.versionCode.toString()
-                },
-                appPackageName = packageName
-            )
-        }
     }
 
     // Gathers and formats device-related information.

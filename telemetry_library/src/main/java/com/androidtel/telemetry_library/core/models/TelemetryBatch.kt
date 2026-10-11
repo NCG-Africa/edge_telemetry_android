@@ -69,10 +69,11 @@ data class EventAttributes(
     val customAttributes: Map<String, Any>
 )
 
+// Null = unknown; omitted from the envelope, never sent as "" or "unknown" (#135 R15).
 data class AppInfo(
-    val appName: String,
-    val appVersion: String,
-    val appBuildNumber: String,
+    val appName: String?,
+    val appVersion: String?,
+    val appBuildNumber: String?,
     val appPackageName: String
 )
 

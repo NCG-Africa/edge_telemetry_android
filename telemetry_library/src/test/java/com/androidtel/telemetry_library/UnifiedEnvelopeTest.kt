@@ -117,6 +117,19 @@ class UnifiedEnvelopeTest {
     }
 
     @Test
+    fun `unknown app name version and build are omitted never empty`() {
+        listOf(
+            AppInfo(null, null, null, "com.test.app"),       // 4.x: unknown is null
+            AppInfo("", "", "", "com.test.app"),             // defensive
+            AppInfo("unknown", "unknown", "unknown", "com.test.app") // 2.x-stored placeholder
+        ).forEach { appInfo ->
+            val app = JsonParser.parseString(sendAndCaptureBody(createTestBatch(app = appInfo)))
+                .asJsonObject.getAsJsonObject("app")
+            assertEquals("for $appInfo", setOf("package_name", "platform"), app.keySet())
+        }
+    }
+
+    @Test
     fun `session counters serialize as native JSON numbers`() {
         val body = sendAndCaptureBody(createTestBatch())
         val attrs = JsonParser.parseString(body).asJsonObject
@@ -194,10 +207,11 @@ class UnifiedEnvelopeTest {
     private fun createTestBatch(
         events: Int = 1,
         deviceId: String = "test_device_123",
-        custom: Map<String, Any> = emptyMap()
+        custom: Map<String, Any> = emptyMap(),
+        app: AppInfo = AppInfo("TestApp", "1.0.0", "100", "com.test.app")
     ): TelemetryBatch {
         val attributes = EventAttributes(
-            app = AppInfo("TestApp", "1.0.0", "100", "com.test.app"),
+            app = app,
             device = DeviceInfo(
                 deviceId = deviceId, platform = "android", platformVersion = "13",
                 model = "TestModel", manufacturer = "TestManufacturer", brand = "TestBrand",
