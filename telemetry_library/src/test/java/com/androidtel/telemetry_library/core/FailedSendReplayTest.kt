@@ -89,11 +89,13 @@ class FailedSendReplayTest {
         val tm = TelemetryManager.getInstance()
 
         tm.recordEvent("first")
-        val firstFailed = await("first attempted during outage") { hit("first", 503) }
+        val firstFailed = await("first queued (3 attempts failed)") { queued("first") }
         tm.recordEvent("revoked")
         await("revoked attempted") { hit("revoked", 401) }
         tm.recordEvent("second")
-        await("second attempted during outage") { hit("second", 503) }
+        // Flip only once second is queued too: a live in-process retry landing after the flip
+        // isn't the offline queue and may legitimately overtake it.
+        await("second queued (3 attempts failed)") { queued("second") }
 
         outage = false
         await("both delivered") { hit("first", 200) != null && hit("second", 200) != null }
@@ -104,6 +106,8 @@ class FailedSendReplayTest {
         val replayed = hit("first", 200)!!
         assertTrue("re-stamped at send, not the stored time", replayed.sentAt.isAfter(firstFailed!!.sentAt))
     }
+
+    private fun queued(name: String) = hits.filter { it.code == 503 && name in it.names }.takeIf { it.size >= 3 }?.first()
 
     private fun hit(name: String, code: Int) = hits.firstOrNull { it.code == code && name in it.names }
 
