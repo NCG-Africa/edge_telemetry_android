@@ -5,6 +5,7 @@ import com.androidtel.telemetry_library.core.CountedEventQueue
 import com.androidtel.telemetry_library.core.OfflineBatchStorage
 import com.androidtel.telemetry_library.core.TelemetryConfig
 import com.androidtel.telemetry_library.core.TelemetryHttpClient
+import com.androidtel.telemetry_library.core.isRejected
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.androidtel.telemetry_library.core.models.TelemetryEvent
 import kotlinx.coroutines.CoroutineScope
@@ -104,6 +105,9 @@ internal class BatchProcessingService(
 
         if (result.isSuccess) {
             Log.i(TAG, "Successfully sent batch.")
+        } else if (result.isRejected()) {
+            // Resending can't succeed, so storing would only wedge replay (R12).
+            Log.e(TAG, "Batch of ${batch.batchSize} events rejected by the collector; dropped.")
         } else {
             Log.e(TAG, "Failed to send batch. Storing offline.")
             if (flushOffline) {
