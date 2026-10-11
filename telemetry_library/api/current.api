@@ -738,10 +738,6 @@ package com.androidtel.telemetry_library.core.models {
     property public final String type;
   }
 
-  public final class TelemetryBatchKt {
-    field public static final String CONTRACT_VERSION = "4.0.0";
-  }
-
   public final class TelemetryDataOut {
     ctor public TelemetryDataOut(optional String type, optional String contract_version, String timestamp, int batch_size, String device_id, com.androidtel.telemetry_library.core.models.SdkOut sdk, com.androidtel.telemetry_library.core.models.AppOut app, java.util.List<com.androidtel.telemetry_library.core.models.TelemetryEventOut> events);
     method public String component1();

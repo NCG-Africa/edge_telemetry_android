@@ -4,7 +4,7 @@ import java.util.UUID
 
 // Contract version of the batch envelope (#135). Its own constant, not derived from SDK_VERSION —
 // the two coincide only at 4.0.0.
-const val CONTRACT_VERSION = "4.0.0"
+internal const val CONTRACT_VERSION = "4.0.0"
 
 // Contract 4.0.0 batch envelope (#135): closed at exactly these 8 keys. Identity (device_id, sdk,
 // app) lives here once per batch, never on events. Gson drops nulls, so an unknown app.name /
