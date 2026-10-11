@@ -268,6 +268,30 @@ class TelemetryHttpClientTest {
         dead.getOkHttpClient().release()
     }
 
+    @Test
+    fun `503 with Retry-After waits that long before the next attempt`() = runBlocking {
+        val waits = mutableListOf<Long>()
+        httpClient.sleep = { waits += it }
+        mockWebServer.enqueue(MockResponse().setResponseCode(503).setHeader("Retry-After", "5"))
+        mockWebServer.enqueue(MockResponse().setResponseCode(200))
+
+        assertTrue(httpClient.sendBatch(createTestBatch()).isSuccess)
+        assertEquals(listOf(5_000L), waits)
+    }
+
+    @Test
+    fun `429 with Retry-After over the cap stops retrying and stays retryable`() = runBlocking {
+        httpClient.sleep = { fail("must not wait out a 60s window in-process") }
+        mockWebServer.enqueue(MockResponse().setResponseCode(429).setHeader("Retry-After", "60"))
+        mockWebServer.enqueue(MockResponse().setResponseCode(200))
+
+        val result = httpClient.sendBatch(createTestBatch())
+
+        assertEquals(1, mockWebServer.requestCount)
+        assertTrue(result.isFailure)
+        assertFalse(result.isRejected())
+    }
+
     // R10: the configured URL is the request URL — nothing appended, for canonical and legacy paths.
     @Test
     fun `posts to the configured URL exactly as given`() = runBlocking {

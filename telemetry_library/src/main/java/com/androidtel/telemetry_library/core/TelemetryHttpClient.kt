@@ -81,9 +81,11 @@ class TelemetryHttpClient(
     private suspend fun sendWithRetry(batch: TelemetryBatch, maxRetries: Int): Result<Unit> {
         lateinit var last: Exception
         for (attempt in 0 until maxRetries) {
+            var retryAfterMs: Long? = null
             try {
                 makeHttpRequest(batch.toJson(), telemetryUrl).use { response ->
                     val code = response.code
+                    retryAfterMs = response.header("Retry-After")?.trim()?.toLongOrNull()?.times(1000)
                     last = when (code) {
                         in 200..299 -> return Result.success(Unit)
                         429 -> RateLimitedException(code, response.message)
@@ -99,7 +101,10 @@ class TelemetryHttpClient(
                 last = e
             }
             Log.e(TAG, "Send attempt ${attempt + 1}/$maxRetries failed: ${last.message}")
-            if (attempt < maxRetries - 1) sleep(calculateBackoffDelay(attempt))
+            // Retry-After past the cap: stop now; the caller queues the batch and the flush tick
+            // replays it later, rather than blocking the send path for the server's whole window.
+            if (retryAfterMs != null && retryAfterMs > MAX_RETRY_AFTER_MS) break
+            if (attempt < maxRetries - 1) sleep(retryAfterMs ?: calculateBackoffDelay(attempt))
         }
         return Result.failure(last)
     }
@@ -226,6 +231,8 @@ class TelemetryHttpClient(
 
     private companion object {
         const val TAG = "TelemetryHttpClient"
+        // ponytail: delta-seconds Retry-After only; the HTTP-date form falls back to backoff.
+        const val MAX_RETRY_AFTER_MS = 30_000L
         val APP_IDENTITY_KEYS = setOf(
             "app.name", "app.version", "app.build_number", "app.package_name", "app.platform", "app.environment"
         )
