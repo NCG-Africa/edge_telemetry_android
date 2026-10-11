@@ -9,6 +9,7 @@ import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -90,13 +91,15 @@ class FailedSendReplayTest {
         val tm = TelemetryManager.getInstance()
 
         tm.recordEvent("first")
-        val firstFailed = await("first queued (3 attempts failed)") { queued("first") }
+        await("first queued offline") { queued("first") }
+        val firstFailed = hit("first", 503)
         tm.recordEvent("revoked") // queued during the outage, rejected once it's over
-        await("revoked queued (3 attempts failed)") { queued("revoked") }
+        await("revoked queued offline") { queued("revoked") }
         tm.recordEvent("second")
-        // Flip only once second is queued too: a live in-process retry landing after the flip
-        // isn't the offline queue and may legitimately overtake it.
-        await("second queued (3 attempts failed)") { queued("second") }
+        // Flip only once second is in the offline queue: a live in-process retry landing after the
+        // flip isn't the queue and may legitimately overtake it. (Server hit counts can't tell —
+        // OkHttp transparently re-sends on a stale pooled connection.)
+        await("second queued offline") { queued("second") }
 
         outage = false
         await("both delivered") { hit("first", 200) != null && hit("second", 200) != null }
@@ -123,7 +126,8 @@ class FailedSendReplayTest {
             ?.takeIf { "revoked" in it })
     }
 
-    private fun queued(name: String) = hits.filter { it.code == 503 && name in it.names }.takeIf { it.size >= 3 }?.first()
+    private fun queued(name: String) =
+        runBlocking { OfflineBatchStorage(app).getStoredBatches() }.any { b -> b.events.any { it.eventName == name } }
 
     private fun hit(name: String, code: Int) = hits.firstOrNull { it.code == code && name in it.names }
 
