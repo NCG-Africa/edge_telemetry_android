@@ -122,7 +122,8 @@ POSTs. Today `sendStoredBatches` loops over *all* stored batches with no delay a
   30 s flush timer (spec #32) paces the rest — 200 envelopes clear in ~20 cycles, not one burst. No
   new scheduler; reuse the flush tick.
 
-- **Stop on the first failure** in a cycle. A 4xx/5xx/network error means the collector isn't ready
+- **Stop on the first failure** in a cycle. *(Amended by #138 / R12: a rejected batch — any 4xx but
+  429 — is dropped and replay continues; only a retryable failure stops the cycle.)* A 4xx/5xx/network error means the collector isn't ready
   for more; the remaining stored envelopes wait for the next tick. (Current code logs and keeps
   going — wasteful when the endpoint is down.)
 

@@ -1,0 +1,30 @@
+# Throwaway #138 e2e stack for LocalCollectorE2ETest, isolated from any shared telemetry-* stack.
+#   docker compose -p e2e138 -f telemetry_library/src/test/e2e/docker-compose.yml up -d zookeeper kafka
+#   create topics rum-api-keys (cleanup.policy=compact) and telemetry-upsert, produce a key and a
+#   tombstoned key to rum-api-keys ({"hash": sha256(secret), "tenant_id": "..."}), then `up -d collector`.
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    environment: {ZOOKEEPER_CLIENT_PORT: 2181, ZOOKEEPER_TICK_TIME: 2000}
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    depends_on: [zookeeper]
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+  collector:
+    image: papijo/edge_telemetry_collector_go@sha256:033966702ace2c6e2736cb4c5a16c19212fa6ffe79b79f40dc2946bbb3b6cbab
+    depends_on: [kafka]
+    ports: ["127.0.0.1:18138:8000"]
+    environment:
+      AUTH_MODE: api_key
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_TOPIC: telemetry-upsert
+      KAFKA_API_KEYS_TOPIC: rum-api-keys
+      KAFKA_ACKS: all
+      API_HOST: 0.0.0.0
+      API_PORT: 8000

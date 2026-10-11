@@ -197,7 +197,7 @@ class MyApplication : android.app.Application() {
         // Initialize telemetry with screen tracking enabled
         val config = com.androidtel.telemetry_library.core.TelemetryConfig(
             apiKey = BuildConfig.TELEMETRY_API_KEY,
-            endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
+            endpoint = "https://edgetelemetry.ncgafrica.com/telemetry",
             enableScreenTracking = true, // This enables automatic Activity tracking
             enableLegacyScreenEvents = false, // Use navigation events instead
             // ... other config

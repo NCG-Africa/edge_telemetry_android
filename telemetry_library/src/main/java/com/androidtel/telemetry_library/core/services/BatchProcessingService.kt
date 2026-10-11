@@ -5,11 +5,13 @@ import com.androidtel.telemetry_library.core.CountedEventQueue
 import com.androidtel.telemetry_library.core.OfflineBatchStorage
 import com.androidtel.telemetry_library.core.TelemetryConfig
 import com.androidtel.telemetry_library.core.TelemetryHttpClient
+import com.androidtel.telemetry_library.core.isRejected
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.androidtel.telemetry_library.core.models.TelemetryEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import com.androidtel.telemetry_library.core.TelemetryTime
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
@@ -32,6 +34,7 @@ internal class BatchProcessingService(
     private val scope: CoroutineScope
 ) {
     private var flushTimer: ScheduledExecutorService? = null
+    private val replayLock = Mutex()
     private var batchSendJob: Job? = null
 
     // Stored as a field (not a startFlushTimer param) so resumeFlushTimer() re-wires it after a stop.
@@ -104,6 +107,9 @@ internal class BatchProcessingService(
 
         if (result.isSuccess) {
             Log.i(TAG, "Successfully sent batch.")
+        } else if (result.isRejected()) {
+            // Resending can't succeed, so storing would only wedge replay (R12).
+            Log.e(TAG, "Batch of ${batch.batchSize} events rejected by the collector; dropped.")
         } else {
             Log.e(TAG, "Failed to send batch. Storing offline.")
             if (flushOffline) {
@@ -115,13 +121,25 @@ internal class BatchProcessingService(
     /**
      * Replay stored offline batches, oldest-first.
      *
-     * Throttled to at most [REPLAY_BATCH_LIMIT] envelopes per call and stops on the first failure:
+     * Throttled to at most [REPLAY_BATCH_LIMIT] envelopes per call and stops on the first retryable
+     * failure (a rejected batch is dropped and replay moves on):
      * a device offline long enough to fill the store must not fire the whole store back-to-back on
      * reconnect, and a failure means the collector isn't ready for more. The flush timer paces the
      * rest across subsequent ticks. Replay goes offline-store → network directly (never back through
      * the in-memory queue).
      */
     suspend fun sendStoredBatches() {
+        // One replay at a time: flush ticks overlap when a replay outlives the interval (in-process
+        // Retry-After waits), and two replays of one snapshot would deliver each batch twice.
+        if (!replayLock.tryLock()) return
+        try {
+            replayStoredBatches()
+        } finally {
+            replayLock.unlock()
+        }
+    }
+
+    private suspend fun replayStoredBatches() {
         Log.i(TAG, "Checking for stored batches to send.")
         val storedBatches = offlineStorage.getStoredBatches()
         if (storedBatches.isEmpty()) return
@@ -131,6 +149,10 @@ internal class BatchProcessingService(
             val result = httpClient.sendBatch(batch)
             if (result.isSuccess) {
                 Log.i(TAG, "Successfully re-sent stored batch.")
+                offlineStorage.removeBatch(batch.id)
+            } else if (result.isRejected()) {
+                // A rejection is about this batch, not the collector: drop it and keep draining (R12).
+                Log.e(TAG, "Stored batch rejected by the collector; dropped.")
                 offlineStorage.removeBatch(batch.id)
             } else {
                 Log.e(TAG, "Stored batch send failed; pausing replay until next flush tick.")

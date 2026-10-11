@@ -30,7 +30,7 @@ Android telemetry library (AAR) published via JitPack as `com.github.NCG-Africa:
 - **Kotlin:** 2.1.0 | **AGP:** 8.7.1
 - **Java:** 11 (source + target)
 - **Gradle:** 8.4+
-- **Current version:** 2.3.0
+- **Current version:** 4.0.0
 
 ## Project Structure
 
@@ -157,7 +157,7 @@ Spec: `docs/specs/distributed-trace-span.md`. Wire contract: `docs/specs/backend
 ```kotlin
 val config = TelemetryConfig(
     apiKey = "edge_your_api_key",       // Must start with "edge_"
-    endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry"
+    endpoint = "https://edgetelemetry.ncgafrica.com/telemetry"
 )
 TelemetryManager.initialize(application, config)
 ```

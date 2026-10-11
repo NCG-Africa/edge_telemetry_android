@@ -10,7 +10,11 @@ Android RUM SDK: crashes, ANRs, app-exit reasons, cold-start timing, screens, se
 user interactions, and distributed traces — collected automatically after a two-line init and shipped
 to the EdgeTelemetry collector in batches.
 
-**Current release: `2.2.2`**
+**Current release: `4.0.0`** *(unreleased — tagged only after the backend release passes acceptance; until then `2.3.0` is the latest published)*
+
+> ⚠️ **Install the EdgeTelemetry backend release (deployment, analytics, processor, collector) before
+> shipping any 4.0 build.** 4.0 sends identity once per batch (contract `4.0.0`), not per event; an
+> older backend loses it. Upgrading from 2.x: [Migration guide v4](docs/MIGRATION_GUIDE_V4.md).
 
 ---
 
@@ -63,7 +67,7 @@ dependencyResolutionManagement {
 
 ```groovy
 // app/build.gradle
-implementation 'com.github.NCG-Africa:edge_telemetry_android:2.2.2'
+implementation 'com.github.NCG-Africa:edge_telemetry_android:4.0.0'
 ```
 
 **Java 8 bytecode** (apps whose `compileOptions` are pinned to 1.8) — built from the
@@ -90,7 +94,7 @@ class MyApplication : Application() {
 
         val config = TelemetryConfig(
             apiKey = BuildConfig.TELEMETRY_API_KEY,   // must start with "edge_"
-            endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry",
+            endpoint = "https://edgetelemetry.ncgafrica.com/telemetry",
             traceHostAllowlist = listOf("api.example.com")   // see Distributed Tracing
         )
         TelemetryManager.initialize(this, config)
@@ -103,10 +107,13 @@ Java:
 ```java
 TelemetryConfig config = new TelemetryConfig(
     BuildConfig.TELEMETRY_API_KEY,
-    "https://edgetelemetry.ncgafrica.com/collector/telemetry"
+    "https://edgetelemetry.ncgafrica.com/telemetry"
 );
 TelemetryManager.initialize(this, config);
 ```
+
+> The endpoint is used **exactly as given** — the SDK appends nothing. `/telemetry` is the canonical
+> collector route; `/collector/telemetry` is a legacy alias the collector still accepts.
 
 > Never hardcode the API key — see [API key handling](#api-key-handling).
 
@@ -411,7 +418,8 @@ Then `apiKey = BuildConfig.TELEMETRY_API_KEY`. Full details: [API Key Guide](doc
 | No `traceparent` on requests | Host missing from `traceHostAllowlist` (bare host, no scheme/port/path) |
 | No `app.start` event | SDK initialized after the first `onResume`, or the process started in the background |
 | No `app.exit` events | Device is below API 30, or there were no abnormal deaths to harvest |
-| 401 from the collector | Key inactive/expired on the backend |
+| 401 from the collector | Key inactive/expired on the backend. Rejected batches (any 4xx but 429) are **dropped**, not queued — fix the key; they won't replay |
+| Events delayed after an outage | 429, 5xx and network errors are retried (honouring `Retry-After` up to 30 s), then queued offline (200 batches) and replayed oldest-first on the flush timer |
 
 Verify the crash path end-to-end in a debug build:
 
@@ -426,6 +434,7 @@ TelemetryManager.getInstance().testCrashReporting("smoke test")
 - [Event Schema Reference](docs/EVENT_SCHEMA_REFERENCE.md) — wire format per event type
 - [Specs](docs/specs) — per-feature design docs (tracing, ANR, app-start, exit harvest, device signals)
 - [Changelog](CHANGELOG.md)
+- [v4 Migration Guide](docs/MIGRATION_GUIDE_V4.md) — 2.x → 4.0.0
 - [v2 Migration Guide](docs/MIGRATION_GUIDE_V2.md)
 - [API Key Guide](docs/API_KEY_GUIDE.md)
 

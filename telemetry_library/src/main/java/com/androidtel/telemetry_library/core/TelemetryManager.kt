@@ -142,7 +142,7 @@ class TelemetryManager private constructor(
          * ```
          * val config = TelemetryConfig(
          *     apiKey = "edge_your_api_key",
-         *     endpoint = "https://edgetelemetry.ncgafrica.com/collector/telemetry"
+         *     endpoint = "https://edgetelemetry.ncgafrica.com/telemetry"
          * )
          * TelemetryManager.initialize(application, config)
          * ```
@@ -188,7 +188,7 @@ class TelemetryManager private constructor(
             application: Application,
             apiKey: String,
             batchSize: Int = 50,
-            endpoint: String = "https://edgetelemetry.ncgafrica.com/collector/telemetry"
+            endpoint: String = "https://edgetelemetry.ncgafrica.com/telemetry"
         ): TelemetryManager {
             // Validate the API key up-front with user-friendly messages for this simple string API.
             // Runs before TelemetryConfig construction so callers of the string overload get these
@@ -276,6 +276,9 @@ class TelemetryManager private constructor(
         internal fun resetForTesting() {
             // Stop the daemon so it doesn't keep posting heartbeats across tests (issue #60).
             instance?.anrWatchdog?.stop()
+            // Stop the flush timer too: a stale instance would keep replaying the shared offline
+            // store under its own mutex, racing the next instance.
+            instance?.takeIf { it::batchProcessingService.isInitialized }?.batchProcessingService?.stopFlushTimer()
             instance = null
         }
     }

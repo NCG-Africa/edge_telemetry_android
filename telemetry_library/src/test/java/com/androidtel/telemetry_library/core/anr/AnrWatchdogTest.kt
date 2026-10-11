@@ -184,8 +184,9 @@ class AnrWatchdogTest {
                 filesDir, Gson().toJson(anrBatch()), FatalCrashStore.ANR_FILE_NAME
             )
 
-            // Non-2xx: file survives for retry. 400 fails immediately (5xx would burn 3 retry+backoff).
-            mockWebServer.enqueue(MockResponse().setResponseCode(400))
+            // Retryable failure: file survives for retry (a 4xx rejection would delete it — #138).
+            httpClient.sleep = {}
+            repeat(3) { mockWebServer.enqueue(MockResponse().setResponseCode(503)) }
             runBlocking {
                 FatalCrashStore.replayOnce(filesDir, httpClient, Gson(), FatalCrashStore.ANR_FILE_NAME)
             }

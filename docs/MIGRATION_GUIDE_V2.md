@@ -1,5 +1,8 @@
 # Migration Guide: v1.x to v2.0.0
 
+> **Upgrading to 4.0?** See [Migration guide v4](MIGRATION_GUIDE_V4.md). Install the EdgeTelemetry
+> backend release (deployment, analytics, processor, collector) before shipping any 4.0 build.
+
 ## Overview
 
 Version 2.0.0 introduces **breaking changes** to the crash reporting payload structure to align with backend Kafka processor requirements. This guide will help you migrate from v1.x to v2.0.0.
