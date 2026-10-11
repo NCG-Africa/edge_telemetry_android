@@ -336,12 +336,6 @@ class IdGeneratorTest {
     }
 
     @Test(expected = IllegalStateException::class)
-    fun `throws exception when not initialized - getOrGenerateDeviceId`() {
-        val uninitializedGenerator = IdGenerator()
-        uninitializedGenerator.getOrGenerateDeviceId()
-    }
-
-    @Test(expected = IllegalStateException::class)
     fun `throws exception when not initialized - getUserId`() {
         val uninitializedGenerator = IdGenerator()
         uninitializedGenerator.getUserId()

@@ -2,13 +2,17 @@ package com.androidtel.telemetry_library.core.ids
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import java.security.SecureRandom
+import java.util.UUID
 
 class IdGenerator {
     
     companion object {
+        private const val TAG = "IdGenerator"
         private const val PREFS_NAME = "edge_telemetry_ids"
         private const val KEY_DEVICE_ID = "device_id"
+        private const val KEY_FALLBACK_DEVICE_ID = "device_id_fallback"
         private const val KEY_USER_ID = "edge_rum_user_id"
 
         private val secureRandom = SecureRandom()
@@ -55,16 +59,37 @@ class IdGenerator {
         }
     }
     
+    // Set once the primary id has failed; pins the fallback for this process so the id is stable.
+    @Volatile
+    private var fallbackDeviceId: String? = null
+
+    /** Never throws: device_id is required on every batch (#135 R9). */
     fun getOrGenerateDeviceId(): String {
-        val sharedPrefs = prefs ?: throw IllegalStateException("IdGenerator not initialized")
-        
-        return synchronized(lock) {
-            sharedPrefs.getString(KEY_DEVICE_ID, null) ?: run {
-                val deviceId = generateId("device")
-                sharedPrefs.edit().putString(KEY_DEVICE_ID, deviceId).apply()
-                deviceId
+        fallbackDeviceId?.let { return it }
+        return try {
+            val sharedPrefs = prefs ?: throw IllegalStateException("IdGenerator not initialized")
+            synchronized(lock) {
+                sharedPrefs.getString(KEY_DEVICE_ID, null) ?: run {
+                    val deviceId = generateId("device")
+                    sharedPrefs.edit().putString(KEY_DEVICE_ID, deviceId).apply()
+                    deviceId
+                }
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "Device id unavailable; using a UUID fallback", e)
+            fallbackDeviceId()
         }
+    }
+
+    // R9: a random UUIDv4 persisted once under its own key; if storage fails too, in-memory for
+    // this process.
+    private fun fallbackDeviceId(): String = synchronized(lock) {
+        fallbackDeviceId ?: runCatching {
+            val p = prefs!!
+            p.getString(KEY_FALLBACK_DEVICE_ID, null) ?: UUID.randomUUID().toString().also {
+                check(p.edit().putString(KEY_FALLBACK_DEVICE_ID, it).commit()) { "fallback id write failed" }
+            }
+        }.getOrElse { UUID.randomUUID().toString() }.also { fallbackDeviceId = it }
     }
     
     fun getDeviceId(): String {
