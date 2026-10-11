@@ -23,7 +23,6 @@ import com.androidtel.telemetry_library.core.ids.IdGenerator
 import com.androidtel.telemetry_library.core.startup.AppStartTracker
 import com.androidtel.telemetry_library.core.trace.TraceManager
 import com.androidtel.telemetry_library.core.trace.TracingCallFactory
-import com.androidtel.telemetry_library.core.models.AppInfo
 import com.androidtel.telemetry_library.core.services.EventTrackingService
 import com.androidtel.telemetry_library.core.services.SessionService
 import com.androidtel.telemetry_library.core.services.UserProfileService

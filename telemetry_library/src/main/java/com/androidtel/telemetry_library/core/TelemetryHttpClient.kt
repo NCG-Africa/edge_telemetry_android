@@ -142,7 +142,9 @@ class TelemetryHttpClient(
             "CRITICAL ERROR: device_id is blank. IDs were not properly validated before sending."
         }
         val out = TelemetryDataOut(
-            timestamp = this.timestamp,
+            // Stamped at each send attempt, never the stored time, so a replayed batch carries its
+            // send time (R13). Event timestamps are untouched.
+            timestamp = TelemetryTime.now(),
             batch_size = this.batchSize,
             device_id = identity.device.deviceId,
             sdk = SdkOut(name = "android", version = BuildConfig.SDK_VERSION),
