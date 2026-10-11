@@ -56,6 +56,9 @@ Upgrade notes: [Migration guide v4](docs/MIGRATION_GUIDE_V4.md).
   attempt, up to 30 s. A longer window stops retrying and queues the batch; the flush timer replays it.
 - **Offline replay** drops a stored batch the collector rejects and continues to the next; a
   retryable failure still pauses replay until the next flush tick.
+- **Offline replay no longer delivers a batch more than once** when flush ticks overlap (a replay
+  outliving the flush interval, e.g. during `Retry-After` waits): one replay runs at a time and an
+  overlapping tick skips. Previously one stored batch could reach the collector several times.
 - **Frozen crash/ANR**: a rejected one is deleted (no more endless `CrashReplayWorker` retries); a
   retryable failure keeps it and reschedules as before.
 - A revoked/inactive key (401/403) now loses the batches sent with it instead of queuing them —

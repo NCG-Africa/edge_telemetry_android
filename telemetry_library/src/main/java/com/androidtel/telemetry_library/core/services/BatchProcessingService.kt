@@ -11,6 +11,7 @@ import com.androidtel.telemetry_library.core.models.TelemetryEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import com.androidtel.telemetry_library.core.TelemetryTime
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
@@ -33,6 +34,7 @@ internal class BatchProcessingService(
     private val scope: CoroutineScope
 ) {
     private var flushTimer: ScheduledExecutorService? = null
+    private val replayLock = Mutex()
     private var batchSendJob: Job? = null
 
     // Stored as a field (not a startFlushTimer param) so resumeFlushTimer() re-wires it after a stop.
@@ -127,6 +129,17 @@ internal class BatchProcessingService(
      * the in-memory queue).
      */
     suspend fun sendStoredBatches() {
+        // One replay at a time: flush ticks overlap when a replay outlives the interval (in-process
+        // Retry-After waits), and two replays of one snapshot would deliver each batch twice.
+        if (!replayLock.tryLock()) return
+        try {
+            replayStoredBatches()
+        } finally {
+            replayLock.unlock()
+        }
+    }
+
+    private suspend fun replayStoredBatches() {
         Log.i(TAG, "Checking for stored batches to send.")
         val storedBatches = offlineStorage.getStoredBatches()
         if (storedBatches.isEmpty()) return

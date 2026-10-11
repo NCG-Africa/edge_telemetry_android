@@ -12,6 +12,7 @@ import com.google.gson.Gson
 import com.google.gson.JsonParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -115,6 +116,20 @@ class FailedSendPolicyTest {
 
         assertEquals(4, server.requestCount) // a, then b three times; c never tried
         assertEquals(listOf("b", "c"), storedNames())
+    }
+
+    // Flush ticks overlap when a replay outlives the interval (Retry-After waits); each must not
+    // resend the same stored batch — the e2e run delivered one batch 7 times.
+    @Test
+    fun `overlapping replays send a stored batch once`() = runBlocking {
+        storage.storeBatch(batchOf("once"))
+        repeat(2) { server.enqueue(MockResponse().setResponseCode(200).setHeadersDelay(300, TimeUnit.MILLISECONDS)) }
+
+        listOf(launch(Dispatchers.IO) { service.sendStoredBatches() }, launch(Dispatchers.IO) { service.sendStoredBatches() })
+            .forEach { it.join() }
+
+        assertEquals(1, server.requestCount)
+        assertEquals(emptyList<String>(), storedNames())
     }
 
     // --- helpers ---

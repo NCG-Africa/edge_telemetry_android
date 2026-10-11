@@ -18,14 +18,16 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * #138 end-to-end against the real local backend stack (edge_telemetry_deployment_go), not a stub.
- * Skipped unless E2E_COLLECTOR_URL is set; drives docker to stage the collector's "not ready" 503.
+ * #138 end-to-end against a real collector + Kafka, not a stub. Skipped unless E2E_COLLECTOR_URL is
+ * set; drives docker (stop Kafka, restart the collector) to stage the collector's "not ready" 503,
+ * so never point it at a shared stack — use src/test/e2e/docker-compose.yml:
  *
- *   E2E_COLLECTOR_URL=http://localhost:8001/telemetry \
+ *   E2E_COLLECTOR_URL=http://127.0.0.1:18138/telemetry \
  *   E2E_KEY=edge_<lookup>_<secret> E2E_REVOKED_KEY=edge_<lookup>_<secret> \
+ *   E2E_KAFKA_CONTAINER=e2e138-kafka-1 E2E_COLLECTOR_CONTAINER=e2e138-collector-1 \
  *   ./gradlew :telemetry_library:testDebugUnitTest --tests '*LocalCollectorE2ETest*'
  *
- * Containers default to the single-host names (telemetry-kafka, telemetry-collector).
+ * Exactly-once delivery is checked by hand on the telemetry-upsert topic.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -33,8 +35,8 @@ class LocalCollectorE2ETest {
 
     private val app: Application = RuntimeEnvironment.getApplication()
     private val url = System.getenv("E2E_COLLECTOR_URL")
-    private val kafka = System.getenv("E2E_KAFKA_CONTAINER") ?: "telemetry-kafka"
-    private val collector = System.getenv("E2E_COLLECTOR_CONTAINER") ?: "telemetry-collector"
+    private val kafka = System.getenv("E2E_KAFKA_CONTAINER") ?: "e2e138-kafka-1"
+    private val collector = System.getenv("E2E_COLLECTOR_CONTAINER") ?: "e2e138-collector-1"
 
     @Before
     fun setUp() {
