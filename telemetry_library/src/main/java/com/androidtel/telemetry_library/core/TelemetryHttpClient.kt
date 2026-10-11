@@ -167,29 +167,14 @@ class TelemetryHttpClient(
         return Gson().toJson(out)
     }
 
+    private fun isIdentityKey(key: String): Boolean =
+        key.startsWith("sdk.") || key == "device.id" || key in APP_IDENTITY_KEYS
+
     // ---- Helper: Flatten attributes into map ----
     private fun flattenAttributes(attrs: EventAttributes): Map<String, Any?> {
         val flat = mutableMapOf<String, Any?>()
 
-        // SDK identity — required common attrs on every event (issue #48). Replaces the X-SDK-* headers.
-        flat["sdk.version"] = BuildConfig.SDK_VERSION
-        flat["sdk.platform"] = "android"
-
-        // App
-        flat["app.name"] = attrs.app.appName
-        flat["app.version"] = attrs.app.appVersion
-        flat["app.build_number"] = attrs.app.appBuildNumber
-        flat["app.package_name"] = attrs.app.appPackageName
-
-        // Device - CRITICAL: device.id must never be null or empty
-        // This should never happen due to validation in TelemetryManager.sendBatch()
-        if (attrs.device.deviceId.isBlank()) {
-            throw IllegalStateException(
-                "CRITICAL ERROR: device.id is blank in event attributes. " +
-                "This indicates IDs were not properly validated before sending."
-            )
-        }
-        flat["device.id"] = attrs.device.deviceId
+        // No sdk.*, app.* or device.id here: identity lives in the envelope only (#135 R1).
         flat["device.platform"] = attrs.device.platform
         flat["device.platform_version"] = attrs.device.platformVersion
         flat["device.model"] = attrs.device.model
@@ -235,10 +220,16 @@ class TelemetryHttpClient(
 
 
 
-        // Custom
-        flat.putAll(attrs.customAttributes)
+        // Custom — identity keys are stripped, never sent: the envelope wins (R1). Exact app.* keys
+        // only, so event attrs like app.start.type survive.
+        attrs.customAttributes.filterKeys { !isIdentityKey(it) }.let(flat::putAll)
 
         return flat
     }
 
+    private companion object {
+        val APP_IDENTITY_KEYS = setOf(
+            "app.name", "app.version", "app.build_number", "app.package_name", "app.platform", "app.environment"
+        )
+    }
 }

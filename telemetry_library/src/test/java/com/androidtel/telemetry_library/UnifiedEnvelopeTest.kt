@@ -86,19 +86,33 @@ class UnifiedEnvelopeTest {
     }
 
     @Test
-    fun `every event carries sdk and identity common attrs`() {
-        val body = sendAndCaptureBody(createTestBatch(events = 2))
-        val events = JsonParser.parseString(body).asJsonObject.getAsJsonArray("events")
-        assertTrue(events.size() > 0)
+    fun `events carry no identity copies and custom identity keys are stripped`() {
+        val custom = mapOf<String, Any>(
+            "app.package_name" to "com.evil", "app.version" to "9.9", "app.name" to "x",
+            "app.build_number" to "9", "app.platform" to "ios", "app.environment" to "prod",
+            "sdk.version" to "0.0.1", "sdk.platform" to "flutter-android", "device.id" to "spoofed",
+            "app.start.type" to "cold", "screen.name" to "Home"
+        )
+        val json = JsonParser.parseString(sendAndCaptureBody(createTestBatch(events = 2, custom = custom))).asJsonObject
 
-        events.forEach { el ->
+        assertFalse("no environment at the root", json.has("environment"))
+        assertEquals("envelope wins", "com.test.app", json.getAsJsonObject("app").get("package_name").asString)
+        assertFalse(json.getAsJsonObject("app").has("environment"))
+        json.getAsJsonArray("events").forEach { el ->
             val attrs = el.asJsonObject.getAsJsonObject("attributes")
-            assertTrue("sdk.version present", attrs.has("sdk.version"))
-            assertFalse(attrs.get("sdk.version").asString.isBlank())
-            assertEquals("android", attrs.get("sdk.platform").asString)
-            assertTrue("device.id present", attrs.has("device.id"))
+            val leaked = attrs.keySet().filter {
+                it.startsWith("sdk.") || it == "device.id" || it in setOf(
+                    "app.name", "app.version", "app.build_number", "app.package_name", "app.platform", "app.environment"
+                )
+            }
+            assertEquals(emptyList<String>(), leaked)
+            // Non-identity attrs are untouched.
+            assertEquals("cold", attrs.get("app.start.type").asString)
+            assertEquals("Home", attrs.get("screen.name").asString)
+            assertEquals("android", attrs.get("device.platform").asString)
             assertTrue("session.id present", attrs.has("session.id"))
             assertTrue("user.id present", attrs.has("user.id"))
+            assertEquals("wifi", attrs.get("network.type").asString)
         }
     }
 
@@ -177,7 +191,11 @@ class UnifiedEnvelopeTest {
         assertNull(request.getHeader("X-SDK-Platform"))
     }
 
-    private fun createTestBatch(events: Int = 1, deviceId: String = "test_device_123"): TelemetryBatch {
+    private fun createTestBatch(
+        events: Int = 1,
+        deviceId: String = "test_device_123",
+        custom: Map<String, Any> = emptyMap()
+    ): TelemetryBatch {
         val attributes = EventAttributes(
             app = AppInfo("TestApp", "1.0.0", "100", "com.test.app"),
             device = DeviceInfo(
@@ -193,7 +211,7 @@ class UnifiedEnvelopeTest {
                 visitedScreens = "TestScreen", isFirstSession = false, totalSessions = 5,
                 networkType = "wifi"
             ),
-            customAttributes = emptyMap()
+            customAttributes = custom
         )
         val evList = (1..events).map { i ->
             TelemetryEvent(
