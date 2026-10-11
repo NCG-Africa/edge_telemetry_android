@@ -3,7 +3,9 @@ package com.androidtel.telemetry_library.core
 import android.util.Log
 import com.androidtel.telemetry_library.BuildConfig
 import com.androidtel.telemetry_library.core.interceptors.ApiKeyRedactionInterceptor
+import com.androidtel.telemetry_library.core.models.AppOut
 import com.androidtel.telemetry_library.core.models.EventAttributes
+import com.androidtel.telemetry_library.core.models.SdkOut
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
 import com.androidtel.telemetry_library.core.models.TelemetryDataOut
 import com.androidtel.telemetry_library.core.models.TelemetryEventOut
@@ -130,11 +132,27 @@ class TelemetryHttpClient(
 
 
     // --- Extension: Convert Batch -> Outgoing JSON ---
-    // Serializes the single unified `telemetry_batch` envelope (issue #48). device.id lives per
-    // event in `attributes` (guarded in flattenAttributes); no top-level device_id/location.
+    // Serializes the contract 4.0.0 envelope (#135). Identity is derived from the batch's own first
+    // event, never the live process, so an offline-stored or frozen-crash batch is sent under the
+    // build that recorded it (R14) and a 2.x-stored TelemetryBatch re-serializes without migration.
     fun TelemetryBatch.toJson(): String {
+        val identity = events.first().attributes
+        // CRITICAL: device_id is required at the root (R9); never send without it.
+        check(identity.device.deviceId.isNotBlank()) {
+            "CRITICAL ERROR: device_id is blank. IDs were not properly validated before sending."
+        }
         val out = TelemetryDataOut(
-            type = "telemetry_batch",
+            timestamp = this.timestamp,
+            batch_size = this.batchSize,
+            device_id = identity.device.deviceId,
+            sdk = SdkOut(name = "android", version = BuildConfig.SDK_VERSION),
+            app = AppOut(
+                name = identity.app.appName,
+                package_name = identity.app.appPackageName,
+                platform = "android",
+                version = identity.app.appVersion,
+                build_number = identity.app.appBuildNumber
+            ),
             events = this.events.map { event ->
                 TelemetryEventOut(
                     type = event.type,
@@ -144,9 +162,7 @@ class TelemetryHttpClient(
                     timestamp = event.timestamp,
                     attributes = flattenAttributes(event.attributes)
                 )
-            },
-            batch_size = this.batchSize,
-            timestamp = this.timestamp
+            }
         )
         return Gson().toJson(out)
     }

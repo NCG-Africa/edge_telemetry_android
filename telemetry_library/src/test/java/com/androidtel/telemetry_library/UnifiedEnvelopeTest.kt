@@ -1,6 +1,7 @@
 package com.androidtel.telemetry_library
 
 import com.androidtel.telemetry_library.core.TelemetryHttpClient
+import com.androidtel.telemetry_library.BuildConfig
 import com.androidtel.telemetry_library.core.models.*
 import com.google.gson.JsonParser
 import kotlinx.coroutines.runBlocking
@@ -51,18 +52,37 @@ class UnifiedEnvelopeTest {
     }
 
     @Test
-    fun `envelope has exactly the unified top-level keys and no legacy fields`() {
-        val body = sendAndCaptureBody(createTestBatch())
-        val json = JsonParser.parseString(body).asJsonObject
+    fun `envelope is the closed 8-key contract 4_0_0 shape`() {
+        val json = JsonParser.parseString(sendAndCaptureBody(createTestBatch())).asJsonObject
 
+        assertEquals(
+            setOf("type", "contract_version", "timestamp", "batch_size", "device_id", "sdk", "app", "events"),
+            json.keySet()
+        )
         assertEquals("telemetry_batch", json.get("type").asString)
-        assertEquals(setOf("type", "timestamp", "batch_size", "events"), json.keySet())
+        assertEquals("4.0.0", json.get("contract_version").asString)
+        assertEquals(1, json.get("batch_size").asInt)
+        assertEquals("test_device_123", json.get("device_id").asString)
 
-        // Removed legacy fields (Path A + Path B leftovers).
-        assertFalse("device_id must not be top-level", json.has("device_id"))
-        assertFalse("location must not be top-level", json.has("location"))
-        assertFalse("data wrapper must be gone", json.has("data"))
-        assertFalse("tenant_id must be gone", json.has("tenant_id"))
+        val sdk = json.getAsJsonObject("sdk")
+        assertEquals(setOf("name", "version"), sdk.keySet())
+        assertEquals("android", sdk.get("name").asString)
+        assertEquals(BuildConfig.SDK_VERSION, sdk.get("version").asString)
+
+        val app = json.getAsJsonObject("app")
+        assertEquals(setOf("name", "package_name", "platform", "version", "build_number"), app.keySet())
+        assertEquals("TestApp", app.get("name").asString)
+        assertEquals("com.test.app", app.get("package_name").asString)
+        assertEquals("android", app.get("platform").asString)
+        assertEquals("1.0.0", app.get("version").asString)
+        assertEquals("100", app.get("build_number").asString)
+    }
+
+    @Test
+    fun `blank device id is never sent`() {
+        val result = runBlocking { httpClient.sendBatch(createTestBatch(deviceId = " ")) }
+        assertTrue(result.isFailure)
+        assertEquals(0, mockWebServer.requestCount)
     }
 
     @Test
@@ -157,11 +177,11 @@ class UnifiedEnvelopeTest {
         assertNull(request.getHeader("X-SDK-Platform"))
     }
 
-    private fun createTestBatch(events: Int = 1): TelemetryBatch {
+    private fun createTestBatch(events: Int = 1, deviceId: String = "test_device_123"): TelemetryBatch {
         val attributes = EventAttributes(
             app = AppInfo("TestApp", "1.0.0", "100", "com.test.app"),
             device = DeviceInfo(
-                deviceId = "test_device_123", platform = "android", platformVersion = "13",
+                deviceId = deviceId, platform = "android", platformVersion = "13",
                 model = "TestModel", manufacturer = "TestManufacturer", brand = "TestBrand",
                 androidSdk = "33", androidRelease = "13", fingerprint = "fp",
                 hardware = "hw", product = "prod"
