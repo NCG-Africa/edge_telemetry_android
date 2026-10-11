@@ -26,6 +26,10 @@ import java.util.concurrent.ThreadLocalRandom
 class ClientException(code: Int, message: String) : IOException("Client error $code: $message")
 class ServerException(code: Int, message: String) : IOException("Server error $code: $message")
 class UnknownException(code: Int) : IOException("Unknown HTTP error code: $code")
+internal class RateLimitedException(code: Int, message: String) : IOException("Rate limited $code: $message")
+
+/** True when the collector rejected the batch (non-429 4xx): resending can't succeed, so drop it (R12). */
+internal fun Result<*>.isRejected(): Boolean = exceptionOrNull() is ClientException
 
 class TelemetryHttpClient(
     private val telemetryUrl: String,
@@ -67,52 +71,37 @@ class TelemetryHttpClient(
     }
 
 
-    // Implementation of the retry strategy with exponential backoff.
+    // Test seam: backoff waits go through here so retry timing is observable without sleeping.
+    internal var sleep: suspend (Long) -> Unit = { delay(it) }
+
+    // Failed-send policy (R12): 429, 5xx, other non-2xx codes and network errors are retryable —
+    // retried here, then the caller keeps the batch for offline replay. Any other 4xx is a
+    // rejection (ClientException): not retried, and the caller drops it (see isRejected).
+    // Non-4xx/5xx codes (OkHttp follows 3xx itself) are treated as retryable: when in doubt, keep.
     private suspend fun sendWithRetry(batch: TelemetryBatch, maxRetries: Int): Result<Unit> {
-        repeat(maxRetries) { attempt ->
+        lateinit var last: Exception
+        for (attempt in 0 until maxRetries) {
             try {
-                val jsonPayload = batch.toJson()
-                makeHttpRequest(jsonPayload, telemetryUrl).use { response ->
-                    when (response.code) {
+                makeHttpRequest(batch.toJson(), telemetryUrl).use { response ->
+                    val code = response.code
+                    last = when (code) {
                         in 200..299 -> return Result.success(Unit)
+                        429 -> RateLimitedException(code, response.message)
                         in 400..499 -> {
-                            Log.e(
-                                "TelemetryHttpClient",
-                                "Client error ${response.code}: ${response.message}"
-                            )
-                            return Result.failure(ClientException(response.code, response.message))
+                            Log.e(TAG, "Batch rejected ($code ${response.message}); not retried.")
+                            return Result.failure(ClientException(code, response.message))
                         }
-
-                        in 500..599 -> {
-                            Log.e(
-                                "TelemetryHttpClient",
-                                "Server error ${response.code}: ${response.message}. Retrying..."
-                            )
-
-                            if (attempt < maxRetries - 1) {
-                                delay(calculateBackoffDelay(attempt))
-                            } else {
-                                return Result.failure(ServerException(response.code, response.message))
-                            }
-                        }
-
-                        else -> return Result.failure(UnknownException(response.code))
+                        in 500..599 -> ServerException(code, response.message)
+                        else -> UnknownException(code)
                     }
                 }
             } catch (e: Exception) {
-                Log.e(
-                    "TelemetryHttpClient",
-                    "Network error on attempt ${attempt + 1}: ${e.message}. Retrying...",
-                    e
-                )
-                if (attempt < maxRetries - 1) {
-                    delay(calculateBackoffDelay(attempt))
-                } else {
-                    return Result.failure(e)
-                }
+                last = e
             }
+            Log.e(TAG, "Send attempt ${attempt + 1}/$maxRetries failed: ${last.message}")
+            if (attempt < maxRetries - 1) sleep(calculateBackoffDelay(attempt))
         }
-        return Result.failure(Exception("Max retries exceeded"))
+        return Result.failure(last)
     }
 
     // Calculates the backoff delay with jitter.
@@ -236,6 +225,7 @@ class TelemetryHttpClient(
     }
 
     private companion object {
+        const val TAG = "TelemetryHttpClient"
         val APP_IDENTITY_KEYS = setOf(
             "app.name", "app.version", "app.build_number", "app.package_name", "app.platform", "app.environment"
         )

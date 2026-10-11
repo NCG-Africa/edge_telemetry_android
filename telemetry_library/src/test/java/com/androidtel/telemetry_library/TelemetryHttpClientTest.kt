@@ -1,6 +1,7 @@
 package com.androidtel.telemetry_library
 
 import com.androidtel.telemetry_library.core.TelemetryHttpClient
+import com.androidtel.telemetry_library.core.isRejected
 import com.androidtel.telemetry_library.core.models.*
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
@@ -209,6 +210,62 @@ class TelemetryHttpClientTest {
         assertNotNull(request.getHeader("X-API-Key"))
         assertNotNull(request.getHeader("Content-Type"))
         assertNotNull(request.getHeader("User-Agent"))
+    }
+
+    // R12: 429 is retryable like 5xx — retried in-process, then kept for offline replay.
+    @Test
+    fun `429 is retried with backoff then reported retryable`() = runBlocking {
+        val waits = mutableListOf<Long>()
+        httpClient.sleep = { waits += it }
+        repeat(3) { mockWebServer.enqueue(MockResponse().setResponseCode(429)) }
+
+        val result = httpClient.sendBatch(createTestBatch())
+
+        assertEquals(3, mockWebServer.requestCount)
+        assertEquals(2, waits.size)
+        assertTrue(result.isFailure)
+        assertFalse(result.isRejected())
+    }
+
+    @Test
+    fun `429 then 200 succeeds`() = runBlocking {
+        httpClient.sleep = {}
+        mockWebServer.enqueue(MockResponse().setResponseCode(429))
+        mockWebServer.enqueue(MockResponse().setResponseCode(200))
+
+        assertTrue(httpClient.sendBatch(createTestBatch()).isSuccess)
+        assertEquals(2, mockWebServer.requestCount)
+    }
+
+    // R12: any other 4xx is rejected — one attempt, never retried, never worth storing.
+    @Test
+    fun `400 401 403 413 are rejected after one attempt`() = runBlocking {
+        httpClient.sleep = { fail("must not back off on a rejection") }
+        for (code in listOf(400, 401, 403, 413)) {
+            mockWebServer.enqueue(MockResponse().setResponseCode(code))
+            mockWebServer.enqueue(MockResponse().setResponseCode(200)) // a retry would succeed
+            val before = mockWebServer.requestCount
+
+            val result = httpClient.sendBatch(createTestBatch())
+
+            assertTrue("$code rejected", result.isRejected())
+            assertEquals("$code sent once", before + 1, mockWebServer.requestCount)
+            mockWebServer.takeRequest(); httpClient.sendBatch(createTestBatch()) // drain the 200
+            mockWebServer.takeRequest()
+        }
+    }
+
+    @Test
+    fun `5xx and network errors are retryable, not rejected`() = runBlocking {
+        httpClient.sleep = {}
+        repeat(3) { mockWebServer.enqueue(MockResponse().setResponseCode(503)) }
+        assertFalse(httpClient.sendBatch(createTestBatch()).isRejected())
+
+        val dead = TelemetryHttpClient("http://127.0.0.1:1/telemetry", testApiKey, false).apply { sleep = {} }
+        val result = dead.sendBatch(createTestBatch())
+        assertTrue(result.isFailure)
+        assertFalse(result.isRejected())
+        dead.getOkHttpClient().release()
     }
 
     // R10: the configured URL is the request URL — nothing appended, for canonical and legacy paths.
