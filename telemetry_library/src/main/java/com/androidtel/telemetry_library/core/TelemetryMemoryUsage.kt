@@ -1,7 +1,7 @@
 package com.androidtel.telemetry_library.core
 
 import android.os.Build
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 
 /**
  * Enhanced memory usage tracking with API-level appropriate methods.
@@ -17,7 +17,7 @@ class TelemetryMemoryUsage(private val telemetryManager: TelemetryManager = Tele
         try {
             telemetryManager.getMemoryCapabilityTracker()
         } catch (e: Exception) {
-            Log.w(TAG, "MemoryCapabilityTracker not available: ${e.localizedMessage}")
+            TelemetryLog.w(TAG, "MemoryCapabilityTracker not available: ${e.localizedMessage}")
             null
         }
     }
@@ -33,7 +33,7 @@ class TelemetryMemoryUsage(private val telemetryManager: TelemetryManager = Tele
                 recordBasicMemoryUsage()
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Error recording memory usage: ${e.localizedMessage}")
+            TelemetryLog.w(TAG, "Error recording memory usage: ${e.localizedMessage}")
             // Fallback to basic memory tracking
             recordBasicMemoryUsage()
         }
@@ -122,10 +122,10 @@ class TelemetryMemoryUsage(private val telemetryManager: TelemetryManager = Tele
                 )
             }
             
-            Log.d(TAG, "Enhanced memory usage recorded: pressure=$pressureLevel, heap=${heapUsedMb}MB, API=${Build.VERSION.SDK_INT}")
+            TelemetryLog.d(TAG, "Enhanced memory usage recorded: pressure=$pressureLevel, heap=${heapUsedMb}MB, API=${Build.VERSION.SDK_INT}")
             
         } catch (e: Exception) {
-            Log.w(TAG, "Error in enhanced memory tracking: ${e.localizedMessage}")
+            TelemetryLog.w(TAG, "Error in enhanced memory tracking: ${e.localizedMessage}")
             recordBasicMemoryUsage()
         }
     }
@@ -177,10 +177,10 @@ class TelemetryMemoryUsage(private val telemetryManager: TelemetryManager = Tele
                 )
             )
             
-            Log.d(TAG, "Basic memory usage recorded: ${usedMb.toInt()}MB/${maxMb.toInt()}MB, pressure=$pressureLevel")
+            TelemetryLog.d(TAG, "Basic memory usage recorded: ${usedMb.toInt()}MB/${maxMb.toInt()}MB, pressure=$pressureLevel")
             
         } catch (e: Exception) {
-            Log.e(TAG, "Error in basic memory tracking: ${e.localizedMessage}")
+            TelemetryLog.e(TAG, "Error in basic memory tracking: ${e.localizedMessage}")
         }
     }
     
@@ -208,7 +208,7 @@ class TelemetryMemoryUsage(private val telemetryManager: TelemetryManager = Tele
                 else -> "low"
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Error calculating pressure level: ${e.localizedMessage}")
+            TelemetryLog.w(TAG, "Error calculating pressure level: ${e.localizedMessage}")
             "unknown"
         }
     }
@@ -253,10 +253,10 @@ class TelemetryMemoryUsage(private val telemetryManager: TelemetryManager = Tele
                     )
                 }
                 
-                Log.d(TAG, "Storage usage recorded")
+                TelemetryLog.d(TAG, "Storage usage recorded")
                 
             } catch (e: Exception) {
-                Log.w(TAG, "Error recording storage usage: ${e.localizedMessage}")
+                TelemetryLog.w(TAG, "Error recording storage usage: ${e.localizedMessage}")
             }
         }
     }

@@ -1,6 +1,6 @@
 package com.androidtel.telemetry_library.core.session
 
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import com.androidtel.telemetry_library.core.ids.IdGenerator
 import java.time.Instant
 import java.util.concurrent.locks.ReentrantReadWriteLock
@@ -45,7 +45,7 @@ class SessionManager(private val idGenerator: IdGenerator) {
             visitedScreens.clear()
             totalSessions++
             
-            Log.i(TAG, "🚀 New session started: $currentSessionId")
+            TelemetryLog.i(TAG, "🚀 New session started: $currentSessionId")
         }
     }
     
@@ -57,7 +57,7 @@ class SessionManager(private val idGenerator: IdGenerator) {
             val sessionId = currentSessionId
             val duration = System.currentTimeMillis() - sessionStartTime
             
-            Log.i(TAG, "🏁 Session ended: $sessionId (duration: ${duration}ms)")
+            TelemetryLog.i(TAG, "🏁 Session ended: $sessionId (duration: ${duration}ms)")
         }
     }
     

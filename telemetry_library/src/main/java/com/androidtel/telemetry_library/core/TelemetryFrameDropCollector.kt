@@ -5,7 +5,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.SystemClock
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import android.view.FrameMetrics
 import android.view.Window
 import com.androidtel.telemetry_library.core.navigation.NavigationStackTracker
@@ -68,7 +68,7 @@ class TelemetryFrameDropCollector(
         // Check if activity window is available
         val window = activity.window
         if (window == null) {
-            Log.w(TAG, "Activity window is null, cannot add frame metrics listener")
+            TelemetryLog.w(TAG, "Activity window is null, cannot add frame metrics listener")
             return
         }
 
@@ -81,11 +81,11 @@ class TelemetryFrameDropCollector(
                     val rasterMs = metrics.getMetric(FrameMetrics.DRAW_DURATION) / 1_000_000.0
                     onFrame(totalMs, buildMs, rasterMs)
                 } catch (e: Exception) {
-                    Log.w(TAG, "Error processing frame metrics: ${e.localizedMessage}")
+                    TelemetryLog.w(TAG, "Error processing frame metrics: ${e.localizedMessage}")
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to create frame metrics listener: ${e.localizedMessage}")
+            TelemetryLog.w(TAG, "Failed to create frame metrics listener: ${e.localizedMessage}")
             return
         }
 
@@ -99,7 +99,7 @@ class TelemetryFrameDropCollector(
             window.addOnFrameMetricsAvailableListener(listener, Handler(thread.looper))
         }
 
-        Log.d(TAG, "Frame metrics listener started for ${activity.javaClass.simpleName}")
+        TelemetryLog.d(TAG, "Frame metrics listener started for ${activity.javaClass.simpleName}")
     }
 
     /**
@@ -195,9 +195,9 @@ class TelemetryFrameDropCollector(
         if (listener != null && activity != null) {
             try {
                 activity.window?.removeOnFrameMetricsAvailableListener(listener)
-                Log.d(TAG, "Frame metrics listener removed for ${activity.javaClass.simpleName}")
+                TelemetryLog.d(TAG, "Frame metrics listener removed for ${activity.javaClass.simpleName}")
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to remove frame metrics listener: ${e.localizedMessage}")
+                TelemetryLog.w(TAG, "Failed to remove frame metrics listener: ${e.localizedMessage}")
             }
         }
 

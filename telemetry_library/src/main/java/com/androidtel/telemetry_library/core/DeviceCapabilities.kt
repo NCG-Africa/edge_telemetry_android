@@ -3,7 +3,7 @@ package com.androidtel.telemetry_library.core
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 
 /**
  * Central capability detection system for runtime feature availability checking.
@@ -151,22 +151,22 @@ class DeviceCapabilities private constructor(private val context: Context) {
      * Log all capabilities for debugging
      */
     private fun logCapabilities() {
-        Log.i(TAG, "Device Capabilities Initialized:")
-        Log.i(TAG, "  API Level: $apiLevel (Android $androidVersion)")
-        Log.i(TAG, "  Frame Metrics: Always Available (minSdk 24+)")
-        Log.i(TAG, "  Modern Networking: ${if (supportsModernNetworking) "✓" else "✗"}")
-        Log.i(TAG, "  Advanced Memory: ${if (supportsAdvancedMemoryInfo) "✓" else "✗"}")
-        Log.i(TAG, "  Scoped Storage: ${if (supportsScopedStorage) "✓" else "✗"}")
-        Log.i(TAG, "  Runtime Permissions: ${if (supportsRuntimePermissions) "✓" else "✗"}")
-        Log.i(TAG, "  Notification Channels: ${if (supportsNotificationChannels) "✓" else "✗"}")
-        Log.i(TAG, "  Long Version Code: ${if (supportsLongVersionCode) "✓" else "✗"}")
+        TelemetryLog.i(TAG, "Device Capabilities Initialized:")
+        TelemetryLog.i(TAG, "  API Level: $apiLevel (Android $androidVersion)")
+        TelemetryLog.i(TAG, "  Frame Metrics: Always Available (minSdk 24+)")
+        TelemetryLog.i(TAG, "  Modern Networking: ${if (supportsModernNetworking) "✓" else "✗"}")
+        TelemetryLog.i(TAG, "  Advanced Memory: ${if (supportsAdvancedMemoryInfo) "✓" else "✗"}")
+        TelemetryLog.i(TAG, "  Scoped Storage: ${if (supportsScopedStorage) "✓" else "✗"}")
+        TelemetryLog.i(TAG, "  Runtime Permissions: ${if (supportsRuntimePermissions) "✓" else "✗"}")
+        TelemetryLog.i(TAG, "  Notification Channels: ${if (supportsNotificationChannels) "✓" else "✗"}")
+        TelemetryLog.i(TAG, "  Long Version Code: ${if (supportsLongVersionCode) "✓" else "✗"}")
         
         // Log hardware capabilities
-        Log.d(TAG, "Hardware Features:")
-        Log.d(TAG, "  Camera: ${if (hasCamera) "✓" else "✗"}")
-        Log.d(TAG, "  Telephony: ${if (hasTelephony) "✓" else "✗"}")
-        Log.d(TAG, "  WiFi: ${if (hasWifi) "✓" else "✗"}")
-        Log.d(TAG, "  Bluetooth: ${if (hasBluetooth) "✓" else "✗"}")
-        Log.d(TAG, "  GPS: ${if (hasGps) "✓" else "✗"}")
+        TelemetryLog.d(TAG, "Hardware Features:")
+        TelemetryLog.d(TAG, "  Camera: ${if (hasCamera) "✓" else "✗"}")
+        TelemetryLog.d(TAG, "  Telephony: ${if (hasTelephony) "✓" else "✗"}")
+        TelemetryLog.d(TAG, "  WiFi: ${if (hasWifi) "✓" else "✗"}")
+        TelemetryLog.d(TAG, "  Bluetooth: ${if (hasBluetooth) "✓" else "✗"}")
+        TelemetryLog.d(TAG, "  GPS: ${if (hasGps) "✓" else "✗"}")
     }
 }

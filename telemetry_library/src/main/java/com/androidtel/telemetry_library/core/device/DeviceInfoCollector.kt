@@ -7,7 +7,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
 import android.util.DisplayMetrics
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import android.view.WindowManager
 import com.androidtel.telemetry_library.core.ids.IdGenerator
 import com.androidtel.telemetry_library.core.models.AppInfo
@@ -34,7 +34,7 @@ class DeviceInfoCollector(
         fun collectAppInfo(context: Context): AppInfo {
             val pm = context.packageManager
             val packageInfo = runCatching { pm.getPackageInfo(context.packageName, 0) }
-                .onFailure { Log.e(TAG, "Failed to read package info", it) }
+                .onFailure { TelemetryLog.e(TAG, "Failed to read package info", it) }
                 .getOrNull()
             return AppInfo(
                 appName = runCatching { pm.getApplicationLabel(context.applicationInfo).toString() }
@@ -84,7 +84,7 @@ class DeviceInfoCollector(
                 )
             } catch (e: Exception) {
                 // Additive, non-critical enrichment — never let a device read break event delivery.
-                Log.e(TAG, "Failed to collect static device context", e)
+                TelemetryLog.e(TAG, "Failed to collect static device context", e)
                 emptyMap()
             }
         }
@@ -126,7 +126,7 @@ class DeviceInfoCollector(
                 else -> "unknown"
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to get network type", e)
+            TelemetryLog.e(TAG, "Failed to get network type", e)
             "unknown"
         }
     }

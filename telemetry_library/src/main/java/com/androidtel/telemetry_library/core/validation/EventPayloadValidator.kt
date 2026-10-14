@@ -1,6 +1,6 @@
 package com.androidtel.telemetry_library.core.validation
 
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
@@ -418,7 +418,7 @@ object EventPayloadValidator {
         return if (errors.isEmpty()) {
             EventValidationResult.Valid
         } else {
-            Log.w(TAG, "Validation failed: ${errors.joinToString("; ")}")
+            TelemetryLog.w(TAG, "Validation failed: ${errors.joinToString("; ")}")
             EventValidationResult.Invalid(errors)
         }
     }

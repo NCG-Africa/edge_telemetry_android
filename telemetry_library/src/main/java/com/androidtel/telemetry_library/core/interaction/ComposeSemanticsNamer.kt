@@ -1,6 +1,6 @@
 package com.androidtel.telemetry_library.core.interaction
 
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import android.view.View
 import androidx.compose.ui.node.RootForTest
 import androidx.compose.ui.semantics.Role
@@ -128,7 +128,7 @@ internal object ComposeSemanticsNamer {
 
     private fun warnOnce(t: Throwable) {
         if (!warned.compareAndSet(false, true)) return
-        Log.w(
+        TelemetryLog.w(
             "ComposeSemanticsNamer",
             "Compose semantics lookup failed; tap names fall back to compose_surface. This usually " +
                 "means an androidx.compose.ui API changed.",

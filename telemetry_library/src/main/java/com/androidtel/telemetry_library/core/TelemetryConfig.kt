@@ -21,7 +21,10 @@ data class TelemetryConfig(
     // leading dot -- as a true suffix: `.example.com` matches `api.example.com` and `api-v2.example.com`
     // but NOT `api.example.com.evil.com` or `evil-example.com`. `traceparent` is injected ONLY to hosts
     // in this list. Empty (the default) = inject nowhere; the SDK logs a one-time warning at init.
-    val traceHostAllowlist: List<String> = emptyList()
+    val traceHostAllowlist: List<String> = emptyList(),
+    // Verbose SDK logcat (v/d/i) via TelemetryLog. Off by default; never enable in release builds.
+    // Warnings and errors print either way. Profile fields are never logged (#140).
+    val debugMode: Boolean = false,
 ) {
     init {
         require(apiKey.isNotBlank()) { "apiKey must not be blank" }
