@@ -1,7 +1,7 @@
 package com.androidtel.telemetry_library.core.services
 
 import android.content.Context
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import com.androidtel.telemetry_library.core.TelemetryConfig
 import com.androidtel.telemetry_library.core.ids.IdGenerator
 import com.androidtel.telemetry_library.core.models.UserInfo
@@ -42,26 +42,26 @@ internal class UserProfileService(
         if (hasPendingProfile) {
             userProfileManager.setUserProfile(pendingName, pendingEmail, pendingPhone)
             clearPendingProfile()
-            Log.d(TAG, "Applied pending user profile")
+            TelemetryLog.d(TAG, "Applied pending user profile")
         }
         
-        Log.d(TAG, "UserProfileService initialized - User ID: $userId")
+        TelemetryLog.d(TAG, "UserProfileService initialized - User ID: $userId")
     }
     
     /**
      * Set user profile information
      */
     fun setUserProfile(name: String?, email: String?, phone: String? = null) {
-        Log.d(TAG, "setUserProfile() called - name: $name, email: $email, phone: $phone")
+        TelemetryLog.d(TAG, "setUserProfile() called")
         if (::userProfileManager.isInitialized) {
             userProfileManager.setUserProfile(name, email, phone)
-            Log.d(TAG, "User profile set successfully via userProfileManager")
+            TelemetryLog.d(TAG, "User profile set successfully via userProfileManager")
         } else {
             pendingName = name
             pendingEmail = email
             pendingPhone = phone
             hasPendingProfile = true
-            Log.i(TAG, "User profile stored as pending (will be applied after initialization)")
+            TelemetryLog.i(TAG, "User profile stored as pending (will be applied after initialization)")
         }
     }
     
@@ -71,9 +71,9 @@ internal class UserProfileService(
     fun clearUserProfile() {
         if (::userProfileManager.isInitialized) {
             userProfileManager.clearUserProfile()
-            Log.d(TAG, "User profile cleared")
+            TelemetryLog.d(TAG, "User profile cleared")
         } else {
-            Log.w(TAG, "UserProfileManager not initialized yet")
+            TelemetryLog.w(TAG, "UserProfileManager not initialized yet")
         }
     }
     
@@ -92,7 +92,7 @@ internal class UserProfileService(
         return if (resolvedId.isNotBlank()) {
             resolvedId
         } else {
-            Log.w(TAG, "User ID not initialized, generating fallback")
+            TelemetryLog.w(TAG, "User ID not initialized, generating fallback")
             "user_fallback_${System.currentTimeMillis()}"
         }
     }
@@ -114,7 +114,7 @@ internal class UserProfileService(
             phone = userProfile?.phone
         )
         
-        Log.d(TAG, "getUserInfo() - userId: ${userInfo.userId}, name: ${userInfo.name}, email: ${userInfo.email}, phone: ${userInfo.phone}")
+        TelemetryLog.d(TAG, "getUserInfo() - userId: ${userInfo.userId}")
         
         return userInfo
     }

@@ -1,7 +1,7 @@
 package com.androidtel.telemetry_library.core.services
 
 import android.content.Context
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import com.androidtel.telemetry_library.core.CountedEventQueue
 import com.androidtel.telemetry_library.core.TelemetryConfig
 import com.androidtel.telemetry_library.core.models.AppInfo
@@ -39,7 +39,7 @@ internal class EventTrackingService(
     fun initialize(appInfo: AppInfo?, deviceInfo: DeviceInfo) {
         this.appInfo = appInfo
         this.deviceInfo = deviceInfo
-        Log.d(TAG, "EventTrackingService initialized")
+        TelemetryLog.d(TAG, "EventTrackingService initialized")
     }
     
     /**

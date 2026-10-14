@@ -1,7 +1,7 @@
 package com.androidtel.telemetry_library.core.trace
 
 import android.os.SystemClock
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import com.androidtel.telemetry_library.core.TelemetryTime
 import com.androidtel.telemetry_library.core.ids.IdGenerator
 import kotlinx.coroutines.asContextElement
@@ -415,7 +415,7 @@ object TraceManager {
 
     private fun warnUnwiredOnce() {
         if (!unwiredWarned.compareAndSet(false, true)) return
-        Log.w(
+        TelemetryLog.w(
             "TraceManager",
             "No trace tag on this request — TelemetryManager.instrument(client) was never wired, so " +
                 "asynchronous calls (Retrofit suspend/enqueue) cannot be attributed to a user action. " +

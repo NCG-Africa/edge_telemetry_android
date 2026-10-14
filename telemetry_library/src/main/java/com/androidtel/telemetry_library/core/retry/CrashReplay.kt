@@ -1,7 +1,7 @@
 package com.androidtel.telemetry_library.core.retry
 
 import android.content.Context
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
@@ -36,7 +36,7 @@ internal object CrashReplay {
             WorkManager.getInstance(context)
                 .enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.REPLACE, work)
         } catch (e: Exception) {
-            Log.w(TAG, "Could not schedule fatal-crash replay", e)
+            TelemetryLog.w(TAG, "Could not schedule fatal-crash replay", e)
         }
     }
 }

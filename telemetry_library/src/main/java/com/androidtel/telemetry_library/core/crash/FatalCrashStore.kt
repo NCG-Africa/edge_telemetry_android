@@ -1,6 +1,6 @@
 package com.androidtel.telemetry_library.core.crash
 
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import com.androidtel.telemetry_library.core.TelemetryHttpClient
 import com.androidtel.telemetry_library.core.isRejected
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
@@ -47,7 +47,7 @@ internal object FatalCrashStore {
         return try {
             gson.fromJson(f.readText(), TelemetryBatch::class.java)
         } catch (e: Exception) {
-            Log.e(TAG, "Corrupt frozen-event file $fileName — deleting", e)
+            TelemetryLog.e(TAG, "Corrupt frozen-event file $fileName — deleting", e)
             f.delete()
             null
         }
@@ -72,7 +72,7 @@ internal object FatalCrashStore {
     ): Boolean {
         val batch = readBatch(filesDir, gson, fileName) ?: return true
         val result = client.sendBatch(batch)
-        if (result.isRejected()) Log.e(TAG, "Frozen $fileName rejected by the collector — deleting")
+        if (result.isRejected()) TelemetryLog.e(TAG, "Frozen $fileName rejected by the collector — deleting")
         return if (result.isSuccess || result.isRejected()) {
             delete(filesDir, fileName)
             true

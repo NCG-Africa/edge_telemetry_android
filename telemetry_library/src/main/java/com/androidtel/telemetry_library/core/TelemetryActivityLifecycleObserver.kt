@@ -4,7 +4,7 @@ import android.app.Activity
 import android.app.Application
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import androidx.fragment.app.FragmentActivity
 import com.androidtel.telemetry_library.core.interaction.UserInteractionTracker
 import com.androidtel.telemetry_library.core.navigation.NavigationStackTracker
@@ -21,7 +21,7 @@ class TelemetryActivityLifecycleObserver(
     private val performanceTracker: PerformanceTracker = PerformanceTrackerFactory.createPerformanceTracker(telemetryManager)
 
     override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
-        Log.d("TelemetryObserver", "Activity Created: ${activity.javaClass.simpleName}")
+        TelemetryLog.d("TelemetryObserver", "Activity Created: ${activity.javaClass.simpleName}")
 
         // Register Fragment observer
         if (activity is FragmentActivity) {
@@ -33,12 +33,12 @@ class TelemetryActivityLifecycleObserver(
     }
 
     override fun onActivityStarted(activity: Activity) {
-        Log.d("TelemetryObserver", "Activity Started: ${activity.javaClass.simpleName}")
+        TelemetryLog.d("TelemetryObserver", "Activity Started: ${activity.javaClass.simpleName}")
     }
 
     override fun onActivityResumed(activity: Activity) {
         val screenName = getScreenName(activity)
-        Log.d("TelemetryObserver", "Activity Resumed: $screenName")
+        TelemetryLog.d("TelemetryObserver", "Activity Resumed: $screenName")
 
         // Cold-start end marker (issue #95): first observed resume times app.start; later ones no-op.
         telemetryManager.notifyActivityResumed()
@@ -77,7 +77,7 @@ class TelemetryActivityLifecycleObserver(
 
     override fun onActivityPaused(activity: Activity) {
         val screenName = getScreenName(activity)
-        Log.d("TelemetryObserver", "Activity Paused: $screenName")
+        TelemetryLog.d("TelemetryObserver", "Activity Paused: $screenName")
 
         // Restore the original window callback to avoid leaks / double-wrapping on re-resume
         interactionTracker.detach(activity)
@@ -90,7 +90,7 @@ class TelemetryActivityLifecycleObserver(
 
     override fun onActivityStopped(activity: Activity) {
         val screenName = getScreenName(activity)
-        Log.d("TelemetryObserver", "Activity Stopped: ${activity.javaClass.simpleName}")
+        TelemetryLog.d("TelemetryObserver", "Activity Stopped: ${activity.javaClass.simpleName}")
 
         // End timing
         val durationMs = screenTimingTracker.endScreen(screenName)
@@ -100,7 +100,7 @@ class TelemetryActivityLifecycleObserver(
     }
 
     override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {
-        Log.d("TelemetryObserver", "Activity SaveInstanceState: ${activity.javaClass.simpleName}")
+        TelemetryLog.d("TelemetryObserver", "Activity SaveInstanceState: ${activity.javaClass.simpleName}")
 
         val screenName = getScreenName(activity)
 
@@ -113,7 +113,7 @@ class TelemetryActivityLifecycleObserver(
 
     override fun onActivityDestroyed(activity: Activity) {
         val screenName = getScreenName(activity)
-        Log.d("TelemetryObserver", "Activity Destroyed: ${activity.javaClass.simpleName}")
+        TelemetryLog.d("TelemetryObserver", "Activity Destroyed: ${activity.javaClass.simpleName}")
 
         // Stop performance tracking to prevent memory leaks
         performanceTracker.stop()

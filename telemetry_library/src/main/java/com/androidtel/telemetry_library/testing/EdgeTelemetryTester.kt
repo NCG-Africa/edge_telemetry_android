@@ -3,7 +3,7 @@ package com.androidtel.telemetry_library.testing
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import com.androidtel.telemetry_library.EdgeTelemetry
 import com.androidtel.telemetry_library.core.TelemetryTime
 import kotlinx.coroutines.CoroutineScope
@@ -23,9 +23,9 @@ object EdgeTelemetryTester {
     fun testCrashReporting(customMessage: String? = null) {
         try {
             EdgeTelemetry.getInstance().testCrashReporting(customMessage)
-            Log.i(TAG, "🧪 Crash reporting test initiated")
+            TelemetryLog.i(TAG, "🧪 Crash reporting test initiated")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to test crash reporting", e)
+            TelemetryLog.e(TAG, "❌ Failed to test crash reporting", e)
         }
     }
     
@@ -42,9 +42,9 @@ object EdgeTelemetryTester {
             edgeTelemetry.addBreadcrumb("Test system event", "system", "warning", mapOf("event" to "low_memory"))
             edgeTelemetry.addBreadcrumb("Test custom event", "custom", "debug", mapOf("test" to "true"))
             
-            Log.i(TAG, "🍞 Breadcrumb test completed - 4 breadcrumbs added")
+            TelemetryLog.i(TAG, "🍞 Breadcrumb test completed - 4 breadcrumbs added")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to test breadcrumbs", e)
+            TelemetryLog.e(TAG, "❌ Failed to test breadcrumbs", e)
         }
     }
     
@@ -62,16 +62,16 @@ object EdgeTelemetryTester {
                 phone = "+1234567890"
             )
             
-            Log.i(TAG, "👤 User profile test completed")
+            TelemetryLog.i(TAG, "👤 User profile test completed")
             
             // Clear user profile after a delay
             CoroutineScope(Dispatchers.IO).launch {
                 kotlinx.coroutines.delay(2000)
                 edgeTelemetry.clearUserProfile()
-                Log.i(TAG, "🧹 User profile cleared")
+                TelemetryLog.i(TAG, "🧹 User profile cleared")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to test user profile", e)
+            TelemetryLog.e(TAG, "❌ Failed to test user profile", e)
         }
     }
     
@@ -82,20 +82,20 @@ object EdgeTelemetryTester {
         try {
             val edgeTelemetry = EdgeTelemetry.getInstance()
             
-            Log.i(TAG, "📊 Current session: ${edgeTelemetry.getSessionId()}")
+            TelemetryLog.i(TAG, "📊 Current session: ${edgeTelemetry.getSessionId()}")
             
             // Start new session
             edgeTelemetry.startNewSession()
-            Log.i(TAG, "🚀 New session started: ${edgeTelemetry.getSessionId()}")
+            TelemetryLog.i(TAG, "🚀 New session started: ${edgeTelemetry.getSessionId()}")
             
             // End session after delay
             CoroutineScope(Dispatchers.IO).launch {
                 kotlinx.coroutines.delay(3000)
                 edgeTelemetry.endCurrentSession()
-                Log.i(TAG, "🏁 Session ended")
+                TelemetryLog.i(TAG, "🏁 Session ended")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to test session management", e)
+            TelemetryLog.e(TAG, "❌ Failed to test session management", e)
         }
     }
     
@@ -122,9 +122,9 @@ object EdgeTelemetryTester {
                 "success" to "true"
             ))
             
-            Log.i(TAG, "📊 Event tracking test completed - 3 events tracked")
+            TelemetryLog.i(TAG, "📊 Event tracking test completed - 3 events tracked")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to test event tracking", e)
+            TelemetryLog.e(TAG, "❌ Failed to test event tracking", e)
         }
     }
     
@@ -149,9 +149,9 @@ object EdgeTelemetryTester {
                 mapOf("manual" to "true")
             )
             
-            Log.i(TAG, "💥 Error tracking test completed - 2 errors tracked")
+            TelemetryLog.i(TAG, "💥 Error tracking test completed - 2 errors tracked")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to test error tracking", e)
+            TelemetryLog.e(TAG, "❌ Failed to test error tracking", e)
         }
     }
     
@@ -160,11 +160,11 @@ object EdgeTelemetryTester {
      */
     fun testApiKeyValidation() {
         try {
-            Log.i(TAG, "🔑 Testing API key validation...")
+            TelemetryLog.i(TAG, "🔑 Testing API key validation...")
             
             // Verify SDK is initialized (which validates API key)
             val edgeTelemetry = EdgeTelemetry.getInstance()
-            Log.i(TAG, "✅ SDK initialized with valid API key")
+            TelemetryLog.i(TAG, "✅ SDK initialized with valid API key")
             
             // Test authenticated connectivity by sending a test event
             edgeTelemetry.recordEvent("api_key.validation_test", mapOf(
@@ -172,7 +172,7 @@ object EdgeTelemetryTester {
                 "timestamp" to TelemetryTime.now()
             ))
             
-            Log.i(TAG, "📡 Test event sent with API key authentication")
+            TelemetryLog.i(TAG, "📡 Test event sent with API key authentication")
             
             // Add breadcrumb to verify authenticated request
             edgeTelemetry.addBreadcrumb(
@@ -182,11 +182,11 @@ object EdgeTelemetryTester {
                 mapOf("validation" to "success")
             )
             
-            Log.i(TAG, "✅ API key validation test completed successfully")
+            TelemetryLog.i(TAG, "✅ API key validation test completed successfully")
         } catch (e: IllegalStateException) {
-            Log.e(TAG, "❌ SDK not initialized - API key validation failed", e)
+            TelemetryLog.e(TAG, "❌ SDK not initialized - API key validation failed", e)
         } catch (e: Exception) {
-            Log.e(TAG, "❌ API key validation test failed", e)
+            TelemetryLog.e(TAG, "❌ API key validation test failed", e)
         }
     }
     
@@ -194,7 +194,7 @@ object EdgeTelemetryTester {
      * Run comprehensive test suite
      */
     fun runComprehensiveTest() {
-        Log.i(TAG, "🧪 Starting comprehensive EdgeTelemetry test suite...")
+        TelemetryLog.i(TAG, "🧪 Starting comprehensive EdgeTelemetry test suite...")
         
         try {
             // Test API key validation first
@@ -220,10 +220,10 @@ object EdgeTelemetryTester {
                 kotlinx.coroutines.delay(1000)
                 testCrashReporting("Comprehensive test crash")
                 
-                Log.i(TAG, "✅ Comprehensive test suite completed")
+                TelemetryLog.i(TAG, "✅ Comprehensive test suite completed")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Comprehensive test suite failed", e)
+            TelemetryLog.e(TAG, "❌ Comprehensive test suite failed", e)
         }
     }
     
@@ -231,22 +231,22 @@ object EdgeTelemetryTester {
      * Validate payload structure (for debugging)
      */
     fun validatePayloadStructure() {
-        Log.i(TAG, "🔍 Validating payload structure...")
+        TelemetryLog.i(TAG, "🔍 Validating payload structure...")
         
         try {
             val edgeTelemetry = EdgeTelemetry.getInstance()
             
-            Log.i(TAG, "Device ID: ${edgeTelemetry.getDeviceId()}")
-            Log.i(TAG, "User ID: ${edgeTelemetry.getUserId() ?: "Not set"}")
-            Log.i(TAG, "Session ID: ${edgeTelemetry.getSessionId()}")
+            TelemetryLog.i(TAG, "Device ID: ${edgeTelemetry.getDeviceId()}")
+            TelemetryLog.i(TAG, "User ID: ${edgeTelemetry.getUserId() ?: "Not set"}")
+            TelemetryLog.i(TAG, "Session ID: ${edgeTelemetry.getSessionId()}")
             
             // Add test breadcrumb and track test event to validate structure
             edgeTelemetry.addBreadcrumb("Payload validation test", "custom", "info")
             edgeTelemetry.recordEvent("payload.validation", mapOf("test" to "structure"))
             
-            Log.i(TAG, "✅ Payload structure validation completed")
+            TelemetryLog.i(TAG, "✅ Payload structure validation completed")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Payload structure validation failed", e)
+            TelemetryLog.e(TAG, "❌ Payload structure validation failed", e)
         }
     }
     
@@ -266,7 +266,7 @@ object EdgeTelemetryTester {
                 else -> "No Connection"
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to check network connectivity", e)
+            TelemetryLog.e(TAG, "Failed to check network connectivity", e)
             "Unknown"
         }
     }

@@ -169,6 +169,7 @@ The SDK skips its own collector requests, so there is no feedback loop.
 | `enableSessionTracking` | `Boolean` | `true` | Session lifecycle events |
 | `traceSampleRate` | `Double` | `1.0` | Head-based sampling; fixed at `1.0` in v3 |
 | `traceHostAllowlist` | `List<String>` | `emptyList()` | Hosts that receive `traceparent`; exact or `.suffix.example.com` |
+| `debugMode` | `Boolean` | `false` | SDK verbose/debug/info logcat; warnings + errors always print. Profile fields and ids never hit release logcat (#140) |
 
 Invalid values fail fast at construction (`IllegalArgumentException`).
 

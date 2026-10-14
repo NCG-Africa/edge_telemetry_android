@@ -4,7 +4,7 @@ import android.app.ActivityManager
 import android.content.Context
 import android.os.Build
 import android.os.Debug
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import java.io.File
 
 /**
@@ -48,7 +48,7 @@ class MemoryCapabilityTracker(
             memoryInfo["supports_advanced"] = deviceCapabilities.supportsAdvancedMemoryInfo
             
         } catch (e: Exception) {
-            Log.w(TAG, "Error collecting memory info: ${e.localizedMessage}")
+            TelemetryLog.w(TAG, "Error collecting memory info: ${e.localizedMessage}")
             memoryInfo["error"] = e.localizedMessage ?: "Unknown error"
         }
         
@@ -74,7 +74,7 @@ class MemoryCapabilityTracker(
                 "large_memory_class_mb" to activityManager.largeMemoryClass
             )
         } catch (e: Exception) {
-            Log.w(TAG, "Error getting memory summary: ${e.localizedMessage}")
+            TelemetryLog.w(TAG, "Error getting memory summary: ${e.localizedMessage}")
             mapOf("error" to (e.localizedMessage ?: "Unknown error"))
         }
     }
@@ -92,7 +92,7 @@ class MemoryCapabilityTracker(
             
             memInfo.lowMemory || availableMemoryMB < thresholdMB * 1.5
         } catch (e: Exception) {
-            Log.w(TAG, "Error checking memory pressure: ${e.localizedMessage}")
+            TelemetryLog.w(TAG, "Error checking memory pressure: ${e.localizedMessage}")
             false
         }
     }
@@ -139,7 +139,7 @@ class MemoryCapabilityTracker(
                 memoryInfo["native_heap_alloc_kb"] = nativeHeapAllocatedSize
                 memoryInfo["native_heap_free_kb"] = nativeHeapFreeSize
             } catch (e: Exception) {
-                Log.d(TAG, "Native heap info not available: ${e.localizedMessage}")
+                TelemetryLog.d(TAG, "Native heap info not available: ${e.localizedMessage}")
             }
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -149,7 +149,7 @@ class MemoryCapabilityTracker(
             }
             
         } catch (e: Exception) {
-            Log.w(TAG, "Error getting advanced memory info: ${e.localizedMessage}")
+            TelemetryLog.w(TAG, "Error getting advanced memory info: ${e.localizedMessage}")
         }
     }
     
@@ -166,7 +166,7 @@ class MemoryCapabilityTracker(
             }
             
         } catch (e: Exception) {
-            Log.w(TAG, "Error getting process memory info: ${e.localizedMessage}")
+            TelemetryLog.w(TAG, "Error getting process memory info: ${e.localizedMessage}")
         }
     }
     
@@ -187,7 +187,7 @@ class MemoryCapabilityTracker(
             memoryInfo["under_memory_pressure"] = isUnderMemoryPressure()
             
         } catch (e: Exception) {
-            Log.w(TAG, "Error getting memory pressure info: ${e.localizedMessage}")
+            TelemetryLog.w(TAG, "Error getting memory pressure info: ${e.localizedMessage}")
         }
     }
     
@@ -220,7 +220,7 @@ class MemoryCapabilityTracker(
             }
             
         } catch (e: Exception) {
-            Log.w(TAG, "Error getting storage info: ${e.localizedMessage}")
+            TelemetryLog.w(TAG, "Error getting storage info: ${e.localizedMessage}")
             storageInfo["error"] = e.localizedMessage ?: "Unknown error"
         }
         

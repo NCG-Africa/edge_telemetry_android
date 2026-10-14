@@ -6,7 +6,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.Build
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import androidx.annotation.RequiresApi
 
 /**
@@ -36,7 +36,7 @@ class NetworkCapabilityDetector(
                 getNetworkTypeLegacy()
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to get network type: ${e.localizedMessage}")
+            TelemetryLog.w(TAG, "Failed to get network type: ${e.localizedMessage}")
             "unknown"
         }
     }
@@ -52,7 +52,7 @@ class NetworkCapabilityDetector(
                 isConnectedLegacy()
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to check connectivity: ${e.localizedMessage}")
+            TelemetryLog.w(TAG, "Failed to check connectivity: ${e.localizedMessage}")
             false
         }
     }
@@ -88,7 +88,7 @@ class NetworkCapabilityDetector(
                     }
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to get detailed network capabilities: ${e.localizedMessage}")
+                TelemetryLog.w(TAG, "Failed to get detailed network capabilities: ${e.localizedMessage}")
             }
         }
         
@@ -100,12 +100,12 @@ class NetworkCapabilityDetector(
      */
     fun startNetworkMonitoring(onNetworkChanged: (String) -> Unit) {
         if (!deviceCapabilities.supportsNetworkCallback) {
-            Log.d(TAG, "Network callback not supported on API ${deviceCapabilities.apiLevel}")
+            TelemetryLog.d(TAG, "Network callback not supported on API ${deviceCapabilities.apiLevel}")
             return
         }
         
         if (isMonitoring) {
-            Log.d(TAG, "Network monitoring already active")
+            TelemetryLog.d(TAG, "Network monitoring already active")
             return
         }
         
@@ -113,18 +113,18 @@ class NetworkCapabilityDetector(
             networkCallback = object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
                     val networkType = getCurrentNetworkType()
-                    Log.d(TAG, "Network available: $networkType")
+                    TelemetryLog.d(TAG, "Network available: $networkType")
                     onNetworkChanged(networkType)
                 }
                 
                 override fun onLost(network: Network) {
-                    Log.d(TAG, "Network lost")
+                    TelemetryLog.d(TAG, "Network lost")
                     onNetworkChanged("disconnected")
                 }
                 
                 override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
                     val networkType = getCurrentNetworkType()
-                    Log.d(TAG, "Network capabilities changed: $networkType")
+                    TelemetryLog.d(TAG, "Network capabilities changed: $networkType")
                     onNetworkChanged(networkType)
                 }
             }
@@ -135,10 +135,10 @@ class NetworkCapabilityDetector(
                 
             connectivityManager.registerNetworkCallback(networkRequest, networkCallback!!)
             isMonitoring = true
-            Log.d(TAG, "Network monitoring started")
+            TelemetryLog.d(TAG, "Network monitoring started")
             
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to start network monitoring: ${e.localizedMessage}")
+            TelemetryLog.w(TAG, "Failed to start network monitoring: ${e.localizedMessage}")
         }
     }
     
@@ -149,9 +149,9 @@ class NetworkCapabilityDetector(
         networkCallback?.let { callback ->
             try {
                 connectivityManager.unregisterNetworkCallback(callback)
-                Log.d(TAG, "Network monitoring stopped")
+                TelemetryLog.d(TAG, "Network monitoring stopped")
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to stop network monitoring: ${e.localizedMessage}")
+                TelemetryLog.w(TAG, "Failed to stop network monitoring: ${e.localizedMessage}")
             }
         }
         networkCallback = null

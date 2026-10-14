@@ -2,7 +2,7 @@ package com.androidtel.telemetry_library.core
 
 import android.app.Activity
 import android.os.Build
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 
 /**
  * Unified performance tracking interface that provides consistent performance monitoring
@@ -22,7 +22,7 @@ object PerformanceTrackerFactory {
     private const val TAG = "PerformanceTrackerFactory"
     
     fun createPerformanceTracker(telemetryManager: TelemetryManager): PerformanceTracker {
-        Log.d(TAG, "Creating FrameMetrics-based performance tracker for API ${Build.VERSION.SDK_INT}")
+        TelemetryLog.d(TAG, "Creating FrameMetrics-based performance tracker for API ${Build.VERSION.SDK_INT}")
         return ModernPerformanceTracker(telemetryManager)
     }
 }

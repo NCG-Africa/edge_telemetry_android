@@ -1,6 +1,6 @@
 package com.androidtel.telemetry_library.core
 
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import com.androidtel.telemetry_library.BuildConfig
 import com.androidtel.telemetry_library.core.interceptors.ApiKeyRedactionInterceptor
 import com.androidtel.telemetry_library.core.models.AppOut
@@ -94,7 +94,7 @@ class TelemetryHttpClient(
                         in 200..299 -> return Result.success(Unit)
                         429 -> RateLimitedException(code, response.message)
                         in 400..499 -> {
-                            Log.e(TAG, "Batch rejected ($code ${response.message}); not retried.")
+                            TelemetryLog.e(TAG, "Batch rejected ($code ${response.message}); not retried.")
                             return Result.failure(ClientException(code, response.message))
                         }
                         in 500..599 -> ServerException(code, response.message)
@@ -104,7 +104,7 @@ class TelemetryHttpClient(
             } catch (e: Exception) {
                 last = e
             }
-            Log.e(TAG, "Send attempt ${attempt + 1}/$maxRetries failed: ${last.message}")
+            TelemetryLog.e(TAG, "Send attempt ${attempt + 1}/$maxRetries failed: ${last.message}")
             // Retry-After past the cap: stop now; the caller queues the batch and the flush tick
             // replays it later, rather than blocking the send path for the server's whole window.
             if (retryAfterMs != null && retryAfterMs > MAX_RETRY_AFTER_MS) break

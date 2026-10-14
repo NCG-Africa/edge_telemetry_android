@@ -1,7 +1,7 @@
 package com.androidtel.telemetry_library.core
 
 import android.os.Build
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 
 /**
  * Unified memory tracking interface that provides consistent memory telemetry
@@ -47,18 +47,18 @@ object MemoryTrackerFactory {
             when {
                 // Enhanced memory tracking (API 21+ with MemoryCapabilityTracker)
                 capabilities != null && memoryCapabilityTracker != null -> {
-                    Log.d(TAG, "Creating enhanced memory tracker for API ${Build.VERSION.SDK_INT}")
+                    TelemetryLog.d(TAG, "Creating enhanced memory tracker for API ${Build.VERSION.SDK_INT}")
                     EnhancedMemoryTracker(telemetryManager, memoryCapabilityTracker)
                 }
                 
                 // Basic memory tracking (fallback for API 21+)
                 else -> {
-                    Log.d(TAG, "Creating basic memory tracker for API ${Build.VERSION.SDK_INT}")
+                    TelemetryLog.d(TAG, "Creating basic memory tracker for API ${Build.VERSION.SDK_INT}")
                     BasicMemoryTracker(telemetryManager)
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Error creating memory tracker, using basic fallback: ${e.localizedMessage}")
+            TelemetryLog.w(TAG, "Error creating memory tracker, using basic fallback: ${e.localizedMessage}")
             BasicMemoryTracker(telemetryManager)
         }
     }
@@ -112,10 +112,10 @@ class EnhancedMemoryTracker(
                 )
             )
             
-            Log.d(TAG, "Enhanced memory usage recorded: ${heapUsedMb}MB, pressure=$pressureLevel")
+            TelemetryLog.d(TAG, "Enhanced memory usage recorded: ${heapUsedMb}MB, pressure=$pressureLevel")
             
         } catch (e: Exception) {
-            Log.w(TAG, "Error recording enhanced memory usage: ${e.localizedMessage}")
+            TelemetryLog.w(TAG, "Error recording enhanced memory usage: ${e.localizedMessage}")
         }
     }
     
@@ -150,7 +150,7 @@ class EnhancedMemoryTracker(
             )
             
         } catch (e: Exception) {
-            Log.w(TAG, "Error recording storage usage: ${e.localizedMessage}")
+            TelemetryLog.w(TAG, "Error recording storage usage: ${e.localizedMessage}")
         }
     }
     
@@ -160,7 +160,7 @@ class EnhancedMemoryTracker(
             val isUnderPressure = memoryCapabilityTracker.isUnderMemoryPressure()
             calculatePressureLevel(memorySummary, isUnderPressure)
         } catch (e: Exception) {
-            Log.w(TAG, "Error getting memory pressure: ${e.localizedMessage}")
+            TelemetryLog.w(TAG, "Error getting memory pressure: ${e.localizedMessage}")
             "unknown"
         }
     }
@@ -169,7 +169,7 @@ class EnhancedMemoryTracker(
         return try {
             memoryCapabilityTracker.isUnderMemoryPressure()
         } catch (e: Exception) {
-            Log.w(TAG, "Error checking memory pressure: ${e.localizedMessage}")
+            TelemetryLog.w(TAG, "Error checking memory pressure: ${e.localizedMessage}")
             false
         }
     }
@@ -257,16 +257,16 @@ class BasicMemoryTracker(
                 )
             )
             
-            Log.d(TAG, "Basic memory usage recorded: ${usedMb.toInt()}MB/${maxMb.toInt()}MB")
+            TelemetryLog.d(TAG, "Basic memory usage recorded: ${usedMb.toInt()}MB/${maxMb.toInt()}MB")
             
         } catch (e: Exception) {
-            Log.e(TAG, "Error recording basic memory usage: ${e.localizedMessage}")
+            TelemetryLog.e(TAG, "Error recording basic memory usage: ${e.localizedMessage}")
         }
     }
     
     override fun recordStorageUsage() {
         // Basic storage tracking not implemented in fallback
-        Log.d(TAG, "Storage tracking not available in basic mode")
+        TelemetryLog.d(TAG, "Storage tracking not available in basic mode")
     }
     
     override fun getCurrentMemoryPressure(): String {

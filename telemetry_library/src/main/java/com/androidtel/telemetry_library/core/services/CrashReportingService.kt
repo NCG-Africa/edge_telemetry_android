@@ -1,7 +1,7 @@
 package com.androidtel.telemetry_library.core.services
 
 import android.content.Context
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import com.androidtel.telemetry_library.core.TelemetryConfig
 import com.androidtel.telemetry_library.core.TelemetryHttpClient
 import com.androidtel.telemetry_library.core.TelemetryTime
@@ -69,9 +69,9 @@ internal class CrashReportingService(
 
         if (config.enableCrashReporting && crashHandlerInstalled.compareAndSet(false, true)) {
             installFatalHandler()
-            Log.d(TAG, "Fatal crash handler installed")
+            TelemetryLog.d(TAG, "Fatal crash handler installed")
         }
-        Log.d(TAG, "CrashReportingService initialized")
+        TelemetryLog.d(TAG, "CrashReportingService initialized")
     }
 
     // --- Durable-fatal rail ---
@@ -82,7 +82,7 @@ internal class CrashReportingService(
             try {
                 freezeFatalCrash(thread, throwable)
             } catch (e: Throwable) {
-                Log.e(TAG, "Failed to freeze fatal crash", e)
+                TelemetryLog.e(TAG, "Failed to freeze fatal crash", e)
             } finally {
                 // Preserve normal crash behaviour: hand off to the platform handler, which kills the
                 // process. The freeze above has already completed synchronously by this point.
@@ -124,7 +124,7 @@ internal class CrashReportingService(
      */
     suspend fun replayFatalCrashIfAny() {
         if (!FatalCrashStore.replayOnce(context.filesDir, httpClient, gson)) {
-            Log.w(TAG, "Fatal crash replay failed; scheduling WorkManager retry")
+            TelemetryLog.w(TAG, "Fatal crash replay failed; scheduling WorkManager retry")
             CrashReplay.schedule(context, config.apiKey, config.endpoint)
         }
     }
@@ -189,7 +189,7 @@ internal class CrashReportingService(
                 // thread's carrier, so without this cross-thread annotation a hang carries no action at
                 // all -- and a hang is exactly where "what was the user doing" matters most.
                 + TraceManager.annotateTerminal()
-        ) ?: Log.w(TAG, "Hang event sink not wired")
+        ) ?: TelemetryLog.w(TAG, "Hang event sink not wired")
     }
 
     // --- Normal batch rail ---
@@ -222,7 +222,7 @@ internal class CrashReportingService(
         stackTraceOverride: String? = null
     ) {
         if (!config.enableCrashReporting) {
-            Log.w(TAG, "Crash reporting not enabled")
+            TelemetryLog.w(TAG, "Crash reporting not enabled")
             return
         }
         val attrs = buildCrashAttributes(
@@ -234,7 +234,7 @@ internal class CrashReportingService(
             stackTraceOverride = stackTraceOverride,
             extra = attributes?.mapValues { it.value as Any } ?: emptyMap()
         )
-        recordCrashEventFn?.invoke(attrs) ?: Log.w(TAG, "Crash event sink not wired")
+        recordCrashEventFn?.invoke(attrs) ?: TelemetryLog.w(TAG, "Crash event sink not wired")
     }
 
     // --- Canonical app.crash attribute set (D1: unprefixed, natively-typed) ---
@@ -279,7 +279,7 @@ internal class CrashReportingService(
         data: Map<String, String>? = null
     ) {
         breadcrumbManager?.addBreadcrumb(message, category, level, data)
-            ?: Log.w(TAG, "Breadcrumb manager not initialized")
+            ?: TelemetryLog.w(TAG, "Breadcrumb manager not initialized")
     }
 
     // product_id is dropped from the wire (D1 follow-up); retained as a no-op so callers don't break.
@@ -291,7 +291,7 @@ internal class CrashReportingService(
         val message = customMessage ?: "Test crash from EdgeTelemetry SDK"
         breadcrumbManager?.addCustom("Test crash initiated", mapOf("test" to "true"))
         trackError(RuntimeException(message), mapOf("test.crash" to "true"))
-        Log.i(TAG, "Test crash reported: $message")
+        TelemetryLog.i(TAG, "Test crash reported: $message")
     }
 
     fun getBreadcrumbManager(): BreadcrumbManager? = breadcrumbManager

@@ -2,7 +2,7 @@ package com.androidtel.telemetry_library.core.ids
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import java.security.SecureRandom
 import java.util.UUID
 
@@ -78,7 +78,7 @@ class IdGenerator {
                     }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Device id unavailable; using a UUID fallback", e)
+            TelemetryLog.w(TAG, "Device id unavailable; using a UUID fallback", e)
             resolveFallbackId()
         }
     }

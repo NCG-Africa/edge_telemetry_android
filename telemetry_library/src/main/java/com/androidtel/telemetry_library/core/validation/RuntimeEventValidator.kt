@@ -1,6 +1,6 @@
 package com.androidtel.telemetry_library.core.validation
 
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import com.androidtel.telemetry_library.core.models.TelemetryEvent
 
 /**
@@ -55,7 +55,7 @@ class RuntimeEventValidator(
             )
             else -> {
                 if (debugMode) {
-                    Log.w(TAG, "Unknown event type: ${event.eventName}")
+                    TelemetryLog.w(TAG, "Unknown event type: ${event.eventName}")
                 }
                 EventValidationResult.Valid // Allow unknown events in non-strict mode
             }
@@ -69,8 +69,8 @@ class RuntimeEventValidator(
         
         // Log validation results in debug mode
         if (debugMode && !combinedResult.isValid) {
-            Log.w(TAG, "Event validation failed for ${event.eventName}:")
-            Log.w(TAG, combinedResult.getErrorReport())
+            TelemetryLog.w(TAG, "Event validation failed for ${event.eventName}:")
+            TelemetryLog.w(TAG, combinedResult.getErrorReport())
         }
         
         // In strict mode, throw exception on validation failure
