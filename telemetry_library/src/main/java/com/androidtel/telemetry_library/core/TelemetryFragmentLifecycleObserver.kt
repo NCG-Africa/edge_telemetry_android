@@ -3,7 +3,7 @@ package com.androidtel.telemetry_library.core
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import android.view.View
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
@@ -19,7 +19,7 @@ class TelemetryFragmentLifecycleObserver(private val telemetryManager: Telemetry
     override fun onFragmentResumed(fm: FragmentManager, f: Fragment) {
         super.onFragmentResumed(fm, f)
         val fragmentName = f.javaClass.simpleName
-        Log.d("TelemetryObserver", "Fragment Resumed: $fragmentName")
+        TelemetryLog.d("TelemetryObserver", "Fragment Resumed: $fragmentName")
 
         // Start tracking screen duration for this fragment
         screenTimingTracker.startScreen(fragmentName)
@@ -44,7 +44,7 @@ class TelemetryFragmentLifecycleObserver(private val telemetryManager: Telemetry
     override fun onFragmentPaused(fm: FragmentManager, f: Fragment) {
         super.onFragmentPaused(fm, f)
         val fragmentName = f.javaClass.simpleName
-        Log.d("TelemetryObserver", "Fragment Paused: $fragmentName")
+        TelemetryLog.d("TelemetryObserver", "Fragment Paused: $fragmentName")
 
         // End the screen timing and record the screen duration
         val durationMs = screenTimingTracker.endScreen(fragmentName)

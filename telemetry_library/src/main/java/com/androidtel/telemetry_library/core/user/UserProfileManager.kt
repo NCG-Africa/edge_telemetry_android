@@ -2,7 +2,7 @@ package com.androidtel.telemetry_library.core.user
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import com.androidtel.telemetry_library.core.ids.IdGenerator
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
@@ -62,7 +62,7 @@ class UserProfileManager(
             // Persist to SharedPreferences
             saveUserProfile()
             
-            Log.i(TAG, "User profile updated: name=$name, email=$email, phone=$phone")
+            TelemetryLog.i(TAG, "User profile updated")
         }
     }
     

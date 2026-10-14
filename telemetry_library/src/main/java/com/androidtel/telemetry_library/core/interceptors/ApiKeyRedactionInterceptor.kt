@@ -2,7 +2,7 @@ package com.androidtel.telemetry_library.core.interceptors
 
 import okhttp3.Interceptor
 import okhttp3.Response
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 
 /**
  * OkHttp interceptor that redacts API keys in logs for security.
@@ -33,7 +33,7 @@ class ApiKeyRedactionInterceptor(
             val apiKey = originalRequest.header(API_KEY_HEADER)
             if (apiKey != null) {
                 val redactedKey = redactApiKey(apiKey)
-                Log.d(TAG, "API Key: $redactedKey")
+                TelemetryLog.d(TAG, "API Key: $redactedKey")
             }
         }
         

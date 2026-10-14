@@ -1,6 +1,6 @@
 package com.androidtel.telemetry_library.core.breadcrumbs
 
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import com.google.gson.Gson
 import java.time.Instant
 import java.util.LinkedList
@@ -43,7 +43,7 @@ class BreadcrumbManager {
             }
         }
         
-        Log.d(TAG, "🍞 Breadcrumb added: [$category] $message")
+        TelemetryLog.d(TAG, "🍞 Breadcrumb added: [$category] $message")
     }
     
     /**
@@ -142,7 +142,7 @@ class BreadcrumbManager {
             try {
                 gson.toJson(breadcrumbs.toList())
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to serialize breadcrumbs", e)
+                TelemetryLog.e(TAG, "Failed to serialize breadcrumbs", e)
                 "[]"
             }
         }
@@ -169,7 +169,7 @@ class BreadcrumbManager {
         lock.write {
             breadcrumbs.clear()
         }
-        Log.d(TAG, "🧹 Breadcrumbs cleared")
+        TelemetryLog.d(TAG, "🧹 Breadcrumbs cleared")
     }
     
     /**

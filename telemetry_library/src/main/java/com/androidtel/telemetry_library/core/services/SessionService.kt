@@ -1,7 +1,7 @@
 package com.androidtel.telemetry_library.core.services
 
 import android.content.Context
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import com.androidtel.telemetry_library.core.TelemetryConfig
 import com.androidtel.telemetry_library.core.ids.IdGenerator
 import com.androidtel.telemetry_library.core.models.SessionInfo
@@ -81,7 +81,7 @@ internal class SessionService(
         // resume branch logs and does nothing. No double-decision, no double-mint.
         prefs.edit().putLong("last_active_timestamp", now).apply()
 
-        Log.d(TAG, "SessionService initialized - Session: $sessionId, Total: $totalSessions, " +
+        TelemetryLog.d(TAG, "SessionService initialized - Session: $sessionId, Total: $totalSessions, " +
             "resumed=$initResumed, timedOut=$initTimedOut")
     }
     
@@ -105,7 +105,7 @@ internal class SessionService(
         initResumed = false
         initTimedOut = false
 
-        Log.i(TAG, "New session started: $sessionId")
+        TelemetryLog.i(TAG, "New session started: $sessionId")
         return sessionId
     }
     
@@ -116,7 +116,7 @@ internal class SessionService(
         if (config.enableSessionTracking && enhancedSessionManager != null) {
             enhancedSessionManager!!.endCurrentSession()
         }
-        Log.i(TAG, "Session ended: $sessionId")
+        TelemetryLog.i(TAG, "Session ended: $sessionId")
     }
     
     /**

@@ -1,6 +1,6 @@
 package com.androidtel.telemetry_library.core.services
 
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import com.androidtel.telemetry_library.core.CountedEventQueue
 import com.androidtel.telemetry_library.core.OfflineBatchStorage
 import com.androidtel.telemetry_library.core.TelemetryConfig
@@ -48,7 +48,7 @@ internal class BatchProcessingService(
     fun initialize(onFlush: () -> Unit) {
         this.onFlush = onFlush
         startFlushTimer()
-        Log.d(TAG, "BatchProcessingService initialized")
+        TelemetryLog.d(TAG, "BatchProcessingService initialized")
     }
     
     /**
@@ -79,7 +79,7 @@ internal class BatchProcessingService(
         location: String? = null
     ) {
         if (!idsInitialized) {
-            Log.w(TAG, "Skipping batch send - IDs not properly initialized. Events remain queued (${eventQueue.size} events).")
+            TelemetryLog.w(TAG, "Skipping batch send - IDs not properly initialized. Events remain queued (${eventQueue.size} events).")
             return
         }
 
@@ -102,16 +102,16 @@ internal class BatchProcessingService(
             location = location
         )
         
-        Log.i(TAG, "Attempting to send a batch of ${batch.batchSize} events")
+        TelemetryLog.i(TAG, "Attempting to send a batch of ${batch.batchSize} events")
         val result = httpClient.sendBatch(batch)
 
         if (result.isSuccess) {
-            Log.i(TAG, "Successfully sent batch.")
+            TelemetryLog.i(TAG, "Successfully sent batch.")
         } else if (result.isRejected()) {
             // Resending can't succeed, so storing would only wedge replay (R12).
-            Log.e(TAG, "Batch of ${batch.batchSize} events rejected by the collector; dropped.")
+            TelemetryLog.e(TAG, "Batch of ${batch.batchSize} events rejected by the collector; dropped.")
         } else {
-            Log.e(TAG, "Failed to send batch. Storing offline.")
+            TelemetryLog.e(TAG, "Failed to send batch. Storing offline.")
             if (flushOffline) {
                 offlineStorage.storeBatch(batch)
             }
@@ -140,22 +140,22 @@ internal class BatchProcessingService(
     }
 
     private suspend fun replayStoredBatches() {
-        Log.i(TAG, "Checking for stored batches to send.")
+        TelemetryLog.i(TAG, "Checking for stored batches to send.")
         val storedBatches = offlineStorage.getStoredBatches()
         if (storedBatches.isEmpty()) return
 
-        Log.i(TAG, "Found ${storedBatches.size} stored batches. Replaying up to $REPLAY_BATCH_LIMIT.")
+        TelemetryLog.i(TAG, "Found ${storedBatches.size} stored batches. Replaying up to $REPLAY_BATCH_LIMIT.")
         for (batch in storedBatches.take(REPLAY_BATCH_LIMIT)) {
             val result = httpClient.sendBatch(batch)
             if (result.isSuccess) {
-                Log.i(TAG, "Successfully re-sent stored batch.")
+                TelemetryLog.i(TAG, "Successfully re-sent stored batch.")
                 offlineStorage.removeBatch(batch.id)
             } else if (result.isRejected()) {
                 // A rejection is about this batch, not the collector: drop it and keep draining (R12).
-                Log.e(TAG, "Stored batch rejected by the collector; dropped.")
+                TelemetryLog.e(TAG, "Stored batch rejected by the collector; dropped.")
                 offlineStorage.removeBatch(batch.id)
             } else {
-                Log.e(TAG, "Stored batch send failed; pausing replay until next flush tick.")
+                TelemetryLog.e(TAG, "Stored batch send failed; pausing replay until next flush tick.")
                 return
             }
         }
@@ -191,10 +191,10 @@ internal class BatchProcessingService(
                     events = eventsToStore
                 )
                 offlineStorage.storeBatch(batch)
-                Log.d(TAG, "Flushed ${eventsToStore.size} events to offline storage")
+                TelemetryLog.d(TAG, "Flushed ${eventsToStore.size} events to offline storage")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error flushing to offline storage", e)
+            TelemetryLog.e(TAG, "Error flushing to offline storage", e)
         }
     }
     
@@ -207,10 +207,10 @@ internal class BatchProcessingService(
             try {
                 onFlush?.invoke()
             } catch (e: Exception) {
-                Log.e(TAG, "Error in flush timer", e)
+                TelemetryLog.e(TAG, "Error in flush timer", e)
             }
         }, config.flushIntervalMs, config.flushIntervalMs, TimeUnit.MILLISECONDS)
-        Log.d(TAG, "Flush timer started with interval: ${config.flushIntervalMs}ms")
+        TelemetryLog.d(TAG, "Flush timer started with interval: ${config.flushIntervalMs}ms")
     }
     
     /**
@@ -219,7 +219,7 @@ internal class BatchProcessingService(
     fun stopFlushTimer() {
         flushTimer?.shutdown()
         flushTimer = null
-        Log.d(TAG, "Flush timer stopped")
+        TelemetryLog.d(TAG, "Flush timer stopped")
     }
     
     /**

@@ -4,7 +4,7 @@ import android.app.ActivityManager
 import android.app.ApplicationExitInfo
 import android.content.Context
 import android.os.Build
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import androidx.annotation.RequiresApi
 
 /**
@@ -43,7 +43,7 @@ internal object ExitInfoReader {
             result.newWatermark?.let { prefs.edit().putLong(KEY_WATERMARK, it).apply() }
         } catch (e: Exception) {
             // Never let a diagnostic read take down init. Buffer read can throw on odd OEM builds.
-            Log.w(TAG, "Exit-reason harvest failed", e)
+            TelemetryLog.w(TAG, "Exit-reason harvest failed", e)
         }
     }
 
@@ -66,7 +66,7 @@ internal object ExitInfoReader {
     private fun readTrace(info: ApplicationExitInfo): String? = try {
         info.traceInputStream?.bufferedReader()?.use { it.readText() }
     } catch (e: Exception) {
-        Log.w(TAG, "Exit trace read failed", e)
+        TelemetryLog.w(TAG, "Exit trace read failed", e)
         null
     }
 }

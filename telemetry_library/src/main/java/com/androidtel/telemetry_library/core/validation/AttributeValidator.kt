@@ -1,6 +1,6 @@
 package com.androidtel.telemetry_library.core.validation
 
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 
 /**
  * Validator for Standard Attributes
@@ -83,7 +83,7 @@ object AttributeValidator {
             ValidationResult.Success
         } else {
             val eventInfo = eventName?.let { " for event '$it'" } ?: ""
-            Log.w(TAG, "Standard attributes validation failed$eventInfo. Missing: $missingAttributes, Empty: $emptyAttributes")
+            TelemetryLog.w(TAG, "Standard attributes validation failed$eventInfo. Missing: $missingAttributes, Empty: $emptyAttributes")
             ValidationResult.Failure(missingAttributes, emptyAttributes)
         }
     }
@@ -127,7 +127,7 @@ object AttributeValidator {
         return if (allIssues.isEmpty()) {
             ValidationResult.Success
         } else {
-            Log.w(TAG, "$category validation failed. Missing: $missingAttributes, Empty: $emptyAttributes")
+            TelemetryLog.w(TAG, "$category validation failed. Missing: $missingAttributes, Empty: $emptyAttributes")
             ValidationResult.Failure(missingAttributes, emptyAttributes)
         }
     }

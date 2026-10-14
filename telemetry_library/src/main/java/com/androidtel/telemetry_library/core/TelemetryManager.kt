@@ -8,7 +8,7 @@ import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.os.Build
 import android.os.Process
-import android.util.Log
+import com.androidtel.telemetry_library.core.log.TelemetryLog
 import androidx.compose.runtime.Composable
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
@@ -149,7 +149,8 @@ class TelemetryManager private constructor(
          */
         fun initialize(application: Application, config: TelemetryConfig): TelemetryManager {
             // Step 1: Validate config (already done in TelemetryConfig.init)
-            Log.i("TelemetryManager", "Starting SDK initialization")
+            TelemetryLog.debug = config.debugMode
+            TelemetryLog.i("TelemetryManager", "Starting SDK initialization")
             
             return instance ?: synchronized(this) {
                 instance ?: TelemetryManager(
@@ -157,6 +158,8 @@ class TelemetryManager private constructor(
                     httpClient = TelemetryHttpClient(
                         telemetryUrl = config.endpoint,
                         apiKey = config.apiKey,
+                        // Stays off even with config.debugMode: OkHttp BODY logging would print the
+                        // batch, user.name/email/phone included, straight to logcat (#140).
                         debugMode = false,
                         // Mint the static device-context bundle once, here at init (issue #93).
                         staticDeviceContext = DeviceInfoCollector.collectStaticDeviceContext(
@@ -168,7 +171,7 @@ class TelemetryManager private constructor(
                     batchSize = config.batchSize,
                     apiKey = config.apiKey,
                     telemetryEndpoint = config.endpoint,
-                    debugMode = false,
+                    debugMode = config.debugMode,
                     config = config,
                 ).also { manager ->
                     instance = manager
@@ -279,6 +282,7 @@ class TelemetryManager private constructor(
             // Stop the flush timer too: a stale instance would keep replaying the shared offline
             // store under its own mutex, racing the next instance.
             instance?.takeIf { it::batchProcessingService.isInitialized }?.batchProcessingService?.stopFlushTimer()
+            TelemetryLog.debug = false
             instance = null
         }
     }
@@ -305,7 +309,7 @@ class TelemetryManager private constructor(
     private fun performInitializationSequence() {
         try {
             // Step 1: Config already validated in TelemetryConfig.init
-            Log.d("TelemetryManager", "Step 1: Config validated")
+            TelemetryLog.d("TelemetryManager", "Step 1: Config validated")
             TraceManager.traceSampleRate = config.traceSampleRate
             // Δ2 — build the normalized allowlist once; the interceptor's gate reads it via TraceManager.
             TraceManager.traceHostAllowlist =
@@ -314,7 +318,7 @@ class TelemetryManager private constructor(
             // request reports skipped_off_allowlist), but nothing told a developer on-device that they
             // had wired everything correctly and still propagated nothing.
             if (TraceManager.traceHostAllowlist.isEmpty()) {
-                Log.w(
+                TelemetryLog.w(
                     "TelemetryManager",
                     "traceHostAllowlist is empty — NO traceparent header will be injected on any " +
                         "request. Enumerate your API hosts to enable distributed tracing " +
@@ -326,27 +330,27 @@ class TelemetryManager private constructor(
             idGenerator = IdGenerator()
             idGenerator.initialize(context)
             deviceId = idGenerator.getOrGenerateDeviceId()
-            Log.d("TelemetryManager", "Step 2: Device ID initialized: $deviceId")
+            TelemetryLog.d("TelemetryManager", "Step 2: Device ID initialized: $deviceId")
             
             // Step 3: Collect and cache device info
             deviceInfo = collectDeviceInfo()
             initializeCapabilities()
-            Log.d("TelemetryManager", "Step 3: Device info collected")
+            TelemetryLog.d("TelemetryManager", "Step 3: Device info collected")
             
             // Step 4: Initialize Services (Phase 2 Architecture)
             eventTrackingService = EventTrackingService(context, config)
             eventTrackingService.initialize(appInfo, deviceInfo)
-            Log.d("TelemetryManager", "Step 4: EventTrackingService initialized")
+            TelemetryLog.d("TelemetryManager", "Step 4: EventTrackingService initialized")
             
             // Step 5: Initialize SessionService
             sessionService = SessionService(context, config, idGenerator)
             sessionService.initialize()
-            Log.d("TelemetryManager", "Step 5: SessionService initialized")
+            TelemetryLog.d("TelemetryManager", "Step 5: SessionService initialized")
             
             // Step 6: Initialize UserProfileService
             userProfileService = UserProfileService(context, config, idGenerator)
             userProfileService.initialize()
-            Log.d("TelemetryManager", "Step 6: UserProfileService initialized")
+            TelemetryLog.d("TelemetryManager", "Step 6: UserProfileService initialized")
             
             // Step 7: Initialize CrashReportingService
             // Crashes ride the same enrichment (buildAttributes) and event sink (recordEvent) as
@@ -360,7 +364,7 @@ class TelemetryManager private constructor(
                 recordCrashEventFn = { attrs -> recordEvent("app.crash", attrs) },
                 recordHangEventFn = { attrs -> recordEvent("app.hang", attrs) }
             )
-            Log.d("TelemetryManager", "Step 7: CrashReportingService initialized")
+            TelemetryLog.d("TelemetryManager", "Step 7: CrashReportingService initialized")
             
             // Step 8: Initialize BatchProcessingService
             batchProcessingService = BatchProcessingService(config, httpClient, offlineStorage, scope)
@@ -373,27 +377,27 @@ class TelemetryManager private constructor(
                     sendStoredBatches()
                 }
             })
-            Log.d("TelemetryManager", "Step 8: BatchProcessingService initialized")
+            TelemetryLog.d("TelemetryManager", "Step 8: BatchProcessingService initialized")
             
             // Step 9: Initialize legacy components for backward compatibility
             deviceInfoCollector = DeviceInfoCollector(context, idGenerator)
-            Log.d("TelemetryManager", "Step 9: Legacy components initialized")
+            TelemetryLog.d("TelemetryManager", "Step 9: Legacy components initialized")
 
             // Step 9b: Initialize memory tracker so memory metrics flow when sampled
             if (config.enableMemoryTracking) {
                 memoryTracker = MemoryTrackerFactory.createMemoryTracker(this)
-                Log.d("TelemetryManager", "Step 9b: MemoryTracker initialized")
+                TelemetryLog.d("TelemetryManager", "Step 9b: MemoryTracker initialized")
             }
             
             // Step 10: Mark as ready
             idsInitialized = true
             batchProcessingService.setIdsInitialized(true)
             isReady.set(true)
-            Log.d("TelemetryManager", "Step 10: SDK marked as ready")
+            TelemetryLog.d("TelemetryManager", "Step 10: SDK marked as ready")
             
             // Step 11: Drain pre-init queue
             drainPreInitQueue()
-            Log.d("TelemetryManager", "Step 11: Pre-init queue drained")
+            TelemetryLog.d("TelemetryManager", "Step 11: Pre-init queue drained")
             
             // Step 12: Register activity lifecycle callbacks if enabled
             if (config.enableScreenTracking && activityObserverRegistered.compareAndSet(false, true)) {
@@ -401,7 +405,7 @@ class TelemetryManager private constructor(
                 if (app != null) {
                     val observer = TelemetryActivityLifecycleObserver(this)
                     app.registerActivityLifecycleCallbacks(observer)
-                    Log.d("TelemetryManager", "Step 12: Activity lifecycle observer registered")
+                    TelemetryLog.d("TelemetryManager", "Step 12: Activity lifecycle observer registered")
 
                     // Step 12a: Cold-start timer (issue #95). Anchor = true fork time; importance
                     // captured now (at init) decides the background-start guard. The observer's first
@@ -437,7 +441,7 @@ class TelemetryManager private constructor(
                 } else {
                     // Roll back the CAS so a later retry with a proper Application context succeeds
                     activityObserverRegistered.set(false)
-                    Log.w("TelemetryManager", "Step 12: Context is not Application, cannot register activity observer")
+                    TelemetryLog.w("TelemetryManager", "Step 12: Context is not Application, cannot register activity observer")
                 }
             }
 
@@ -452,16 +456,16 @@ class TelemetryManager private constructor(
             // Step 13: Register ProcessLifecycleOwner observer if enabled
             if (config.enableLifecycleTracking && processObserverRegistered.compareAndSet(false, true)) {
                 ProcessLifecycleOwner.get().lifecycle.addObserver(this)
-                Log.d("TelemetryManager", "Step 13: Process lifecycle observer registered")
+                TelemetryLog.d("TelemetryManager", "Step 13: Process lifecycle observer registered")
             }
             
             // Step 14: Instantiate TelemetryInterceptor if enabled
             if (config.enableNetworkTracking) {
                 telemetryInterceptor = TelemetryInterceptor(this, telemetryEndpoint)
-                Log.d("TelemetryManager", "Step 14: Network interceptor instantiated")
+                TelemetryLog.d("TelemetryManager", "Step 14: Network interceptor instantiated")
             }
             
-            Log.i("TelemetryManager", "SDK initialization complete - All modules active")
+            TelemetryLog.i("TelemetryManager", "SDK initialization complete - All modules active")
 
             // Step 15: Session boundary emission (issue #53, load-then-decide).
             // - Timed-out cold start: finalize the persisted (dead) session once, then start new.
@@ -486,7 +490,7 @@ class TelemetryManager private constructor(
             }
 
         } catch (e: Exception) {
-            Log.e("TelemetryManager", "Failed to complete initialization sequence", e)
+            TelemetryLog.e("TelemetryManager", "Failed to complete initialization sequence", e)
             throw e
         }
     }
@@ -546,7 +550,7 @@ class TelemetryManager private constructor(
                 memoryTracker?.recordStorageUsage()
             }
         } catch (e: Exception) {
-            Log.w("TelemetryManager", "Memory sample failed: ${e.localizedMessage}")
+            TelemetryLog.w("TelemetryManager", "Memory sample failed: ${e.localizedMessage}")
         }
     }
 
@@ -556,7 +560,7 @@ class TelemetryManager private constructor(
         super.onStart(owner)
         if (!config.enableLifecycleTracking) return
 
-        Log.i("TelemetryManager", "App moved to foreground")
+        TelemetryLog.i("TelemetryManager", "App moved to foreground")
 
         // 1. Check session timeout and start new session if needed
         // (Offline-stored envelopes replay via the flush tick — see sendStoredBatches — not by
@@ -571,11 +575,11 @@ class TelemetryManager private constructor(
                 ))
             }
             sessionService.startNewSession()
-            Log.i("TelemetryManager", "Started new session: ${sessionService.getCurrentSessionId()}")
+            TelemetryLog.i("TelemetryManager", "Started new session: ${sessionService.getCurrentSessionId()}")
             emitSessionStartedEvent()
         } else {
             val elapsed = System.currentTimeMillis() - sessionService.getLastActiveTimestamp()
-            Log.i("TelemetryManager", "Resuming existing session (elapsed: ${elapsed}ms)")
+            TelemetryLog.i("TelemetryManager", "Resuming existing session (elapsed: ${elapsed}ms)")
         }
         
         // 2. Resume the flush timer
@@ -593,7 +597,7 @@ class TelemetryManager private constructor(
         super.onStop(owner)
         if (!config.enableLifecycleTracking) return
         
-        Log.i("TelemetryManager", "App moved to background")
+        TelemetryLog.i("TelemetryManager", "App moved to background")
         
         // 1. Flush in-memory event queue to offline buffer
         scope.launch {
@@ -679,7 +683,7 @@ class TelemetryManager private constructor(
     )
     fun recordError(throwable: Throwable, attributes: Map<String, Any> = emptyMap()) {
         if (debugMode) {
-            Log.w("TelemetryManager", "recordError() is deprecated. Use recordCrash() instead. Recording as app.crash.")
+            TelemetryLog.w("TelemetryManager", "recordError() is deprecated. Use recordCrash() instead. Recording as app.crash.")
         }
         recordCrash(throwable)
     }
@@ -807,7 +811,7 @@ class TelemetryManager private constructor(
         networkCapabilityDetector = NetworkCapabilityDetector(context, deviceCapabilities)
         memoryCapabilityTracker = MemoryCapabilityTracker(context, deviceCapabilities)
         
-        Log.i("TelemetryManager", "Device capabilities initialized for API ${deviceCapabilities.apiLevel}")
+        TelemetryLog.i("TelemetryManager", "Device capabilities initialized for API ${deviceCapabilities.apiLevel}")
         
         // Log comprehensive capability information
         logCapabilityDetails()
@@ -820,38 +824,38 @@ class TelemetryManager private constructor(
      * Log detailed capability information for debugging
      */
     private fun logCapabilityDetails() {
-        Log.i("TelemetryManager", "=== Device Capability Report ===")
-        Log.i("TelemetryManager", "API Level: ${deviceCapabilities.apiLevel} (Android ${deviceCapabilities.androidVersion})")
+        TelemetryLog.i("TelemetryManager", "=== Device Capability Report ===")
+        TelemetryLog.i("TelemetryManager", "API Level: ${deviceCapabilities.apiLevel} (Android ${deviceCapabilities.androidVersion})")
         
-        Log.i("TelemetryManager", "Performance Features:")
-        Log.i("TelemetryManager", "  Frame Metrics: ${if (deviceCapabilities.canCollectFrameMetrics) "✓ Enabled" else "✗ Disabled (API < 24)"}")
-        Log.i("TelemetryManager", "  Advanced Memory: ${if (deviceCapabilities.canCollectAdvancedMemoryMetrics) "✓ Enabled" else "✗ Basic Mode"}")
+        TelemetryLog.i("TelemetryManager", "Performance Features:")
+        TelemetryLog.i("TelemetryManager", "  Frame Metrics: ${if (deviceCapabilities.canCollectFrameMetrics) "✓ Enabled" else "✗ Disabled (API < 24)"}")
+        TelemetryLog.i("TelemetryManager", "  Advanced Memory: ${if (deviceCapabilities.canCollectAdvancedMemoryMetrics) "✓ Enabled" else "✗ Basic Mode"}")
         
-        Log.i("TelemetryManager", "Network Features:")
-        Log.i("TelemetryManager", "  Modern Networking: ${if (deviceCapabilities.canUseModernNetworkAPIs) "✓ Enabled" else "✗ Legacy Mode"}")
-        Log.i("TelemetryManager", "  Network Callbacks: ${if (deviceCapabilities.supportsNetworkCallback) "✓ Enabled" else "✗ Not Available"}")
+        TelemetryLog.i("TelemetryManager", "Network Features:")
+        TelemetryLog.i("TelemetryManager", "  Modern Networking: ${if (deviceCapabilities.canUseModernNetworkAPIs) "✓ Enabled" else "✗ Legacy Mode"}")
+        TelemetryLog.i("TelemetryManager", "  Network Callbacks: ${if (deviceCapabilities.supportsNetworkCallback) "✓ Enabled" else "✗ Not Available"}")
         
-        Log.i("TelemetryManager", "System Features:")
-        Log.i("TelemetryManager", "  Runtime Permissions: ${if (deviceCapabilities.canHandleRuntimePermissions) "✓ Enabled" else "✗ Manifest Only"}")
-        Log.i("TelemetryManager", "  Scoped Storage: ${if (deviceCapabilities.canUseScopedStorage) "✓ Enabled" else "✗ Legacy Storage"}")
-        Log.i("TelemetryManager", "  Notification Channels: ${if (deviceCapabilities.supportsNotificationChannels) "✓ Enabled" else "✗ Legacy Notifications"}")
+        TelemetryLog.i("TelemetryManager", "System Features:")
+        TelemetryLog.i("TelemetryManager", "  Runtime Permissions: ${if (deviceCapabilities.canHandleRuntimePermissions) "✓ Enabled" else "✗ Manifest Only"}")
+        TelemetryLog.i("TelemetryManager", "  Scoped Storage: ${if (deviceCapabilities.canUseScopedStorage) "✓ Enabled" else "✗ Legacy Storage"}")
+        TelemetryLog.i("TelemetryManager", "  Notification Channels: ${if (deviceCapabilities.supportsNotificationChannels) "✓ Enabled" else "✗ Legacy Notifications"}")
         
-        Log.i("TelemetryManager", "Hardware Features:")
-        Log.i("TelemetryManager", "  Camera: ${if (deviceCapabilities.hasCamera) "✓" else "✗"}")
-        Log.i("TelemetryManager", "  WiFi: ${if (deviceCapabilities.hasWifi) "✓" else "✗"}")
-        Log.i("TelemetryManager", "  Cellular: ${if (deviceCapabilities.hasTelephony) "✓" else "✗"}")
-        Log.i("TelemetryManager", "  GPS: ${if (deviceCapabilities.hasGps) "✓" else "✗"}")
+        TelemetryLog.i("TelemetryManager", "Hardware Features:")
+        TelemetryLog.i("TelemetryManager", "  Camera: ${if (deviceCapabilities.hasCamera) "✓" else "✗"}")
+        TelemetryLog.i("TelemetryManager", "  WiFi: ${if (deviceCapabilities.hasWifi) "✓" else "✗"}")
+        TelemetryLog.i("TelemetryManager", "  Cellular: ${if (deviceCapabilities.hasTelephony) "✓" else "✗"}")
+        TelemetryLog.i("TelemetryManager", "  GPS: ${if (deviceCapabilities.hasGps) "✓" else "✗"}")
         
         // Log current network status
         val networkType = networkCapabilityDetector.getCurrentNetworkType()
         val isConnected = networkCapabilityDetector.isConnected()
-        Log.i("TelemetryManager", "Current Network: $networkType (Connected: $isConnected)")
+        TelemetryLog.i("TelemetryManager", "Current Network: $networkType (Connected: $isConnected)")
         
         // Log memory status
         val memoryPressure = memoryCapabilityTracker.isUnderMemoryPressure()
-        Log.i("TelemetryManager", "Memory Pressure: ${if (memoryPressure) "High" else "Normal"}")
+        TelemetryLog.i("TelemetryManager", "Memory Pressure: ${if (memoryPressure) "High" else "Normal"}")
         
-        Log.i("TelemetryManager", "=== End Capability Report ===")
+        TelemetryLog.i("TelemetryManager", "=== End Capability Report ===")
     }
     
     /**
@@ -860,7 +864,7 @@ class TelemetryManager private constructor(
     private fun recordCapabilityTelemetry() {
         if (!config.enableCapabilityEvents) {
             if (debugMode) {
-                Log.d("TelemetryManager", "Capability events disabled - skipping telemetry.capabilities_initialized")
+                TelemetryLog.d("TelemetryManager", "Capability events disabled - skipping telemetry.capabilities_initialized")
             }
             return
         }
@@ -880,9 +884,9 @@ class TelemetryManager private constructor(
                 )
             )
             
-            Log.d("TelemetryManager", "Capability telemetry recorded")
+            TelemetryLog.d("TelemetryManager", "Capability telemetry recorded")
         } catch (e: Exception) {
-            Log.w("TelemetryManager", "Failed to record capability telemetry: ${e.localizedMessage}")
+            TelemetryLog.w("TelemetryManager", "Failed to record capability telemetry: ${e.localizedMessage}")
         }
     }
     
@@ -1160,11 +1164,11 @@ class TelemetryManager private constructor(
                 action?.invoke()
                 drained++
             } catch (e: Exception) {
-                Log.e("TelemetryManager", "Error executing pre-init queued action", e)
+                TelemetryLog.e("TelemetryManager", "Error executing pre-init queued action", e)
             }
         }
         if (drained > 0) {
-            Log.i("TelemetryManager", "Drained $drained pre-init queued calls")
+            TelemetryLog.i("TelemetryManager", "Drained $drained pre-init queued calls")
         }
     }
 
