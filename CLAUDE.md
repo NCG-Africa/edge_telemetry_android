@@ -30,7 +30,7 @@ Android telemetry library (AAR) published via JitPack as `com.github.NCG-Africa:
 - **Kotlin:** 2.1.0 | **AGP:** 8.7.1
 - **Java:** 11 (source + target)
 - **Gradle:** 8.4+
-- **Current version:** 4.0.0
+- **Current version:** 4.0.1
 
 ## Project Structure
 
