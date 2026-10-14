@@ -5,7 +5,21 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [4.0.0] - Unreleased
+## [4.0.1] - 2026-10-14
+
+First published 4.x build. Contains everything listed under 4.0.0 below (never tagged) plus the fix
+below. The batch `contract_version` stays `"4.0.0"`; `sdk.version` is `"4.0.1"`.
+
+> ⚠️ **Install the EdgeTelemetry backend release (deployment, analytics, processor, collector) before
+> shipping this build.** See 4.0.0.
+
+### 🔒 Security
+
+- **No personal data in logcat** (#140, SDK-001): all logging goes through `TelemetryLog`;
+  verbose/debug/info lines only print when `debugMode` is on, and user name, email and phone are
+  never logged.
+
+## [4.0.0] - Not published (superseded by 4.0.1)
 
 > ⚠️ **Install the EdgeTelemetry backend release (deployment, analytics, processor, collector) before
 > shipping this build.** 4.0 sends app, SDK and device identity once per batch instead of on every

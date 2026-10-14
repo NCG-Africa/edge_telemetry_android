@@ -10,7 +10,7 @@ Android RUM SDK: crashes, ANRs, app-exit reasons, cold-start timing, screens, se
 user interactions, and distributed traces — collected automatically after a two-line init and shipped
 to the EdgeTelemetry collector in batches.
 
-**Current release: `4.0.0`** *(unreleased — tagged only after the backend release passes acceptance; until then `2.3.0` is the latest published)*
+**Current release: `4.0.1`**
 
 > ⚠️ **Install the EdgeTelemetry backend release (deployment, analytics, processor, collector) before
 > shipping any 4.0 build.** 4.0 sends identity once per batch (contract `4.0.0`), not per event; an
@@ -67,7 +67,7 @@ dependencyResolutionManagement {
 
 ```groovy
 // app/build.gradle
-implementation 'com.github.NCG-Africa:edge_telemetry_android:4.0.0'
+implementation 'com.github.NCG-Africa:edge_telemetry_android:4.0.1'
 ```
 
 **Java 8 bytecode** (apps whose `compileOptions` are pinned to 1.8) — built from the
