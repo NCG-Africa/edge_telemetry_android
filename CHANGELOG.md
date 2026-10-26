@@ -19,12 +19,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (foreground, tap, navigation) finalizes the idle session and starts a new one. Passive events (http,
   memory, frames) don't count as activity, so they can't keep a session alive.
 - **Offline storage is sent before live events**, so a session's stored events can't arrive after
-  its finalize.
+  its finalize. At the 200-envelope cap a live batch is sent rather than parked, so nothing stored is
+  evicted to make room for it.
+- **A timed-out session's finalize waits for the previous launch's crash/ANR replay.** A replay that
+  fails at launch is retried by WorkManager and can still land later.
+- **Event/metric counts are saved on every flush tick**, so an app killed in the foreground reports
+  counts at most one flush interval stale.
 
 ### Changed
 
-- **`http.url` is templated on device** (RN v4 contract §4.4.1): `host[:port]` + path, no scheme,
-  query or fragment. A segment with a digit or ≥ 32 chars becomes `{id}` (except `vN`); trailing
+- **`http.url` is templated on device** (same rule as RN §4.4.1; spec in
+  `docs/specs/backend-wire-contract.md` §4.3.1): `host[:port]` + path, no scheme, query or fragment.
+  A percent-encoded segment with a digit or ≥ 32 chars becomes `{id}` (except `vN`, any case); trailing
   slash dropped; depth capped at 6 then `/…`; empty path → `/`. e.g.
   `https://api.example.com/v2/users/42?x=1` → `api.example.com/v2/users/{id}`.
 

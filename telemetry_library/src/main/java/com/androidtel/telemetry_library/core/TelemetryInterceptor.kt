@@ -96,13 +96,14 @@ class TelemetryInterceptor(
     }
 }
 
-private val VERSION_SEGMENT = Regex("v\\d+")
+private val VERSION_SEGMENT = Regex("v\\d+", RegexOption.IGNORE_CASE)
 private const val MAX_PATH_DEPTH = 6
 
 /**
  * RN v4 contract §4.4.1 (#143): `host[:port]` + templated path — no scheme, query or fragment. A
- * segment becomes `{id}` unless it is `vN`, and does if it holds any digit or is ≥ 32 chars. Trailing
- * slash dropped, no case folding, depth capped at 6 then `/…`, empty path → `/`. Port it verbatim.
+ * segment becomes `{id}` unless it is `vN` (any case), and does if it holds any digit or is ≥ 32 chars, both
+ * judged on the percent-encoded segment as RN judges `URL.pathname`. Trailing
+ * slash dropped, no case folding, depth capped at 6 then `/…`, empty path → `/`. Spec: backend-wire-contract.md §4.3.1.
  */
 internal fun templateUrl(url: HttpUrl): String {
     val host = if (':' in url.host) "[${url.host}]" else url.host // IPv6 literal

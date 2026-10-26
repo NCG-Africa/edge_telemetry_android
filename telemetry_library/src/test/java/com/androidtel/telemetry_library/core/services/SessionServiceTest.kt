@@ -406,6 +406,26 @@ class SessionServiceTest {
     }
 
     @Test
+    fun `counts saved mid-session survive a foreground death into the timed-out finalize`() {
+        every { idGenerator.generateSessionId() } returns "dies-in-foreground"
+        service.initialize()
+        val seeded = sharedPrefs.getLong("last_active_timestamp", 0)
+        Thread.sleep(5)
+        service.saveCounts(eventCount = 42, metricCount = 7)
+        assertEquals(seeded, sharedPrefs.getLong("last_active_timestamp", -1)) // last-active untouched
+        sharedPrefs.edit()
+            .putLong("last_active_timestamp", System.currentTimeMillis() - config.sessionTimeoutMs - 1000)
+            .apply()
+
+        every { idGenerator.generateSessionId() } returns "next"
+        val f = SessionService(context, config, idGenerator).apply { initialize() }.getFinalizedSessionAttrs()!!
+
+        assertEquals("dies-in-foreground", f["session.id"])
+        assertEquals(42, f["session.event_count"])
+        assertEquals(7, f["session.metric_count"])
+    }
+
+    @Test
     fun `active duration ends at last activity, not at the moment the timeout is noticed`() {
         service.initialize()
         val start = service.getSessionStartTime()

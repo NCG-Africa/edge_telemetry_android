@@ -267,6 +267,24 @@ class BatchProcessingServiceTest {
     }
 
     @Test
+    fun `at the storage cap a live batch is sent rather than parked, so no stored envelope is evicted`() = runTest {
+        service.setIdsInitialized(true)
+        val full = List(com.androidtel.telemetry_library.core.OfflineBatchStorage.MAX_ENVELOPES) { i ->
+            mockk<TelemetryBatch>(relaxed = true) { every { id } returns "b$i" }
+        }
+        coEvery { offlineStorage.getStoredBatches() } returns full
+        coEvery { httpClient.sendBatch(any()) } answers {
+            if (firstArg<TelemetryBatch>() in full) Result.failure(java.io.IOException("x")) else Result.success(Unit)
+        }
+        val queue = CountedEventQueue().apply { enqueue(mockk(relaxed = true)) }
+
+        service.sendBatch(queue, forceSend = true)
+
+        coVerify(exactly = 0) { offlineStorage.storeBatch(any()) }
+        coVerify { httpClient.sendBatch(match { it !in full }) }
+    }
+
+    @Test
     fun `an empty live send still replays offline storage, so the flush tick drains it`() = runTest {
         service.setIdsInitialized(true)
         val stored = mockk<TelemetryBatch>(relaxed = true) { every { id } returns "old" }

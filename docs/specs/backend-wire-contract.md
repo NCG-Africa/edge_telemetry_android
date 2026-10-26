@@ -255,21 +255,49 @@ The nine `device.*` keys at `DeviceInfoCollector.kt:53-61` are a launch-time bun
 
 ### 4.3 `http.request`
 
-`TelemetryInterceptor.kt:46-59`, plus the trace attrs merged at `:56`.
+`TelemetryInterceptor.intercept()` builds the map in its `finally` block; trace attrs are merged from the `TraceManager` decision.
 
 | Key | Type | Null? | Cardinality | Call | Now | Source |
 |---|---|---|---|---|---|---|
-| `http.url` | String | never | high | COL (join/dim) | ❌ | `templateUrl()` in `TelemetryInterceptor.kt` — `host[:port]` + templated path, no scheme/query/fragment (#143, RN v4 contract §4.4.1) |
-| `http.method` | String | never | ~8 | COL (dim) | ❌ | `:48` |
-| `http.status_code` | Int | never (`0` on transport failure) | ~60 | COL (dim) | ❌ | `:49`, `0` at `:44` |
-| `http.duration_ms` | Long | never | measure | COL (measure) | ❌ | `:50` |
-| `http.success` | Bool | never | 2 | COL (dim) | ❌ | `:51` |
-| `http.request_size` | Long | **omitted** when chunked/streamed | measure | COL (measure) | ❌ | `:54` |
-| `http.response_size` | Long | **omitted** when chunked/streamed | measure | COL (measure) | ❌ | `:55` |
+| `http.url` | String | never | ~100s (templated) | COL (join/dim) | ❌ | `templateUrl()` — §4.3.1 |
+| `http.method` | String | never | ~8 | COL (dim) | ❌ | `request.method` |
+| `http.status_code` | Int | never (`0` on transport failure) | ~60 | COL (dim) | ❌ | `response?.code ?: 0` |
+| `http.duration_ms` | Long | never | measure | COL (measure) | ❌ | `nanoTime` delta |
+| `http.success` | Bool | never | 2 | COL (dim) | ❌ | `status_code in 200..299` |
+| `http.request_size` | Long | **omitted** when chunked/streamed | measure | COL (measure) | ❌ | `request.body?.contentLength()` |
+| `http.response_size` | Long | **omitted** when chunked/streamed | measure | COL (measure) | ❌ | `response.body?.contentLength()` |
 
-> `http.status_code = 0` means the call never got a response (DNS, TLS, timeout, cancellation) — `response?.code ?: 0` at `:44`. It is not an HTTP status. Dashboards must treat `0` as a distinct failure bucket, not fold it into 5xx.
+> `http.status_code = 0` means the call never got a response (DNS, TLS, timeout, cancellation) — `response?.code ?: 0`. It is not an HTTP status. Dashboards must treat `0` as a distinct failure bucket, not fold it into 5xx.
 
-> `http.request_size` / `http.response_size` are a true optional pair: `contentLength()` returns `-1` for chunked bodies and the SDK omits the key rather than sending a false `0` (`:52-55`). The column stays NULL.
+> `http.request_size` / `http.response_size` are a true optional pair: `contentLength()` returns `-1` for chunked bodies and the SDK omits the key rather than sending a false `0`. The column stays NULL.
+
+#### 4.3.1 `http.url` — templated on device, nothing raw leaves it (#143)
+
+The same rule as the React Native SDK's contract §4.4.1 (`normalizeRoute()`), so every SDK lands
+the same endpoint in the same `rum_http_requests.url` row. Port it verbatim; do not "improve" it.
+
+```
+http.url = authority + route
+
+authority = host            when the port is the scheme's default
+          | host ":" port   otherwise            (IPv6 literal bracketed: "[::1]:8080")
+route     = "/"                                  when the path has no non-empty segment
+          | "/" + kept.join("/") [+ "/…"]        "/…" only when there were more than 6 segments
+kept      = first 6 non-empty segments, each isVariable(s) ? "{id}" : s
+
+isVariable(s):                                   s is the percent-encoded segment, as in URL.pathname
+  1. /^v\d+$/i   → false   // version carve-out, any case: /v2/ and /V2/ survive
+  2. /\d/        → true    // any digit (so any %xx escape too)
+  3. length ≥ 32 → true    // opaque all-alpha token / dashless UUID
+  otherwise      → false
+```
+
+No scheme, query or fragment. Trailing slash dropped (empty segments are skipped). No case folding.
+`https://api.example.com/v2/users/42/orders?x=1#f` → `api.example.com/v2/users/{id}/orders`.
+
+**Accepted residue:** an all-alpha slug that identifies one record (`/accounts/savings`) survives;
+guessing harder would eat `/settings/privacy`. Android implements it in `templateUrl()`
+(`TelemetryInterceptor.kt`); the cases live in `UrlTemplateTest`.
 
 ### 4.4 Trace attributes — on span-carrying events
 

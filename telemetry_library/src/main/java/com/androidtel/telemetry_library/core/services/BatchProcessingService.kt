@@ -107,8 +107,9 @@ internal class BatchProcessingService(
         )
         
         // Offline storage still holds older envelopes: queue this batch behind them — else a finalize
-        // can land before the session's own events.
-        if (flushOffline && offlineStorage.getStoredBatches().isNotEmpty()) {
+        // can land before the session's own events. Not at the cap, though: parking there would evict
+        // the oldest stored envelope, so order gives way to keeping data.
+        if (flushOffline && offlineStorage.getStoredBatches().size in 1 until OfflineBatchStorage.MAX_ENVELOPES) {
             offlineStorage.storeBatch(batch)
             return
         }

@@ -204,6 +204,14 @@ internal class SessionService(
             .apply()
     }
 
+    /**
+     * Save the running counts without touching last-active (#143): called on each flush tick, so a
+     * process that dies in the foreground leaves counts at most one flush interval stale.
+     */
+    fun saveCounts(eventCount: Int, metricCount: Int) {
+        prefs.edit().putInt(KEY_EVENT_COUNT, eventCount).putInt(KEY_METRIC_COUNT, metricCount).apply()
+    }
+
     /** True if initialize() resumed a persisted session — suppresses session.started. */
     fun wasResumed(): Boolean = initResumed
 

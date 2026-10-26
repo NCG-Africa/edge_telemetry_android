@@ -377,6 +377,7 @@ class TelemetryManager private constructor(
             // Timed flush force-sends partial batches so a low-activity session doesn't hold
             // telemetry indefinitely. Empty queue no-ops inside sendBatch (no heartbeat traffic).
             batchProcessingService.initialize(onFlush = {
+                sessionService.saveCounts(eventTrackingService.getEventCount(), eventTrackingService.getMetricCount())
                 scope.launch {
                     // sendBatch replays offline-stored envelopes first (throttled, offline-store →
                     // network) and gates on the backlog, so live never overtakes it (#143).
@@ -477,9 +478,7 @@ class TelemetryManager private constructor(
             // - Timed-out cold start: finalize the persisted (dead) session once, then start new.
             // - Resume within timeout: emit nothing — session-id continuity is the signal.
             // - Fresh/new session: emit session.started (backend marks rum_sessions status=active).
-            if (sessionService.timedOutOnInit()) {
-                emitTimedOutFinalize()
-            }
+            // The timed-out finalize waits for the crash/ANR replay below (#143).
             if (!sessionService.wasResumed()) {
                 emitSessionStartedEvent()
             }
@@ -489,6 +488,10 @@ class TelemetryManager private constructor(
             scope.launch {
                 replayFatalCrashIfAny()
                 replayPendingAnrIfAny()
+                // After the replays, so the old session's crash/ANR reaches the collector before its
+                // finalize (#143). A replay that fails here goes to WorkManager and may still land later.
+                // No-op unless init captured a timed-out session (a later rotation can't clear it).
+                emitTimedOutFinalize()
                 // Step 17: Harvest the OS exit-reason buffer (issue #94) — one app.exit per abnormal
                 // historical death, incl. system ANR/OOM/kill the in-process watchdog can't see.
                 // Blocking I/O, so it rides this Dispatchers.IO launch; no-op below API 30.

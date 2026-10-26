@@ -16,6 +16,8 @@ class UrlTemplateTest {
         assertEquals("api.example.com/tokens/{id}", t("https://api.example.com/tokens/" + "x".repeat(32)))
         assertEquals("api.example.com/tokens/" + "x".repeat(31), t("https://api.example.com/tokens/" + "x".repeat(31)))
         assertEquals("api.example.com/v10/a", t("https://api.example.com/v10/a"))
+        assertEquals("api.example.com/V2/a", t("https://api.example.com/V2/a"))
+        assertEquals("api.example.com/{id}", t("https://api.example.com/my%20file")) // encoded, as RN
     }
 
     @Test
