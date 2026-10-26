@@ -18,7 +18,6 @@ class TelemetryInterceptor(
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
-        val requestUrl = request.url.toString()
         
         // Skip tracking if this is the SDK's own telemetry request to avoid infinite loop
         if (isTelemetryRequest(request.url)) {
@@ -54,7 +53,7 @@ class TelemetryInterceptor(
             val statusCode = response?.code ?: 0
 
             val attributes = buildMap<String, Any> {
-                put("http.url", requestUrl.substringBefore('?'))
+                put("http.url", templateUrl(request.url))
                 put("http.method", request.method)
                 put("http.status_code", statusCode)
                 put("http.duration_ms", durationMs)
@@ -95,4 +94,24 @@ class TelemetryInterceptor(
         return url.host.equals(collector.host, ignoreCase = true) &&
             url.encodedPath.startsWith(collector.encodedPath)
     }
+}
+
+private val VERSION_SEGMENT = Regex("v\\d+", RegexOption.IGNORE_CASE)
+private const val MAX_PATH_DEPTH = 6
+
+/**
+ * RN v4 contract §4.4.1 (#143): `host[:port]` + templated path — no scheme, query or fragment. A
+ * segment becomes `{id}` unless it is `vN` (any case), and does if it holds any digit or is ≥ 32 chars, both
+ * judged on the percent-encoded segment as RN judges `URL.pathname`. Trailing
+ * slash dropped, no case folding, depth capped at 6 then `/…`, empty path → `/`. Spec: backend-wire-contract.md §4.3.1.
+ */
+internal fun templateUrl(url: HttpUrl): String {
+    val host = if (':' in url.host) "[${url.host}]" else url.host // IPv6 literal
+    val authority = if (url.port == HttpUrl.defaultPort(url.scheme)) host else "$host:${url.port}"
+    val segments = url.encodedPathSegments.filter { it.isNotEmpty() }
+    if (segments.isEmpty()) return "$authority/"
+    val path = segments.take(MAX_PATH_DEPTH).joinToString("/") { seg ->
+        if (!VERSION_SEGMENT.matches(seg) && (seg.any(Char::isDigit) || seg.length >= 32)) "{id}" else seg
+    }
+    return "$authority/$path" + if (segments.size > MAX_PATH_DEPTH) "/…" else ""
 }

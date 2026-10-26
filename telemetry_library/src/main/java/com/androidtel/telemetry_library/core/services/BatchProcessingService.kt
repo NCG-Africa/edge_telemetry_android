@@ -83,6 +83,10 @@ internal class BatchProcessingService(
             return
         }
 
+        // FIFO across offline storage (#143): replay it before any live send, even an empty one — the
+        // flush tick relies on this for replay.
+        sendStoredBatches()
+
         if (!forceSend && eventQueue.size < config.batchSize) {
             return
         }
@@ -102,6 +106,14 @@ internal class BatchProcessingService(
             location = location
         )
         
+        // Offline storage still holds older envelopes: queue this batch behind them — else a finalize
+        // can land before the session's own events. Not at the cap, though: parking there would evict
+        // the oldest stored envelope, so order gives way to keeping data.
+        if (flushOffline && offlineStorage.getStoredBatches().size in 1 until OfflineBatchStorage.MAX_ENVELOPES) {
+            offlineStorage.storeBatch(batch)
+            return
+        }
+
         TelemetryLog.i(TAG, "Attempting to send a batch of ${batch.batchSize} events")
         val result = httpClient.sendBatch(batch)
 

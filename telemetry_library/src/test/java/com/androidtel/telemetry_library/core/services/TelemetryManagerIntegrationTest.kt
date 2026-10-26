@@ -95,6 +95,70 @@ class TelemetryManagerIntegrationTest {
     }
 
     @Test
+    fun `user activity after 30 min foreground inactivity splits the session`() {
+        val before = telemetryManager.getSessionId()
+        idleBeyondTimeout()
+
+        telemetryManager.recordEvent("ui.interaction", mapOf("interaction.type" to "tap"))
+
+        assertNotEquals(before, telemetryManager.getSessionId())
+    }
+
+    @Test
+    fun `a passive event after inactivity also splits, so no span outgrows the timeout`() {
+        val before = telemetryManager.getSessionId()
+        idleBeyondTimeout()
+
+        telemetryManager.recordEvent("http.request", mapOf("http.status_code" to 200))
+
+        assertNotEquals(before, telemetryManager.getSessionId())
+    }
+
+    @Test
+    fun `passive events do not count as activity`() {
+        val prefs = context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE)
+        val idleSince = System.currentTimeMillis() - 60_000
+        prefs.edit().putLong("last_active_timestamp", idleSince).commit()
+
+        telemetryManager.recordEvent("http.request", mapOf("http.status_code" to 200))
+
+        assertEquals(idleSince, prefs.getLong("last_active_timestamp", 0))
+    }
+
+    @Test
+    fun `a manually ended session is not finalized again by a later timeout`() {
+        val prefs = context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE)
+        val ended = telemetryManager.getSessionId()
+        telemetryManager.endCurrentSession()
+        assertEquals(ended, prefs.getString("finalized_session_id", null))
+        idleBeyondTimeout()
+
+        telemetryManager.recordEvent("ui.interaction", mapOf("interaction.type" to "tap"))
+
+        // Rotated, and the claim still names the manually ended id — the timeout did not re-claim it.
+        assertNotEquals(ended, telemetryManager.getSessionId())
+        assertEquals(ended, prefs.getString("finalized_session_id", null))
+    }
+
+    @Test
+    fun `user activity within the timeout keeps the session and refreshes last activity`() {
+        val before = telemetryManager.getSessionId()
+        val prefs = context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putLong("last_active_timestamp", System.currentTimeMillis() - 60_000).commit()
+
+        telemetryManager.recordEvent("navigation", mapOf("navigation.to_screen" to "Home"))
+
+        assertEquals(before, telemetryManager.getSessionId())
+        assertTrue(prefs.getLong("last_active_timestamp", 0) > System.currentTimeMillis() - 5_000)
+    }
+
+    private fun idleBeyondTimeout() {
+        context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE).edit()
+            .putLong("last_active_timestamp", System.currentTimeMillis() - config.sessionTimeoutMs - 1000)
+            .commit()
+    }
+
+    @Test
     fun `test crash reporting workflow`() {
         telemetryManager.addBreadcrumb("User action", "ui", "info")
         telemetryManager.trackError(RuntimeException("Test error"))

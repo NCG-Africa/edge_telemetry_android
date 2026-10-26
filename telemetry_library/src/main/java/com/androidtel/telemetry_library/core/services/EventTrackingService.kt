@@ -139,6 +139,12 @@ internal class EventTrackingService(
     fun resetMetricCount() {
         metricCount.set(0)
     }
+
+    /** Continue a session resumed across process death from its persisted counts (#143). */
+    fun seedCounts(events: Int, metrics: Int) {
+        eventCount.set(events)
+        metricCount.set(metrics)
+    }
     
     /**
      * Set global attributes for all events
