@@ -234,6 +234,50 @@ class BatchProcessingServiceTest {
         coVerify(exactly = 0) { httpClient.sendBatch(any()) }
     }
 
+    // --- #143: a live batch never overtakes the offline backlog ---
+
+    @Test
+    fun `live send replays the offline backlog first`() = runTest {
+        service.setIdsInitialized(true)
+        val stored = mockk<TelemetryBatch>(relaxed = true) { every { id } returns "old" }
+        coEvery { offlineStorage.getStoredBatches() } returnsMany listOf(listOf(stored), emptyList())
+        coEvery { httpClient.sendBatch(any()) } returns Result.success(Unit)
+        val queue = CountedEventQueue().apply { enqueue(mockk(relaxed = true)) }
+
+        service.sendBatch(queue, forceSend = true)
+
+        coVerifyOrder {
+            httpClient.sendBatch(stored)
+            httpClient.sendBatch(match { it !== stored })
+        }
+    }
+
+    @Test
+    fun `live batch queues behind a backlog that could not drain`() = runTest {
+        service.setIdsInitialized(true)
+        val stored = mockk<TelemetryBatch>(relaxed = true) { every { id } returns "old" }
+        coEvery { offlineStorage.getStoredBatches() } returns listOf(stored)
+        coEvery { httpClient.sendBatch(any()) } returns Result.failure(java.io.IOException("offline"))
+        val queue = CountedEventQueue().apply { enqueue(mockk(relaxed = true)) }
+
+        service.sendBatch(queue, forceSend = true)
+
+        coVerify(exactly = 1) { httpClient.sendBatch(any()) } // only the replay attempt
+        coVerify { offlineStorage.storeBatch(match { it !== stored }) }
+    }
+
+    @Test
+    fun `an empty live send still replays offline storage, so the flush tick drains it`() = runTest {
+        service.setIdsInitialized(true)
+        val stored = mockk<TelemetryBatch>(relaxed = true) { every { id } returns "old" }
+        coEvery { offlineStorage.getStoredBatches() } returns listOf(stored)
+        coEvery { httpClient.sendBatch(any()) } returns Result.success(Unit)
+
+        service.sendBatch(CountedEventQueue(), forceSend = true)
+
+        coVerify(exactly = 1) { httpClient.sendBatch(stored) }
+    }
+
     @Test
     fun `test sendStoredBatches sends all stored batches`() = runTest {
         val batch1 = mockk<TelemetryBatch>(relaxed = true)

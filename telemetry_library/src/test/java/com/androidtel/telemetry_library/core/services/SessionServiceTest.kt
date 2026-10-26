@@ -3,6 +3,7 @@ package com.androidtel.telemetry_library.core.services
 import android.content.Context
 import android.content.SharedPreferences
 import com.androidtel.telemetry_library.core.TelemetryConfig
+import com.androidtel.telemetry_library.core.TelemetryTime
 import com.androidtel.telemetry_library.core.ids.IdGenerator
 import io.mockk.*
 import org.junit.Assert.*
@@ -338,10 +339,79 @@ class SessionServiceTest {
 
         service.initialize()
 
-        assertEquals("old-session", service.getFinalizedSessionId())
+        val f = service.getFinalizedSessionAttrs()!!
+        assertEquals("old-session", f["session.id"])
         // duration = last_active - session_start, from persisted values
-        assertEquals(100_000L, service.getFinalizedDurationMs())
+        assertEquals(100_000L, f["session.duration_ms"])
         assertEquals("new-session", service.getCurrentSessionId())
+    }
+
+    // --- Issue #143: session.finalized correctness + inactivity timeout ---
+
+    @Test
+    fun `timed-out cold start finalize carries the old session's own start and counts`() {
+        val lastActive = System.currentTimeMillis() - config.sessionTimeoutMs - 1000
+        val oldStart = lastActive - 100_000
+        sharedPrefs.edit()
+            .putString("session_id", "old-session")
+            .putLong("session_start", oldStart)
+            .putLong("last_active_timestamp", lastActive)
+            .putInt("session_event_count", 17)
+            .putInt("session_metric_count", 4)
+            .putInt("total_sessions", 2)
+            .apply()
+        every { idGenerator.generateSessionId() } returns "new-session"
+
+        service.initialize()
+
+        val f = service.getFinalizedSessionAttrs()!!
+        assertEquals(TelemetryTime.isoOf(oldStart), f["session.start_time"])
+        assertEquals(17, f["session.event_count"])
+        assertEquals(4, f["session.metric_count"])
+        assertEquals(2, f["session.total_sessions"])
+        assertEquals(false, f["session.is_first_session"])
+    }
+
+    @Test
+    fun `a finalized id is never finalized again on later cold starts`() {
+        sharedPrefs.edit()
+            .putString("session_id", "old-session")
+            .putLong("session_start", 1_000L)
+            .putLong("last_active_timestamp", System.currentTimeMillis() - config.sessionTimeoutMs - 1000)
+            .apply()
+        every { idGenerator.generateSessionId() } returns "new-session"
+        service.initialize()
+        assertEquals("old-session", service.getFinalizedSessionId())
+
+        // Process dies before any onStop, then the next launch comes after another timeout.
+        sharedPrefs.edit()
+            .putLong("last_active_timestamp", System.currentTimeMillis() - config.sessionTimeoutMs - 1000)
+            .apply()
+        every { idGenerator.generateSessionId() } returns "third-session"
+        val next = SessionService(context, config, idGenerator).apply { initialize() }
+
+        assertEquals("new-session", next.getFinalizedSessionId())
+    }
+
+    @Test
+    fun `resume restores the persisted counts`() {
+        service.initialize()
+        service.persistSession(eventCount = 9, metricCount = 3)
+
+        val resumed = SessionService(context, config, idGenerator).apply { initialize() }
+
+        assertTrue(resumed.wasResumed())
+        assertEquals(9, resumed.getResumedEventCount())
+        assertEquals(3, resumed.getResumedMetricCount())
+    }
+
+    @Test
+    fun `active duration ends at last activity, not at the moment the timeout is noticed`() {
+        service.initialize()
+        val start = service.getSessionStartTime()
+        sharedPrefs.edit().putLong("last_active_timestamp", start + 5_000).apply()
+
+        assertEquals(5_000L, service.getActiveDurationMs())
     }
 
     @Test
@@ -468,8 +538,9 @@ class SessionServiceTest {
         every { idGenerator.generateSessionId() } returns "new-instance-session"
         newService.initialize()
         
-        // Total sessions should increment
-        assertEquals(totalSessions + 1, newService.getTotalSessions())
+        // Within timeout the persisted id resumes — no new session, no increment (#143)
+        assertEquals(sessionId, newService.getCurrentSessionId())
+        assertEquals(totalSessions, newService.getTotalSessions())
     }
 
     @Test

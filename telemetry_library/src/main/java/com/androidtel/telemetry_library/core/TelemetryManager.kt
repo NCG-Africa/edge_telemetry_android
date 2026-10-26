@@ -76,6 +76,7 @@ class TelemetryManager private constructor(
 
     // Pre-init call queue
     private val isReady = AtomicBoolean(false)
+    private val sessionLock = Any()
     private val preInitQueue = ConcurrentLinkedQueue<() -> Unit>()
     private val PRE_INIT_QUEUE_MAX_SIZE = 50
 
@@ -132,6 +133,10 @@ class TelemetryManager private constructor(
     internal fun isUserInteractionEventsEnabled(): Boolean = config.enableUserInteractionEvents
 
     companion object {
+        /** User-driven events that count as session activity for the inactivity timeout (#143). */
+        private val USER_ACTIVITY_EVENTS = setOf("ui.interaction", "navigation")
+        private val SESSION_BOUNDARY_EVENTS = setOf("session.started", "session.finalized")
+
         @Volatile
         private var instance: TelemetryManager? = null
 
@@ -345,6 +350,7 @@ class TelemetryManager private constructor(
             // Step 5: Initialize SessionService
             sessionService = SessionService(context, config, idGenerator)
             sessionService.initialize()
+            eventTrackingService.seedCounts(sessionService.getResumedEventCount(), sessionService.getResumedMetricCount())
             TelemetryLog.d("TelemetryManager", "Step 5: SessionService initialized")
             
             // Step 6: Initialize UserProfileService
@@ -372,9 +378,9 @@ class TelemetryManager private constructor(
             // telemetry indefinitely. Empty queue no-ops inside sendBatch (no heartbeat traffic).
             batchProcessingService.initialize(onFlush = {
                 scope.launch {
+                    // sendBatch replays offline-stored envelopes first (throttled, offline-store →
+                    // network) and gates on the backlog, so live never overtakes it (#143).
                     sendBatch(forceSend = true)
-                    // Replay offline-stored envelopes, throttled per tick (offline-store → network).
-                    sendStoredBatches()
                 }
             })
             TelemetryLog.d("TelemetryManager", "Step 8: BatchProcessingService initialized")
@@ -497,21 +503,34 @@ class TelemetryManager private constructor(
 
     /**
      * Emit a single session.finalized(reason=timeout) for a session that died in the background and
-     * timed out before this cold start (issue #53). The old id/duration come from persisted values;
-     * they override the auto-enriched (new) session block via custom attributes. Minimal stats only —
-     * in-memory counters died with the prior process; the backend reconstructs counts by session_id.
+     * timed out before this cold start (issue #53). Every session.* key comes from the old session's
+     * persisted state and overrides the auto-enriched (new) session block via custom attributes (#143).
      */
     private fun emitTimedOutFinalize() {
         if (!::sessionService.isInitialized) return
-        val oldId = sessionService.getFinalizedSessionId() ?: return
-        recordEvent(
-            eventName = "session.finalized",
-            attributes = mapOf(
-                "session.id" to oldId,
-                "session.duration_ms" to sessionService.getFinalizedDurationMs(),
-                "session.reason" to "timeout"
-            )
-        )
+        val old = sessionService.getFinalizedSessionAttrs() ?: return
+        recordEvent(eventName = "session.finalized", attributes = old + ("session.reason" to "timeout"))
+    }
+
+    /**
+     * Inactivity timeout (#143): any event finalizes and rotates a session idle past sessionTimeoutMs,
+     * so no session's span outgrows the timeout plus its activity. Only user activity (foreground, tap,
+     * navigation) refreshes last-active — passive events (http, memory, frames) never extend a session,
+     * so background polling can't keep one alive forever.
+     */
+    private fun rotateIfInactive(isUserActivity: Boolean) = synchronized(sessionLock) {
+        if (sessionService.hasSessionTimedOut()) {
+            // The envelope is still the old session's; only the duration needs the idle gap removed.
+            if (sessionService.claimFinalize()) {
+                recordEvent("session.finalized", mapOf(
+                    "session.reason" to "timeout",
+                    "session.duration_ms" to sessionService.getActiveDurationMs()
+                ))
+            }
+            startNewSession()
+            TelemetryLog.i("TelemetryManager", "Started new session: ${sessionService.getCurrentSessionId()}")
+        }
+        if (isUserActivity) sessionService.updateLastActiveTimestamp()
     }
 
     /**
@@ -565,22 +584,7 @@ class TelemetryManager private constructor(
         // 1. Check session timeout and start new session if needed
         // (Offline-stored envelopes replay via the flush tick — see sendStoredBatches — not by
         //  restoring them into the in-memory queue, which would re-batch and evict live events.)
-        if (sessionService.hasSessionTimedOut()) {
-            val lastActive = sessionService.getLastActiveTimestamp()
-            if (lastActive > 0) {
-                // Emit session.finalized with full session stats (event/metric/screen counts +
-                // visited_screens + network.type) — these come from the standard session envelope.
-                recordEvent("session.finalized", mapOf(
-                    "session.reason" to "timeout"
-                ))
-            }
-            sessionService.startNewSession()
-            TelemetryLog.i("TelemetryManager", "Started new session: ${sessionService.getCurrentSessionId()}")
-            emitSessionStartedEvent()
-        } else {
-            val elapsed = System.currentTimeMillis() - sessionService.getLastActiveTimestamp()
-            TelemetryLog.i("TelemetryManager", "Resuming existing session (elapsed: ${elapsed}ms)")
-        }
+        rotateIfInactive(isUserActivity = true)
         
         // 2. Resume the flush timer
         batchProcessingService.resumeFlushTimer()
@@ -606,7 +610,7 @@ class TelemetryManager private constructor(
         
         // 2. Persist the session (id + start + last_active) so it can be resumed across process
         //    death within the timeout window (issue #53).
-        sessionService.persistSession()
+        sessionService.persistSession(eventTrackingService.getEventCount(), eventTrackingService.getMetricCount())
         
         // 3. Pause the flush timer
         batchProcessingService.stopFlushTimer()
@@ -649,7 +653,10 @@ class TelemetryManager private constructor(
             offerToPreInitQueue { recordEvent(eventName, attributes) }
             return
         }
-        
+        // Before enrichment, so the event that ends an idle session lands in the new one. Boundary
+        // events are emitted by the rotation itself.
+        if (eventName !in SESSION_BOUNDARY_EVENTS) rotateIfInactive(eventName in USER_ACTIVITY_EVENTS)
+
         val userInfo = userProfileService.getUserInfo()
         val sessionInfo = sessionService.getSessionInfo(
             eventTrackingService.getEventCount(),
@@ -1075,7 +1082,7 @@ class TelemetryManager private constructor(
     /**
      * Start new session
      */
-    fun startNewSession() {
+    fun startNewSession() = synchronized(sessionLock) {
         sessionService.startNewSession()
         eventTrackingService.resetEventCount()
         eventTrackingService.resetMetricCount()
@@ -1091,7 +1098,7 @@ class TelemetryManager private constructor(
      * network.type — that's the full set the schema requires.
      */
     fun endCurrentSession() {
-        if (::sessionService.isInitialized) {
+        if (::sessionService.isInitialized && sessionService.claimFinalize()) {
             recordEvent("session.finalized", mapOf(
                 "session.reason" to "manual"
             ))

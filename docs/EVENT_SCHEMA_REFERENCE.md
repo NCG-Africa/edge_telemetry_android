@@ -107,7 +107,7 @@ All events automatically include these standard attributes:
 
 | Attribute | Type | Required | Validation | Description |
 |-----------|------|----------|------------|-------------|
-| `http.url` | String | Yes | Non-empty | Full request URL |
+| `http.url` | String | Yes | Non-empty | `host[:port]` + templated path (no scheme/query/fragment; id-like segments → `{id}`, RN v4 contract §4.4.1) |
 | `http.method` | String | Yes | GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS | HTTP method |
 | `http.status_code` | Int | Yes | 100-599 | Response status code |
 | `http.duration_ms` | Long | Yes | ≥ 0 | Request duration in milliseconds |
@@ -130,7 +130,7 @@ All events automatically include these standard attributes:
   "eventName": "http.request",
   "timestamp": "2024-03-23T14:30:45.123Z",
   "attributes": {
-    "http.url": "https://api.example.com/users",
+    "http.url": "api.example.com/users/{id}",
     "http.method": "GET",
     "http.status_code": 200,
     "http.duration_ms": 245,

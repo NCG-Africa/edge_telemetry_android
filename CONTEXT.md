@@ -29,6 +29,9 @@ _Avoid_: Server, backend API
 
 **Session**:
 A continuous period of app use, rotated after timeout (default 30min) or on explicit restart.
+The timeout runs from the last **user activity** (foreground, tap, navigation); the first event of
+any kind after it finalizes the session once and starts a new one. Passive events (http, memory,
+frames) never count as activity, so they can't keep a session alive.
 
 **Screen**:
 A user-visible destination — an Activity or a Compose navigation route.

@@ -36,8 +36,9 @@ internal class SessionService(
     // Load-then-decide flags, valid immediately after initialize() (issue #53):
     private var initResumed = false
     private var initTimedOut = false
-    private var finalizedSessionId: String? = null
-    private var finalizedDurationMs: Long = 0L
+    private var finalizedSession: Map<String, Any>? = null
+    private var resumedEventCount = 0
+    private var resumedMetricCount = 0
 
     /**
      * Load-then-decide session lifecycle (issue #53).
@@ -57,15 +58,28 @@ internal class SessionService(
             sessionId = savedId!!
             sessionStartTime = prefs.getLong("session_start", now)
             totalSessions = prefs.getInt("total_sessions", 1)
+            resumedEventCount = prefs.getInt(KEY_EVENT_COUNT, 0)
+            resumedMetricCount = prefs.getInt(KEY_METRIC_COUNT, 0)
             initResumed = true
         } else {
-            if (savedId != null) {
-                // Prior session died in background and timed out — capture it so the manager can emit
-                // one session.finalized(reason=timeout) before the new session starts.
+            if (savedId != null && savedId != prefs.getString(KEY_FINALIZED_ID, null)) {
+                // Prior session died in background and timed out — capture its OWN persisted state so
+                // the manager can emit one session.finalized(reason=timeout) that overrides the new
+                // session's envelope (#143: start/counts were the next cold start's). An id already
+                // finalized (manual end, warm timeout) is never finalized again.
                 initTimedOut = true
-                finalizedSessionId = savedId
+                prefs.edit().putString(KEY_FINALIZED_ID, savedId).apply()
                 val savedStart = prefs.getLong("session_start", lastActive)
-                finalizedDurationMs = (lastActive - savedStart).coerceAtLeast(0L)
+                val savedTotal = prefs.getInt("total_sessions", 1)
+                finalizedSession = mapOf(
+                    "session.id" to savedId,
+                    "session.start_time" to TelemetryTime.isoOf(savedStart),
+                    "session.duration_ms" to (lastActive - savedStart).coerceAtLeast(0L),
+                    "session.event_count" to prefs.getInt(KEY_EVENT_COUNT, 0),
+                    "session.metric_count" to prefs.getInt(KEY_METRIC_COUNT, 0),
+                    "session.total_sessions" to savedTotal,
+                    "session.is_first_session" to (savedTotal == 1)
+                )
             }
             sessionId = idGenerator.generateSessionId()
             sessionStartTime = now
@@ -78,8 +92,10 @@ internal class SessionService(
         }
 
         // Seed last_active=now: the first onStart after init sees elapsed ~= 0 → not timed out →
-        // resume branch logs and does nothing. No double-decision, no double-mint.
-        prefs.edit().putLong("last_active_timestamp", now).apply()
+        // resume branch logs and does nothing. No double-decision, no double-mint. Persisting the
+        // decided id now (not first at onStop) overwrites a finalized id, so a process that dies
+        // before backgrounding can't resume or re-finalize it next launch (#143).
+        persistSession(resumedEventCount, resumedMetricCount)
 
         TelemetryLog.d(TAG, "SessionService initialized - Session: $sessionId, Total: $totalSessions, " +
             "resumed=$initResumed, timedOut=$initTimedOut")
@@ -100,6 +116,7 @@ internal class SessionService(
         visitedScreens.clear()
         totalSessions++
         prefs.edit().putInt("total_sessions", totalSessions).apply()
+        persistSession(0, 0)
 
         // A live (warm) rotation is neither a resume nor an init-timeout.
         initResumed = false
@@ -168,22 +185,22 @@ internal class SessionService(
         return elapsed >= config.sessionTimeoutMs
     }
     
-    /**
-     * Update last active timestamp
-     */
+    /** Mark user activity — the foreground inactivity timeout measures from here (#143). */
     fun updateLastActiveTimestamp() {
         prefs.edit().putLong("last_active_timestamp", System.currentTimeMillis()).apply()
     }
 
     /**
-     * Persist the current session on background (issue #53) so it can be resumed across process
-     * death. Replaces the bare updateLastActiveTimestamp() on onStop.
+     * Persist the current session (issue #53) so it can be resumed across process death — with its
+     * counts, so a later timed-out finalize reports this session's own data (#143).
      */
-    fun persistSession() {
+    fun persistSession(eventCount: Int, metricCount: Int) {
         prefs.edit()
             .putString("session_id", sessionId)
             .putLong("session_start", sessionStartTime)
             .putLong("last_active_timestamp", System.currentTimeMillis())
+            .putInt(KEY_EVENT_COUNT, eventCount)
+            .putInt(KEY_METRIC_COUNT, metricCount)
             .apply()
     }
 
@@ -193,11 +210,27 @@ internal class SessionService(
     /** True if initialize() found a persisted session that had timed out — triggers finalize. */
     fun timedOutOnInit(): Boolean = initTimedOut
 
-    /** Id of the timed-out session captured at init, for a single session.finalized. */
-    fun getFinalizedSessionId(): String? = finalizedSessionId
+    /** The timed-out session's own session.* attrs captured at init, for a single session.finalized. */
+    fun getFinalizedSessionAttrs(): Map<String, Any>? = finalizedSession
 
-    /** Duration (persisted session_start → last_active) of the timed-out session. */
-    fun getFinalizedDurationMs(): Long = finalizedDurationMs
+    fun getFinalizedSessionId(): String? = finalizedSession?.get("session.id") as String?
+
+    /**
+     * Claim the right to finalize the current session: true exactly once per id, persisted so neither
+     * a later warm timeout nor a later cold start finalizes it again (#143).
+     */
+    fun claimFinalize(): Boolean {
+        if (prefs.getString(KEY_FINALIZED_ID, null) == sessionId) return false
+        prefs.edit().putString(KEY_FINALIZED_ID, sessionId).apply()
+        return true
+    }
+
+    /** Counts of a session resumed at init — the manager seeds its counters with them. */
+    fun getResumedEventCount(): Int = resumedEventCount
+    fun getResumedMetricCount(): Int = resumedMetricCount
+
+    /** Start → last activity: a timed-out session's duration excludes the idle gap that ended it. */
+    fun getActiveDurationMs(): Long = (getLastActiveTimestamp() - sessionStartTime).coerceAtLeast(0L)
     
     /**
      * Get last active timestamp
@@ -228,5 +261,8 @@ internal class SessionService(
     
     companion object {
         private const val TAG = "SessionService"
+        private const val KEY_EVENT_COUNT = "session_event_count"
+        private const val KEY_METRIC_COUNT = "session_metric_count"
+        private const val KEY_FINALIZED_ID = "finalized_session_id"
     }
 }

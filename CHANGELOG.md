@@ -5,6 +5,29 @@ All notable changes to the Edge Telemetry Android SDK will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### 🐛 Fixed (#143)
+
+- **`session.finalized` reports the finalized session's own data.** A timed-out cold start now sends
+  the old session's start, event/metric/screen counts, visited screens and totals — not the new
+  session's. A session resumed across process death keeps its counts and screens.
+- **No session is finalized twice.** A persisted finalized-id claim covers manual end, warm timeout
+  and cold start; the decided session is also persisted at init and on rotation, so a process that
+  dies before backgrounding can't resume a stale id.
+- **30-min inactivity timeout.** The first event after `sessionTimeoutMs` with no user activity
+  (foreground, tap, navigation) finalizes the idle session and starts a new one. Passive events (http,
+  memory, frames) don't count as activity, so they can't keep a session alive.
+- **Offline storage is sent before live events**, so a session's stored events can't arrive after
+  its finalize.
+
+### Changed
+
+- **`http.url` is templated on device** (RN v4 contract §4.4.1): `host[:port]` + path, no scheme,
+  query or fragment. A segment with a digit or ≥ 32 chars becomes `{id}` (except `vN`); trailing
+  slash dropped; depth capped at 6 then `/…`; empty path → `/`. e.g.
+  `https://api.example.com/v2/users/42?x=1` → `api.example.com/v2/users/{id}`.
+
 ## [4.0.1] - 2026-10-14
 
 First published 4.x build. Contains everything listed under 4.0.0 below (never tagged) plus the fix

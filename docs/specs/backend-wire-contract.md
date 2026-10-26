@@ -259,7 +259,7 @@ The nine `device.*` keys at `DeviceInfoCollector.kt:53-61` are a launch-time bun
 
 | Key | Type | Null? | Cardinality | Call | Now | Source |
 |---|---|---|---|---|---|---|
-| `http.url` | String | never | high | COL (join/dim) | ❌ | `TelemetryInterceptor.kt:47` — **query string stripped** at `substringBefore('?')` |
+| `http.url` | String | never | high | COL (join/dim) | ❌ | `templateUrl()` in `TelemetryInterceptor.kt` — `host[:port]` + templated path, no scheme/query/fragment (#143, RN v4 contract §4.4.1) |
 | `http.method` | String | never | ~8 | COL (dim) | ❌ | `:48` |
 | `http.status_code` | Int | never (`0` on transport failure) | ~60 | COL (dim) | ❌ | `:49`, `0` at `:44` |
 | `http.duration_ms` | Long | never | measure | COL (measure) | ❌ | `:50` |
@@ -693,7 +693,7 @@ So the schema is not designed around a hoped-for cleanup:
 - **The undotted error vocabulary stays undotted** for now (§4.14). Reconciling `EventPayloadValidator`'s unreachable `error.*` names with the emitter's `message` / `stacktrace` / `exception_type` is an SDK-internal cleanup with its own migration cost. Build against what is emitted.
 - **`exit.timestamp` stays an epoch-ms `Long`** (§4.13) unless someone asks otherwise.
 - **The four nested-object attributes stay nested** (§4.15). They are JSON and belong in JSONB.
-- **`http.url` stays query-stripped** (`TelemetryInterceptor.kt:47`). This is deliberate PII protection, not an omission.
+- **`http.url` is templated on device** (`templateUrl()`, #143): no query, and id-like path segments become `{id}`. Deliberate PII protection and cardinality control, not an omission.
 - **Sampling stays fixed at 1.0** in v3, so every action produces a trace. Any sampling design is a later effort.
 - **`app.exit` carries no `rum.action.id`.** Attributing a harvested exit means persisting the active root across process death; deliberately excluded in [#126](https://github.com/NCG-Africa/edge_telemetry_android/issues/126).
 
