@@ -6,7 +6,6 @@
 /.idea/modules.xml
 /.idea/workspace.xml
 /.idea/navEditor.xml
-temp_auto_push.bat
 /.idea/assetWizardSettings.xml
 .DS_Store
 /build
@@ -15,5 +14,3 @@ temp_auto_push.bat
 .cxx
 local.properties
 /.idea
-.gitignore
-branch_structure.json
