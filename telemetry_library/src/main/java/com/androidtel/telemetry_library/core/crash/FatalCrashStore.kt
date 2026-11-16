@@ -4,6 +4,7 @@ import com.androidtel.telemetry_library.core.log.TelemetryLog
 import com.androidtel.telemetry_library.core.TelemetryHttpClient
 import com.androidtel.telemetry_library.core.isRejected
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
+import com.androidtel.telemetry_library.core.models.batchGson
 import com.google.gson.Gson
 import java.io.File
 import java.io.FileOutputStream
@@ -67,7 +68,7 @@ internal object FatalCrashStore {
     suspend fun replayOnce(
         filesDir: File,
         client: TelemetryHttpClient,
-        gson: Gson = Gson(),
+        gson: Gson = batchGson,
         fileName: String = FILE_NAME
     ): Boolean {
         val batch = readBatch(filesDir, gson, fileName) ?: return true

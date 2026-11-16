@@ -31,7 +31,7 @@ class ScreenDurationLifecycleTest {
         observer.onActivityPaused(activity)    // must NOT emit screen_view or consume timing
         observer.onActivityStopped(activity)   // owns endScreen -> emits screen.duration
 
-        verify(exactly = 0) { manager.recordEvent(eq("screen_view"), any()) }
+        verify(exactly = 0) { manager.emit(eq("screen_view"), any(), any()) }
         verify(exactly = 1) { manager.recordScreenDuration(any(), any(), eq("closed")) }
     }
 }

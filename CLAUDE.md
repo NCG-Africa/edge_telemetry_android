@@ -30,7 +30,7 @@ Android telemetry library (AAR) published via JitPack as `com.github.NCG-Africa:
 - **Kotlin:** 2.1.0 | **AGP:** 8.7.1
 - **Java:** 11 (source + target)
 - **Gradle:** 8.4+
-- **Current version:** 4.0.1
+- **Current version:** 4.1.0
 
 ## Project Structure
 
@@ -175,13 +175,17 @@ Retrofit.Builder()
 `createNetworkInterceptor()` is deprecated (v3 Δ6): OkHttp runs interceptors on its dispatcher pool, so
 a bare interceptor cannot attribute async calls to the action that caused them.
 
-### Custom Events & Metrics
+### Custom Events, Metrics & Tasks
 
 ```kotlin
 val tm = TelemetryManager.getInstance()
-tm.recordEvent("button_clicked", mapOf("button_id" to "checkout"))
-tm.recordMetric("load_time_ms", 342.0, mapOf("screen" to "home"))
+tm.recordEvent("button_clicked", mapOf("button_id" to "checkout"))   // sent as custom.event, event.name=button_clicked
+tm.recordMetric("load_time_ms", 342.0, mapOf("screen" to "home"))   // sent as custom.metric, metric.name=load_time_ms
+val task = tm.startTask("checkout")                                  // one task.complete when it ends:
+task.complete()                                                      // or task.fail("card declined") / task.abandon()
 ```
+
+The SDK's own events go through the internal `emit()`, never `recordEvent`.
 
 ### Error Tracking (manual)
 
@@ -243,6 +247,15 @@ tm.setLastUserAction("submit_payment")
 - **Instrumented tests:** Espresso + Compose test (`src/androidTest/`)
 - Test helper: `EdgeTelemetryTester` for consumer test setup
 - `TelemetryManager.resetForTesting()` — internal method to reset singleton in tests
+
+## Event catalogue (conformance gate)
+
+Every event name, key, type and unit comes from the processor's catalogue (`docs/catalogue/` in
+`edge_telemetry_processor_go`) at the tag in `catalogue.version`. `GoldenBatchSnapshotTest` records each
+event through the real emitters into `telemetry_library/src/test/resources/golden/`; `scripts/conform.sh`
+runs the processor's `cmd/conform` on them (CI: `.github/workflows/conform.yml`, every PR and release).
+A new event or key needs a catalogue PR first (processor CODEOWNERS), then a pin bump here. Regenerate
+goldens with `-PupdateGoldens`.
 
 ## Conventions
 

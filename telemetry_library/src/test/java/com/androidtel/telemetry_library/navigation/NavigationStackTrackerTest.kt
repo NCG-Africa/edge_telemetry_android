@@ -18,12 +18,12 @@ class NavigationStackTrackerTest {
     }
     
     @Test
-    fun `push navigation on empty stack has null from_screen`() {
+    fun `push navigation on empty stack has null from_screen and is initial`() {
         val event = tracker.push("ScreenA")
         
         assertNull(event.fromScreen)
         assertEquals("ScreenA", event.toScreen)
-        assertEquals(NavigationMethod.PUSH, event.method)
+        assertEquals(NavigationMethod.INITIAL, event.method)
     }
     
     @Test

@@ -15,31 +15,36 @@ class TelemetryFrameDropCollectorTest {
 
     private var screen: String? = "A"
     private var clockMs = 0L
+    private var epochMs = 0L
+    private var refreshRate = 90f
     private val captured = mutableListOf<Map<String, Any>>()
+    private val stamps = mutableListOf<String>()
 
     private fun newCollector(): TelemetryFrameDropCollector {
         captured.clear()
+        stamps.clear()
         val manager = mockk<TelemetryManager>(relaxed = true)
         every { manager.isFrameTrackingEnabled() } returns true
-        every { manager.recordEvent(eq("frame.summary"), capture(captured)) } returns Unit
+        every { manager.emit(eq("frame.summary"), capture(captured), capture(stamps)) } returns Unit
         return TelemetryFrameDropCollector(
             telemetryManager = manager,
             clock = { clockMs },
             screenOverride = { screen },
-            refreshRateOverride = { 90f },
+            refreshRateOverride = { refreshRate },
+            epochClock = { epochMs },
         )
     }
 
     @Test
     fun `counts, rate and maxes match golden payload`() {
-        screen = "Home"; clockMs = 0
+        screen = "Home"; clockMs = 0; refreshRate = 90f
         val c = newCollector()
-        // 3 smooth (<=16ms)
+        // 3 smooth (<= the 11.1 ms budget at 90 Hz)
         repeat(3) { c.onFrame(totalMs = 10.0, buildMs = 2.0, rasterMs = 3.0) }
-        // 2 slow (16 < ms <= 700)
+        // 2 slow (budget < ms < 700)
         c.onFrame(totalMs = 20.0, buildMs = 5.0, rasterMs = 8.0)
         c.onFrame(totalMs = 30.0, buildMs = 7.0, rasterMs = 10.0)
-        // 1 frozen (> 700)
+        // 1 frozen (>= 700)
         c.onFrame(totalMs = 800.0, buildMs = 12.0, rasterMs = 40.0)
         c.stop() // forces trailing flush
 
@@ -57,12 +62,43 @@ class TelemetryFrameDropCollectorTest {
     }
 
     @Test
-    fun `smooth-only window emits nothing`() {
-        screen = "A"; clockMs = 0
+    fun `smooth-only window is still sent`() {
+        screen = "A"; clockMs = 0; refreshRate = 90f
         val c = newCollector()
         repeat(10) { c.onFrame(totalMs = 8.0, buildMs = 1.0, rasterMs = 2.0) }
         c.stop()
-        assertEquals(0, captured.size)
+        assertEquals(1, captured.size)
+        assertEquals(10, captured.single()["frame.total_frames"])
+        assertEquals(0, captured.single()["frame.slow_frames"])
+    }
+
+    @Test
+    fun `slow is over the refresh-rate budget and frozen starts at 700 ms`() {
+        screen = "A"; clockMs = 0
+        refreshRate = 60f
+        newCollector().apply { onFrame(15.0, 1.0, 1.0); onFrame(700.0, 1.0, 1.0); stop() }
+        assertEquals(1, captured.single()["frame.slow_frames"])   // 15 ms fits 16.7 ms
+        assertEquals(1, captured.single()["frame.frozen_frames"])
+
+        refreshRate = 120f
+        newCollector().apply { onFrame(15.0, 1.0, 1.0); stop() }
+        assertEquals(1, captured.single()["frame.slow_frames"])   // 15 ms is over 8.3 ms
+
+        refreshRate = 0f // unknown rate: 60 Hz budget
+        newCollector().apply { onFrame(15.0, 1.0, 1.0); stop() }
+        assertEquals(0, captured.single()["frame.slow_frames"])
+    }
+
+    @Test
+    fun `window is stamped at its start, with an int duration`() {
+        screen = "A"; clockMs = 1000; epochMs = 1_700_000_000_000
+        val c = newCollector()
+        c.onFrame(20.0, 1.0, 1.0)
+        clockMs = 3500; epochMs += 2500
+        c.onFrame(20.0, 1.0, 1.0)
+        c.stop()
+        assertEquals(TelemetryTime.isoOf(1_700_000_000_000), stamps.single())
+        assertEquals(2500L, captured.single()["frame.window_duration_ms"])
     }
 
     @Test
@@ -113,6 +149,6 @@ class TelemetryFrameDropCollectorTest {
         )
         c.onFrame(totalMs = 800.0, buildMs = 3.0, rasterMs = 4.0)
         c.stop()
-        verify(exactly = 0) { manager.recordEvent(eq("frame_drop"), any()) }
+        verify(exactly = 0) { manager.emit(eq("frame_drop"), any(), any()) }
     }
 }

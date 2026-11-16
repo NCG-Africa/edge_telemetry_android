@@ -132,7 +132,7 @@ class ApplicationExitHarvesterTest {
     }
 
     @Test
-    fun `importance maps to enum string, null description omitted`() {
+    fun `importance is the raw int code, null description omitted`() {
         val records = listOf(
             rec(
                 ApplicationExitInfo.REASON_ANR, 10,
@@ -143,7 +143,7 @@ class ApplicationExitHarvesterTest {
 
         val event = ApplicationExitHarvester.harvest(records, watermark = null).events.single()
 
-        assertEquals("visible", event["exit.importance"])
+        assertEquals(RunningAppProcessInfo.IMPORTANCE_VISIBLE, event["exit.importance"])
         assertFalse(event.containsKey("exit.description"))
     }
 

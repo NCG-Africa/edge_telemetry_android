@@ -69,7 +69,7 @@ class DeviceStateFreezeSeamTest {
 
         service.initialize(
             buildAttributesFn = { attrs -> captured = attrs; stubAttributes(attrs) },
-            recordCrashEventFn = { captured = it },
+            recordErrorEventFn = { captured = it },
             recordHangEventFn = { captured = it }
         )
     }
@@ -108,7 +108,7 @@ class DeviceStateFreezeSeamTest {
         assertEquals(55, attrs["device.battery_level"])
         assertTrue("battery_charging Boolean", attrs["device.battery_charging"] is Boolean)
         assertEquals(true, attrs["device.power_save"])
-        assertEquals(PowerManager.THERMAL_STATUS_MODERATE, attrs["device.thermal_status"])
+        assertEquals("moderate", attrs["device.thermal_status"])
         assertTrue("orientation String", attrs["device.orientation"] is String)
     }
 

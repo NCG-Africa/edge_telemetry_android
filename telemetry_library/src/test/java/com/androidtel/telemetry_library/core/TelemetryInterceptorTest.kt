@@ -36,7 +36,7 @@ class TelemetryInterceptorTest {
             .connectTimeout(1, TimeUnit.SECONDS)
             .readTimeout(1, TimeUnit.SECONDS)
             .build()
-        io.mockk.every { telemetryManager.recordEvent("http.request", capture(recorded)) } returns Unit
+        io.mockk.every { telemetryManager.emit(eq("http.request"), capture(recorded), any()) } returns Unit
         TraceManager.resetForTesting()
         TraceManager.traceSampleRate = 1.0
         TraceManager.traceHostAllowlist = emptySet()

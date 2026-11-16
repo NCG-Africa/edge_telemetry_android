@@ -53,15 +53,7 @@ fun TrackComposeScreen(
             "navigation.timestamp" to navEvent.timestamp
         )
         
-        // For event (can have mixed types)
-        val eventData = mapOf(
-            "navigation.from_screen" to (navEvent.fromScreen ?: ""),
-            "navigation.to_screen" to navEvent.toScreen,
-            "navigation.method" to navEvent.method.toLowerCaseString(),
-            "navigation.route_type" to (additionalData?.get("route_type") ?: "main_flow"),
-            "navigation.has_arguments" to hasArguments,
-            "navigation.timestamp" to navEvent.timestamp
-        )
+        val eventData = navEvent.toAttributes(additionalData?.get("route_type") ?: "main_flow", hasArguments)
         
         // Add navigation breadcrumb
         EdgeTelemetry.getInstance().addBreadcrumb(
@@ -73,7 +65,7 @@ fun TrackComposeScreen(
         
         // Track navigation event — child of a recent interaction (tap→nav) else a new trace root (#59).
         val trace = TraceManager.onNavigation() ?: emptyMap()
-        EdgeTelemetry.getInstance().recordEvent("navigation", eventData + trace)
+        EdgeTelemetry.getInstance().emit("navigation", eventData + trace)
         
         onDispose {
             val duration = System.currentTimeMillis() - startTime

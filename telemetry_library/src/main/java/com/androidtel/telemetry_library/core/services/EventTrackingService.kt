@@ -49,7 +49,8 @@ internal class EventTrackingService(
         eventName: String,
         attributes: Map<String, Any> = emptyMap(),
         userInfo: UserInfo,
-        sessionInfo: SessionInfo
+        sessionInfo: SessionInfo,
+        timestamp: String? = null
     ): TelemetryEvent? {
         eventCount.incrementAndGet()
         
@@ -57,7 +58,7 @@ internal class EventTrackingService(
             TelemetryEvent(
                 type = "event",
                 eventName = eventName,
-                timestamp = TelemetryTime.now(),
+                timestamp = timestamp ?: TelemetryTime.now(),
                 attributes = it
             )
         }

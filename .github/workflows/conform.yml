@@ -1,0 +1,27 @@
+name: Conformance
+
+# The conformance gate (#145, processor #40): the golden batches must match the real wire and the
+# event catalogue at the tag in catalogue.version. Required on every PR and on release tags.
+on:
+  pull_request:
+  push:
+    tags: ['v*']
+
+jobs:
+  conform:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Goldens match the real wire
+        run: ./gradlew :telemetry_library:testDebugUnitTest --tests '*GoldenBatchSnapshotTest*'
+      - name: Goldens conform to the catalogue
+        run: scripts/conform.sh

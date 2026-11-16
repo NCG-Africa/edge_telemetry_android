@@ -52,13 +52,13 @@ class DeviceStateSnapshotTest {
 
     @Test
     @Config(sdk = [29])
-    fun `thermal_status present as Int at API 29`() {
+    fun `thermal_status present as its catalogue name at API 29`() {
         val power = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         shadowOf(power).setCurrentThermalStatus(PowerManager.THERMAL_STATUS_SEVERE)
 
         val snap = DeviceStateSnapshot.read(context)
 
-        assertEquals(PowerManager.THERMAL_STATUS_SEVERE, snap["device.thermal_status"])
+        assertEquals("severe", snap["device.thermal_status"])
     }
 
     @Test

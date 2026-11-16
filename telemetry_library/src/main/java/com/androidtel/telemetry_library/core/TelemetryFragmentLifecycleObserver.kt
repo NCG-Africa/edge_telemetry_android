@@ -28,16 +28,9 @@ class TelemetryFragmentLifecycleObserver(private val telemetryManager: Telemetry
         val navEvent = navigationTracker.push(fragmentName)
         // Child of a recent interaction (tap→nav) else a new trace root (#59).
         val trace = TraceManager.onNavigation() ?: emptyMap()
-        telemetryManager.recordEvent(
+        telemetryManager.emit(
             eventName = "navigation",
-            attributes = mapOf(
-                "navigation.from_screen" to (navEvent.fromScreen ?: ""),
-                "navigation.to_screen" to navEvent.toScreen,
-                "navigation.method" to navEvent.method.toLowerCaseString(),
-                "navigation.route_type" to "fragment_flow",
-                "navigation.has_arguments" to (f.arguments?.isEmpty == false),
-                "navigation.timestamp" to navEvent.timestamp
-            ) + trace
+            attributes = navEvent.toAttributes("fragment_flow", f.arguments?.isEmpty == false) + trace
         )
     }
 

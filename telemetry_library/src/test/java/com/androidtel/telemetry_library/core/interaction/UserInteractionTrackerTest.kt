@@ -62,7 +62,7 @@ class UserInteractionTrackerTest {
         val attrs = slot<Map<String, Any>>()
         tracker.handleGesture(activity.window, "tap", 540f, 1000f, null)
 
-        verify(exactly = 1) { manager.recordEvent(eq("ui.interaction"), capture(attrs)) }
+        verify(exactly = 1) { manager.emit(eq("ui.interaction"), capture(attrs), any()) }
         verify(exactly = 1) { manager.addBreadcrumb(any(), eq("ui"), any(), any()) }
         assertEquals("tap", attrs.captured["ui.type"])
         assertEquals("View", attrs.captured["ui.target"]) // generateViewId ⇒ class fallback
@@ -86,7 +86,7 @@ class UserInteractionTrackerTest {
 
         tracker.handleGesture(activity.window, "tap", 540f, 1000f, null)
 
-        verify(exactly = 0) { manager.recordEvent(any(), any()) }
+        verify(exactly = 0) { manager.emit(any(), any(), any()) }
     }
 
     @Test
@@ -104,7 +104,7 @@ class UserInteractionTrackerTest {
 
         tracker.handleGesture(activity.window, "tap", 5f, 5f, null)
 
-        verify(exactly = 0) { manager.recordEvent(any(), any()) }
+        verify(exactly = 0) { manager.emit(any(), any(), any()) }
     }
 
     @Test
@@ -119,7 +119,7 @@ class UserInteractionTrackerTest {
         val attrs = slot<Map<String, Any>>()
         tracker.handleGesture(activity.window, "swipe", 100f, 100f, "left")
 
-        verify(exactly = 1) { manager.recordEvent(eq("ui.interaction"), capture(attrs)) }
+        verify(exactly = 1) { manager.emit(eq("ui.interaction"), capture(attrs), any()) }
         assertEquals("swipe", attrs.captured["ui.type"])
         assertEquals("left", attrs.captured["ui.direction"])
     }
@@ -166,11 +166,11 @@ class UserInteractionTrackerTest {
         // Compose has already run onClick and fired its request. The root must exist by now.
         val root = TraceManager.current()
         assertNotNull("root is open at ACTION_UP, not at tap-confirm", root)
-        verify(exactly = 0) { manager.recordEvent(any(), any()) }
+        verify(exactly = 0) { manager.emit(any(), any(), any()) }
 
         tracker.emitInteraction("tap", pending, null)
         val attrs = slot<Map<String, Any>>()
-        verify(exactly = 1) { manager.recordEvent(eq("ui.interaction"), capture(attrs)) }
+        verify(exactly = 1) { manager.emit(eq("ui.interaction"), capture(attrs), any()) }
         assertEquals(root!!.spanId, attrs.captured["rum.action.id"])
         TraceManager.resetForTesting()
     }
@@ -188,7 +188,7 @@ class UserInteractionTrackerTest {
         tracker.mintRoot(activity.window, 10f, 10f)   // onSingleTapConfirmed never fires
 
         assertNotEquals("second tap mints its own root", first, TraceManager.current()!!.spanId)
-        verify(exactly = 0) { manager.recordEvent(any(), any()) }  // Delta 7's idle window reaps both
+        verify(exactly = 0) { manager.emit(any(), any(), any()) }  // Delta 7's idle window reaps both
         TraceManager.resetForTesting()
     }
 
@@ -210,7 +210,7 @@ class UserInteractionTrackerTest {
         assertNull("and crucially no root, or the next request would be parented by it",
             TraceManager.current())
         tracker.emitInteraction("tap", pending, null)
-        verify(exactly = 0) { manager.recordEvent(any(), any()) }
+        verify(exactly = 0) { manager.emit(any(), any(), any()) }
         TraceManager.resetForTesting()
     }
 
@@ -227,7 +227,7 @@ class UserInteractionTrackerTest {
         tracker.emitInteraction("tap", pending, null)
 
         val attrs = slot<Map<String, Any>>()
-        verify(exactly = 1) { manager.recordEvent(eq("ui.interaction"), capture(attrs)) }
+        verify(exactly = 1) { manager.emit(eq("ui.interaction"), capture(attrs), any()) }
         assertEquals("vote", attrs.captured["ui.target"])
         assertEquals("track_tap", attrs.captured["ui.name_source"])
         TraceManager.resetForTesting()

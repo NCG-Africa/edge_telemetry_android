@@ -12,15 +12,15 @@ import com.androidtel.telemetry_library.core.navigation.NavigationStackTracker
 import java.lang.ref.WeakReference
 
 /**
- * Windowed frame-metric collector (issue #54).
+ * Windowed frame-metric collector (issue #54, catalogue frames model processor #33).
  *
- * Replaces the retired per-frame `frame_drop` firehose with at most one `frame.summary` per
- * screen-segment (≤10s), emitted only when the window contained slow frames. All aggregation is
- * O(1)-memory counters updated inside the frame callback — no timer, no external wiring.
+ * One `frame.summary` per screen-segment (≤10s), sent for every window that drew a frame, stamped at
+ * the window's start. All aggregation is O(1)-memory counters updated inside the frame callback — no
+ * timer, no external wiring.
  *
  * A window closes on whichever comes first: the current screen differs from the one captured at
- * window start, or 10s elapse. Thresholds are fixed, Android-Vitals-aligned (slow >16ms,
- * frozen >700ms); the device refresh rate is recorded, not used to move the threshold.
+ * window start, or 10s elapse. Slow = over the frame budget for the display's refresh rate (16.7 ms at
+ * 60 Hz, 8.3 ms at 120 Hz; 60 Hz when unknown); frozen = ≥700 ms.
  *
  * Only functions on devices with API 24+ (Android N) that support FrameMetrics.
  */
@@ -31,6 +31,7 @@ class TelemetryFrameDropCollector(
     private val clock: () -> Long = { SystemClock.elapsedRealtime() },
     private val screenOverride: (() -> String?)? = null,
     private val refreshRateOverride: (() -> Float)? = null,
+    private val epochClock: () -> Long = { System.currentTimeMillis() },
 ) {
     // Store listener reference to enable removal
     private var frameMetricsListener: Window.OnFrameMetricsAvailableListener? = null
@@ -46,6 +47,8 @@ class TelemetryFrameDropCollector(
     // Window aggregator — guarded by @Synchronized (frame callback thread vs. stop() on main thread).
     private var windowOpen = false
     private var windowStart = 0L
+    private var windowStartTime = ""
+    private var slowBudgetMs = 0.0
     private var windowScreen: String? = null
     private var windowRefreshRate = 0f
     private var totalFrames = 0
@@ -113,8 +116,8 @@ class TelemetryFrameDropCollector(
         if (!windowOpen) openWindow()
 
         totalFrames++
-        if (totalMs > SLOW_THRESHOLD_MS) slowFrames++
-        if (totalMs > FROZEN_THRESHOLD_MS) frozenFrames++
+        if (totalMs > slowBudgetMs) slowFrames++
+        if (totalMs >= FROZEN_THRESHOLD_MS) frozenFrames++
         if (totalMs > maxTotalMs) maxTotalMs = totalMs
         if (buildMs > maxBuildMs) maxBuildMs = buildMs
         if (rasterMs > maxRasterMs) maxRasterMs = rasterMs
@@ -127,8 +130,10 @@ class TelemetryFrameDropCollector(
     private fun openWindow() {
         windowOpen = true
         windowStart = clock()
+        windowStartTime = TelemetryTime.isoOf(epochClock())
         windowScreen = currentScreen()
         windowRefreshRate = currentRefreshRate()
+        slowBudgetMs = 1000.0 / (windowRefreshRate.takeIf { it > 0f } ?: DEFAULT_REFRESH_HZ)
         totalFrames = 0
         slowFrames = 0
         frozenFrames = 0
@@ -139,10 +144,10 @@ class TelemetryFrameDropCollector(
 
     private fun flushWindow() {
         if (!windowOpen) return
-        if (slowFrames > 0 && telemetryManager.isFrameTrackingEnabled()) {
-            telemetryManager.recordEvent(
-                eventName = "frame.summary",
-                attributes = mapOf(
+        if (totalFrames > 0 && telemetryManager.isFrameTrackingEnabled()) {
+            telemetryManager.emit(
+                "frame.summary",
+                mapOf(
                     "frame.total_frames" to totalFrames,
                     "frame.slow_frames" to slowFrames,
                     "frame.frozen_frames" to frozenFrames,
@@ -150,10 +155,11 @@ class TelemetryFrameDropCollector(
                     "frame.max_total_duration_ms" to maxTotalMs,
                     "frame.max_build_duration_ms" to maxBuildMs,
                     "frame.max_raster_duration_ms" to maxRasterMs,
-                    "frame.window_duration_ms" to (clock() - windowStart).toDouble(),
+                    "frame.window_duration_ms" to (clock() - windowStart),
                     "display.refresh_rate" to windowRefreshRate,
                     "screen.name" to (windowScreen ?: "")
-                )
+                ),
+                windowStartTime
             )
         }
         windowOpen = false
@@ -165,13 +171,10 @@ class TelemetryFrameDropCollector(
     private fun currentScreen(): String? =
         screenOverride?.invoke()
             ?: NavigationStackTracker.currentScreen()
-            ?: currentActivityRef?.get()?.let { screenNameOf(it) }
+            ?: currentActivityRef?.get()?.javaClass?.simpleName
 
     private fun currentRefreshRate(): Float =
         refreshRateOverride?.invoke() ?: (currentActivityRef?.get()?.let { refreshRateOf(it) } ?: 0f)
-
-    private fun screenNameOf(activity: Activity): String =
-        if (activity.title?.isNotEmpty() == true) activity.title.toString() else activity.javaClass.simpleName
 
     private fun refreshRateOf(activity: Activity): Float = try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -218,7 +221,7 @@ class TelemetryFrameDropCollector(
 
     private companion object {
         const val TAG = "TelemetryFrameDropCollector"
-        const val SLOW_THRESHOLD_MS = 16.0
+        const val DEFAULT_REFRESH_HZ = 60f
         const val FROZEN_THRESHOLD_MS = 700.0
         const val WINDOW_CAP_MS = 10_000L
     }

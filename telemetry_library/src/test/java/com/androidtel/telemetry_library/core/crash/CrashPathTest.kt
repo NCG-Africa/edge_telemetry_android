@@ -37,7 +37,7 @@ class CrashPathTest {
     private lateinit var mockWebServer: MockWebServer
     private lateinit var httpClient: TelemetryHttpClient
     private lateinit var service: CrashReportingService
-    private val gson = Gson()
+    private val gson = com.androidtel.telemetry_library.core.models.batchGson // the replay reader
     private val testApiKey = "edge_test_crash_key"
     private val crashSessionId = "session_frozen_001"
     private val crashUserId = "user_frozen_001"
@@ -103,44 +103,39 @@ class CrashPathTest {
     // 1. Crash-during-session carries context (audit #1 regression guard).
     @Test
     fun `app_crash carries active session and user`() {
-        val attrs = service.buildCrashAttributes(RuntimeException("boom"), isFatal = false, handled = true)
+        val attrs = service.buildCrashAttributes(RuntimeException("boom"), cause = "handled")
         val wire = wireAttributesOf(crashBatch(attrs))
 
         assertEquals(crashSessionId, wire.get("session.id").asString)
         assertEquals(crashUserId, wire.get("user.id").asString)
     }
 
-    // 3. Native is_fatal / handled for every entry point.
+    // 3. Fatal vs handled is the event name; error.cause carries the catalogue enum (#145).
     @Test
-    fun `is_fatal and handled serialize as native booleans`() {
-        val fatal = service.buildCrashAttributes(RuntimeException("f"), isFatal = true, handled = false)
-        val handled = service.buildCrashAttributes(RuntimeException("h"), isFatal = false, handled = true)
+    fun `error_cause carries the catalogue enum`() {
+        val fatal = service.buildCrashAttributes(RuntimeException("f"), cause = "unhandled_exception")
+        val handled = service.buildCrashAttributes(RuntimeException("h"), cause = "handled")
 
-        wireAttributesOf(crashBatch(fatal)).let {
-            assertTrue(it.get("is_fatal").asJsonPrimitive.isBoolean)
-            assertTrue(it.get("is_fatal").asBoolean)
-            assertFalse(it.get("handled").asBoolean)
-        }
-        wireAttributesOf(crashBatch(handled)).let {
-            assertFalse(it.get("is_fatal").asBoolean)
-            assertTrue(it.get("handled").asBoolean)
-        }
+        assertEquals("unhandled_exception", wireAttributesOf(crashBatch(fatal)).get("error.cause").asString)
+        assertEquals("handled", wireAttributesOf(crashBatch(handled)).get("error.cause").asString)
     }
 
     // 4. Canonical unprefixed keys; no dropped/legacy keys.
     @Test
     fun `canonical keys present and legacy keys absent`() {
+        com.androidtel.telemetry_library.core.navigation.NavigationStackTracker().push("Cart")
         val attrs = service.buildCrashAttributes(
-            RuntimeException("boom"), isFatal = false, handled = true, errorCode = "E1", userAction = "tap"
+            RuntimeException("boom"), cause = "handled", errorCode = "E1", userAction = "tap"
         )
         val wire = wireAttributesOf(crashBatch(attrs))
 
-        listOf("message", "stacktrace", "exception_type", "cause", "error_context",
-            "is_fatal", "handled", "crash.breadcrumbs", "user_action", "error_code").forEach {
+        listOf("error.message", "error.stacktrace", "error.type", "error.cause", "screen.name",
+            "error.breadcrumbs", "error.user_action", "error.code").forEach {
             assertTrue("missing canonical key $it", wire.has(it))
         }
-        listOf("error.message", "error.stack_trace", "error.is_fatal", "error.severity_level",
-            "error.breadcrumb_count", "severity_level", "breadcrumb_count", "product_id").forEach {
+        listOf("message", "stacktrace", "exception_type", "cause", "error_context", "is_fatal", "handled",
+            "crash.breadcrumbs", "user_action", "error_code", "error.stack_trace", "error.is_fatal",
+            "error.severity_level", "error.breadcrumb_count", "severity_level", "breadcrumb_count", "product_id").forEach {
             assertFalse("legacy key $it must be gone", wire.has(it))
         }
     }
@@ -149,7 +144,7 @@ class CrashPathTest {
     @Test
     fun `crash send has no X-SDK headers and no data wrapper`() {
         mockWebServer.enqueue(MockResponse().setResponseCode(200))
-        val attrs = service.buildCrashAttributes(RuntimeException("boom"), isFatal = true, handled = false)
+        val attrs = service.buildCrashAttributes(RuntimeException("boom"), cause = "unhandled_exception")
         runBlocking { httpClient.sendBatch(crashBatch(attrs)) }
         val request = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!
 
@@ -174,7 +169,7 @@ class CrashPathTest {
         }
         service.initialize(
             buildAttributesFn = { enrich(it) },
-            recordCrashEventFn = { /* not used on the fatal rail */ },
+            recordErrorEventFn = { /* not used on the fatal rail */ },
             recordHangEventFn = { /* not used on the fatal rail */ }
         )
 
@@ -187,25 +182,25 @@ class CrashPathTest {
         assertEquals("app.crash", event.eventName)
         assertEquals(crashSessionId, event.attributes.session.sessionId)
         assertEquals(crashUserId, event.attributes.user.userId)
-        assertEquals(true, event.attributes.customAttributes["is_fatal"])
-        assertEquals(false, event.attributes.customAttributes["handled"])
-        assertTrue(event.attributes.customAttributes.containsKey("crash.thread"))
+        assertEquals("unhandled_exception", event.attributes.customAttributes["error.cause"])
+        assertTrue(event.attributes.customAttributes.containsKey("error.thread"))
     }
 
     // #60: ANR freeze writes a fully-enriched app.anr to its OWN durable slot (separate from the
-    // crash slot), is_fatal:false/handled:false, all-thread dump with main flagged, standard enrichment.
+    // crash slot), main stack as error.stacktrace, all-thread dump with main flagged, standard enrichment.
     @Test
     fun `anr freeze writes enriched app_anr to its own slot`() {
         val filesDir = RuntimeEnvironment.getApplication().filesDir
         com.androidtel.telemetry_library.core.crash.FatalCrashStore.delete(
             filesDir, com.androidtel.telemetry_library.core.crash.FatalCrashStore.ANR_FILE_NAME
         )
-        service.initialize(buildAttributesFn = { enrich(it) }, recordCrashEventFn = {}, recordHangEventFn = {})
+        service.initialize(buildAttributesFn = { enrich(it) }, recordErrorEventFn = {}, recordHangEventFn = {})
 
         val threads = listOf(
             com.androidtel.telemetry_library.core.anr.ThreadDump("main", "RUNNABLE", true, "at a.b(F:1)"),
             com.androidtel.telemetry_library.core.anr.ThreadDump("worker", "WAITING", false, "at c.d(F:2)")
         )
+        com.androidtel.telemetry_library.core.navigation.NavigationStackTracker().push("Cart")
         service.freezeAnr(durationMs = 5000L, threads = threads)
 
         // Crash slot untouched; ANR rides its own file.
@@ -218,9 +213,9 @@ class CrashPathTest {
         assertEquals(crashSessionId, event.attributes.session.sessionId)
         assertEquals(crashUserId, event.attributes.user.userId)
         val custom = event.attributes.customAttributes
-        assertEquals(false, custom["is_fatal"])
-        assertEquals(false, custom["handled"])
-        assertTrue(custom.containsKey("anr.duration_ms"))
+        assertEquals("anr", custom["error.cause"])
+        assertEquals("at a.b(F:1)", custom["error.stacktrace"])
+        assertEquals(5000L, custom["anr.duration_ms"])
         assertTrue(custom.containsKey("screen.name"))
         // Gson round-trips the dump into a list of maps (customAttributes is Map<String,Any>).
         @Suppress("UNCHECKED_CAST")
@@ -235,7 +230,7 @@ class CrashPathTest {
     @Test
     fun `frozen fatal replays with original session and deletes only on 2xx`() {
         val filesDir = RuntimeEnvironment.getApplication().filesDir
-        val fatalAttrs = service.buildCrashAttributes(RuntimeException("fatal"), isFatal = true, handled = false)
+        val fatalAttrs = service.buildCrashAttributes(RuntimeException("fatal"), cause = "unhandled_exception")
         FatalCrashStore.writeBlocking(filesDir, gson.toJson(crashBatch(fatalAttrs)))
         assertTrue(FatalCrashStore.file(filesDir).exists())
 
@@ -253,7 +248,7 @@ class CrashPathTest {
         val wire = JsonParser.parseString(request.body.readUtf8()).asJsonObject
             .getAsJsonArray("events").get(0).asJsonObject.getAsJsonObject("attributes")
         assertEquals(crashSessionId, wire.get("session.id").asString)
-        assertTrue(wire.get("is_fatal").asBoolean)
+        assertEquals("unhandled_exception", wire.get("error.cause").asString)
         assertFalse("file must be gone after 2xx", FatalCrashStore.file(filesDir).exists())
     }
 
@@ -262,7 +257,7 @@ class CrashPathTest {
     @Test
     fun `rejected frozen crash and ANR are deleted and reported done`() {
         val filesDir = RuntimeEnvironment.getApplication().filesDir
-        val attrs = service.buildCrashAttributes(RuntimeException("fatal"), isFatal = true, handled = false)
+        val attrs = service.buildCrashAttributes(RuntimeException("fatal"), cause = "unhandled_exception")
         httpClient.sleep = {}
         for (slot in listOf(FatalCrashStore.FILE_NAME, FatalCrashStore.ANR_FILE_NAME)) {
             FatalCrashStore.writeBlocking(filesDir, gson.toJson(crashBatch(attrs)), slot)

@@ -7,9 +7,10 @@ import org.junit.Test
 class NavigationMethodTest {
     
     @Test
-    fun `NavigationMethod has exactly three values`() {
+    fun `NavigationMethod has exactly four values`() {
         val values = NavigationMethod.values()
-        assertEquals(3, values.size)
+        assertEquals(4, values.size)
+        assertTrue(values.contains(NavigationMethod.INITIAL))
         assertTrue(values.contains(NavigationMethod.PUSH))
         assertTrue(values.contains(NavigationMethod.POP))
         assertTrue(values.contains(NavigationMethod.REPLACE))
@@ -42,6 +43,7 @@ class NavigationMethodTest {
         assertEquals(0, NavigationMethod.PUSH.ordinal)
         assertEquals(1, NavigationMethod.POP.ordinal)
         assertEquals(2, NavigationMethod.REPLACE.ordinal)
+        assertEquals(3, NavigationMethod.INITIAL.ordinal)
     }
     
     @Test
@@ -52,8 +54,8 @@ class NavigationMethodTest {
     }
     
     @Test
-    fun `toLowerCaseString produces valid Kafka method values`() {
-        val validKafkaMethods = setOf("push", "pop", "replace")
+    fun `toLowerCaseString produces catalogue navigation_method values`() {
+        val validKafkaMethods = setOf("push", "pop", "replace", "tab", "deep_link", "initial", "unknown")
         
         NavigationMethod.values().forEach { method ->
             assertTrue(

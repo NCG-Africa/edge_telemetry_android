@@ -3,7 +3,9 @@ package com.androidtel.telemetry_library.core
 import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.app.Application
+import android.content.ComponentCallbacks2
 import android.content.Context
+import android.content.res.Configuration
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.os.Build
@@ -21,6 +23,7 @@ import com.androidtel.telemetry_library.core.device.DeviceInfoCollector
 import com.androidtel.telemetry_library.core.exit.ExitInfoReader
 import com.androidtel.telemetry_library.core.ids.IdGenerator
 import com.androidtel.telemetry_library.core.startup.AppStartTracker
+import com.androidtel.telemetry_library.core.task.TelemetryTask
 import com.androidtel.telemetry_library.core.trace.TraceManager
 import com.androidtel.telemetry_library.core.trace.TracingCallFactory
 import com.androidtel.telemetry_library.core.services.EventTrackingService
@@ -125,6 +128,8 @@ class TelemetryManager private constructor(
     // Cold-start timer (issue #95). Built at init with the process fork time + importance-at-init;
     // fired by the lifecycle observer's first onResume. Null when screen tracking is off / late init.
     private var appStartTracker: AppStartTracker? = null
+    // Tasks started and not yet ended; abandoned (session_end) when their session ends.
+    private val openTasks = java.util.concurrent.ConcurrentHashMap.newKeySet<TelemetryTask>()
 
     // Helper methods to check feature flags
     internal fun isMemoryTrackingEnabled(): Boolean = config.enableMemoryTracking
@@ -133,8 +138,7 @@ class TelemetryManager private constructor(
     internal fun isUserInteractionEventsEnabled(): Boolean = config.enableUserInteractionEvents
 
     companion object {
-        /** User-driven events that count as session activity for the inactivity timeout (#143). */
-        private val USER_ACTIVITY_EVENTS = setOf("ui.interaction", "navigation")
+        // Every event except these is session activity (processor #39).
         private val SESSION_BOUNDARY_EVENTS = setOf("session.started", "session.finalized")
 
         @Volatile
@@ -359,16 +363,16 @@ class TelemetryManager private constructor(
             TelemetryLog.d("TelemetryManager", "Step 6: UserProfileService initialized")
             
             // Step 7: Initialize CrashReportingService
-            // Crashes ride the same enrichment (buildAttributes) and event sink (recordEvent) as
-            // every other event — one app.crash pipeline, no separate Path B (issue #56).
+            // Crashes ride the same enrichment (buildAttributes) and event sink (emit) as
+            // every other event — one crash pipeline, no separate Path B (issue #56).
             crashReportingService = CrashReportingService(context, config, httpClient)
             crashReportingService.initialize(
                 buildAttributesFn = { attrs -> buildAttributes(attrs) },
                 // Δ11's terminal annotation is applied inside CrashReportingService (buildCrashAttributes
                 // / recordHang), so the frozen-fatal rail — which bypasses this sink entirely — carries
-                // it too.
-                recordCrashEventFn = { attrs -> recordEvent("app.crash", attrs) },
-                recordHangEventFn = { attrs -> recordEvent("app.hang", attrs) }
+                // it too. This sink only sees handled errors: a fatal crash is frozen, never queued.
+                recordErrorEventFn = { attrs -> emit("app.error", attrs) },
+                recordHangEventFn = { attrs -> emit("app.hang", attrs) }
             )
             TelemetryLog.d("TelemetryManager", "Step 7: CrashReportingService initialized")
             
@@ -392,7 +396,15 @@ class TelemetryManager private constructor(
 
             // Step 9b: Initialize memory tracker so memory metrics flow when sampled
             if (config.enableMemoryTracking) {
-                memoryTracker = MemoryTrackerFactory.createMemoryTracker(this)
+                val tracker = MemoryTrackerFactory.createMemoryTracker(this)
+                memoryTracker = tracker
+                // memory.pressure is the OS signal (processor #33): forward every trim callback.
+                context.registerComponentCallbacks(object : ComponentCallbacks2 {
+                    override fun onTrimMemory(level: Int) = tracker.recordTrimMemory(level)
+                    override fun onConfigurationChanged(newConfig: Configuration) {}
+                    @Deprecated("Deprecated in Java")
+                    override fun onLowMemory() {}
+                })
                 TelemetryLog.d("TelemetryManager", "Step 9b: MemoryTracker initialized")
             }
             
@@ -435,7 +447,7 @@ class TelemetryManager private constructor(
                         startUptimeMs = Process.getStartUptimeMillis(),
                         importanceAtInit = memoryState.importance,
                         emit = { type, durationMs ->
-                            recordEvent(
+                            emit(
                                 "app.start",
                                 mapOf("app.start.type" to type, "app.start.duration_ms" to durationMs) +
                                     // Δ8/Δ10 — app.start becomes a span-carrying event: the launch
@@ -495,7 +507,7 @@ class TelemetryManager private constructor(
                 // Step 17: Harvest the OS exit-reason buffer (issue #94) — one app.exit per abnormal
                 // historical death, incl. system ANR/OOM/kill the in-process watchdog can't see.
                 // Blocking I/O, so it rides this Dispatchers.IO launch; no-op below API 30.
-                ExitInfoReader.harvest(context) { attrs -> recordEvent("app.exit", attrs) }
+                ExitInfoReader.harvest(context) { attrs -> emit("app.exit", attrs) }
             }
 
         } catch (e: Exception) {
@@ -512,28 +524,34 @@ class TelemetryManager private constructor(
     private fun emitTimedOutFinalize() {
         if (!::sessionService.isInitialized) return
         val old = sessionService.getFinalizedSessionAttrs() ?: return
-        recordEvent(eventName = "session.finalized", attributes = old + ("session.reason" to "timeout"))
+        emit(eventName = "session.finalized", attributes = old + ("session.reason" to "timeout"))
     }
 
     /**
-     * Inactivity timeout (#143): any event finalizes and rotates a session idle past sessionTimeoutMs,
-     * so no session's span outgrows the timeout plus its activity. Only user activity (foreground, tap,
-     * navigation) refreshes last-active — passive events (http, memory, frames) never extend a session,
-     * so background polling can't keep one alive forever.
+     * The catalogue's rotation rule (processor #39): a session ends after sessionTimeoutMs with no event
+     * other than session.*, or 4 h after it started, whichever comes first. Every other event is
+     * activity and refreshes last-active; backgrounding does not end a session.
      */
-    private fun rotateIfInactive(isUserActivity: Boolean) = synchronized(sessionLock) {
-        if (sessionService.hasSessionTimedOut()) {
-            // The envelope is still the old session's; only the duration needs the idle gap removed.
+    private fun rotateIfInactive() = synchronized(sessionLock) {
+        val reason = when {
+            sessionService.hasSessionTimedOut() -> "timeout"
+            sessionService.hasExceededMaxDuration() -> "max_duration"
+            else -> null
+        }
+        if (reason != null) {
+            abandonOpenTasks()
+            // The envelope is still the old session's; a timeout's duration drops the idle gap.
             if (sessionService.claimFinalize()) {
-                recordEvent("session.finalized", mapOf(
-                    "session.reason" to "timeout",
+                emit("session.finalized", mapOf(
+                    "session.reason" to reason,
                     "session.duration_ms" to sessionService.getActiveDurationMs()
                 ))
             }
             startNewSession()
             TelemetryLog.i("TelemetryManager", "Started new session: ${sessionService.getCurrentSessionId()}")
         }
-        if (isUserActivity) sessionService.updateLastActiveTimestamp()
+        // ponytail: one SharedPreferences apply() per event; apply() coalesces, move to memory if it shows.
+        sessionService.updateLastActiveTimestamp()
     }
 
     /**
@@ -547,7 +565,7 @@ class TelemetryManager private constructor(
             eventTrackingService.getMetricCount(),
             getNetworkType(context)
         )
-        recordEvent(
+        emit(
             eventName = "session.started",
             attributes = mapOf(
                 "session.id" to sessionInfo.sessionId,
@@ -587,7 +605,7 @@ class TelemetryManager private constructor(
         // 1. Check session timeout and start new session if needed
         // (Offline-stored envelopes replay via the flush tick — see sendStoredBatches — not by
         //  restoring them into the in-memory queue, which would re-batch and evict live events.)
-        rotateIfInactive(isUserActivity = true)
+        rotateIfInactive()
         
         // 2. Resume the flush timer
         batchProcessingService.resumeFlushTimer()
@@ -625,7 +643,10 @@ class TelemetryManager private constructor(
         anrWatchdog?.stop()
     }
 
-    // Records a new metric event with the specified details.
+    /**
+     * A host-defined metric, sent as `custom.metric` with the host's name in `metric.name` (processor
+     * #41). No cardinality cap.
+     */
     fun recordMetric(
         metricName: String,
         value: Double,
@@ -635,7 +656,8 @@ class TelemetryManager private constructor(
             offerToPreInitQueue { recordMetric(metricName, value, attributes) }
             return
         }
-        
+        rotateIfInactive()
+
         val userInfo = userProfileService.getUserInfo()
         val sessionInfo = sessionService.getSessionInfo(
             eventTrackingService.getEventCount(),
@@ -643,22 +665,31 @@ class TelemetryManager private constructor(
             getNetworkType(context)
         )
         
-        eventTrackingService.recordMetric(metricName, value, attributes, userInfo, sessionInfo)
+        eventTrackingService.recordMetric("custom.metric", value, attributes + ("metric.name" to metricName), userInfo, sessionInfo)
         maybeSendBatch()
     }
 
-    // Records a new general event with the specified details.
+    /**
+     * A host-defined event, sent as `custom.event` with the host's name in `event.name` (processor #37).
+     * The SDK's own events go through [emit].
+     */
     fun recordEvent(
         eventName: String,
         attributes: Map<String, Any> = emptyMap()
-    ) {
+    ) = emit("custom.event", attributes + ("event.name" to eventName))
+
+    /**
+     * Records one SDK event under its catalogue name. [timestamp] overrides the event time (ISO-8601),
+     * e.g. a frame window's start (#145).
+     */
+    internal fun emit(eventName: String, attributes: Map<String, Any> = emptyMap(), timestamp: String? = null) {
         if (!isReady.get()) {
-            offerToPreInitQueue { recordEvent(eventName, attributes) }
+            offerToPreInitQueue { emit(eventName, attributes, timestamp) }
             return
         }
         // Before enrichment, so the event that ends an idle session lands in the new one. Boundary
         // events are emitted by the rotation itself.
-        if (eventName !in SESSION_BOUNDARY_EVENTS) rotateIfInactive(eventName in USER_ACTIVITY_EVENTS)
+        if (eventName !in SESSION_BOUNDARY_EVENTS) rotateIfInactive()
 
         val userInfo = userProfileService.getUserInfo()
         val sessionInfo = sessionService.getSessionInfo(
@@ -667,7 +698,7 @@ class TelemetryManager private constructor(
             getNetworkType(context)
         )
         
-        eventTrackingService.recordEvent(eventName, attributes, userInfo, sessionInfo)
+        eventTrackingService.recordEvent(eventName, attributes, userInfo, sessionInfo, timestamp)
         maybeSendBatch()
     }
 
@@ -681,19 +712,33 @@ class TelemetryManager private constructor(
         appStartTracker?.onFirstResume()
     }
 
+    // --- Tasks ---
+
+    /**
+     * Start a user task (e.g. checkout). End it with `complete()`, `fail(reason)` or `abandon()`; that
+     * sends one `task.complete`, which feeds the task completion rate. Open tasks are abandoned when
+     * the session ends.
+     */
+    fun startTask(name: String): TelemetryTask =
+        TelemetryTask(name, emit = { emit("task.complete", it) }, onDone = { openTasks.remove(it) })
+            .also { openTasks.add(it) }
+
+    private fun abandonOpenTasks() = openTasks.toList().forEach { it.abandon(TelemetryTask.SOURCE_SESSION_END) }
+
     // --- Crash and Error Reporting ---
+    /** A failure the app caught and survived: sent as `app.error`. Uncaught crashes are captured automatically. */
     fun recordCrash(throwable: Throwable) {
         crashReportingService.recordCrash(throwable)
     }
 
     @Deprecated(
-        message = "Use recordCrash() instead. Backend only processes app.crash events.",
+        message = "Use recordCrash() instead.",
         replaceWith = ReplaceWith("recordCrash(throwable)"),
         level = DeprecationLevel.WARNING
     )
     fun recordError(throwable: Throwable, attributes: Map<String, Any> = emptyMap()) {
         if (debugMode) {
-            TelemetryLog.w("TelemetryManager", "recordError() is deprecated. Use recordCrash() instead. Recording as app.crash.")
+            TelemetryLog.w("TelemetryManager", "recordError() is deprecated. Use recordCrash() instead. Recording as app.error.")
         }
         recordCrash(throwable)
     }
@@ -709,15 +754,13 @@ class TelemetryManager private constructor(
         screenTimingTracker.startScreen(screenRoute)
         // Child of the active action root (tap→nav) else a new trace root (#109).
         val trace = TraceManager.onNavigation() ?: emptyMap()
-        recordEvent(
+        emit(
             eventName = "navigation",
             attributes = mapOf(
-                "navigation.from_screen" to "",
                 "navigation.to_screen" to screenRoute,
                 "navigation.method" to "push",
                 "navigation.route_type" to "compose_route",
-                "navigation.has_arguments" to false,
-                "navigation.timestamp" to TelemetryTime.now()
+                "navigation.has_arguments" to false
             ) + trace
         )
     }
@@ -732,18 +775,16 @@ class TelemetryManager private constructor(
     /**
      * Emit a screen.duration event matching the backend's expected wire format.
      *
-     * Backend dispatch: `event_processor.py` matches `eventName == "screen.duration"` and routes to
-     * `rum_screen_durations` via `extract_screen_duration()`. Required attributes: `screen.name`,
-     * `screen.duration_ms`. Optional: `screen.exit_method`, `screen.timestamp`.
+     * Catalogue `screen.duration` (processor #31): the visit's entry time is the event timestamp minus
+     * `screen.duration_ms`, so no separate timestamp key.
      */
     fun recordScreenDuration(screenName: String, durationMs: Long, exitMethod: String) {
-        recordEvent(
+        emit(
             eventName = "screen.duration",
             attributes = mapOf(
                 "screen.name" to screenName,
                 "screen.duration_ms" to durationMs,
-                "screen.exit_method" to exitMethod,
-                "screen.timestamp" to TelemetryTime.now()
+                "screen.exit_method" to exitMethod
             )
         )
     }
@@ -874,7 +915,7 @@ class TelemetryManager private constructor(
     private fun recordCapabilityTelemetry() {
         if (!config.enableCapabilityEvents) {
             if (debugMode) {
-                TelemetryLog.d("TelemetryManager", "Capability events disabled - skipping telemetry.capabilities_initialized")
+                TelemetryLog.d("TelemetryManager", "Capability events disabled - skipping sdk.capabilities")
             }
             return
         }
@@ -884,13 +925,12 @@ class TelemetryManager private constructor(
             val networkSummary = networkCapabilityDetector.getNetworkCapabilitiesSummary()
             val memorySummary = memoryCapabilityTracker.getMemoryUsageSummary()
             
-            recordEvent(
-                eventName = "telemetry.capabilities_initialized",
+            emit(
+                eventName = "sdk.capabilities",
                 attributes = mapOf(
-                    "device_capabilities" to capabilitySummary,
-                    "network_capabilities" to networkSummary,
-                    "memory_status" to memorySummary,
-                    "initialization_timestamp" to TelemetryTime.now()
+                    "capabilities.device" to capabilitySummary,
+                    "capabilities.network" to networkSummary,
+                    "capabilities.memory" to memorySummary
                 )
             )
             
@@ -1012,9 +1052,8 @@ class TelemetryManager private constructor(
             put("user.name", name ?: "")
             put("user.email", email ?: "")
             put("user.phone", phone ?: "")
-            put("user.profile_updated_at", TelemetryTime.now())
         }
-        recordEvent(eventName = "user.profile.update", attributes = attributes)
+        emit(eventName = "user.profile.update", attributes = attributes)
     }
 
     /**
@@ -1101,8 +1140,9 @@ class TelemetryManager private constructor(
      * network.type — that's the full set the schema requires.
      */
     fun endCurrentSession() {
+        abandonOpenTasks()
         if (::sessionService.isInitialized && sessionService.claimFinalize()) {
-            recordEvent("session.finalized", mapOf(
+            emit("session.finalized", mapOf(
                 "session.reason" to "manual"
             ))
         }
@@ -1147,6 +1187,12 @@ class TelemetryManager private constructor(
      * Get breadcrumb manager (for internal use)
      */
     internal fun getBreadcrumbManager(): BreadcrumbManager? = crashReportingService.getBreadcrumbManager()
+
+    // Golden snapshot seams (#145): the queued events as recorded, and the ANR/hang rail.
+    internal fun drainForTesting(): List<com.androidtel.telemetry_library.core.models.TelemetryEvent> =
+        generateSequence { eventTrackingService.getEventQueue().poll() }.toList()
+
+    internal fun crashReportingForTesting(): CrashReportingService = crashReportingService
 
 
     // ================================

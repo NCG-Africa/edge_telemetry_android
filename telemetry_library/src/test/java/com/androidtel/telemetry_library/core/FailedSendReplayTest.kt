@@ -36,7 +36,10 @@ class FailedSendReplayTest {
     private lateinit var server: MockWebServer
 
     private data class Hit(val code: Int, val env: JsonObject) {
-        val names get() = env.getAsJsonArray("events").map { it.asJsonObject.get("eventName")?.asString }
+        // A host event's own name rides custom.event's event.name.
+        val names get() = env.getAsJsonArray("events").map {
+            it.asJsonObject.getAsJsonObject("attributes")?.get("event.name")?.asString ?: it.asJsonObject.get("eventName")?.asString
+        }
         val sentAt: Instant get() = Instant.parse(env.get("timestamp").asString)
     }
 
@@ -127,7 +130,7 @@ class FailedSendReplayTest {
     }
 
     private fun queued(name: String) =
-        runBlocking { OfflineBatchStorage(app).getStoredBatches() }.any { b -> b.events.any { it.eventName == name } }
+        runBlocking { OfflineBatchStorage(app).getStoredBatches() }.any { b -> b.events.any { it.attributes.customAttributes["event.name"] == name } }
 
     private fun hit(name: String, code: Int) = hits.firstOrNull { it.code == code && name in it.names }
 

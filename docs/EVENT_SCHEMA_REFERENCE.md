@@ -1,5 +1,14 @@
 # Event Schema Reference
 
+> ## The event catalogue is the contract
+>
+> Event names, keys, types and units are defined by the processor's event catalogue
+> ([`docs/catalogue/`](https://github.com/NCG-Africa/edge_telemetry_processor_go/tree/catalogue-v4.2/docs/catalogue))
+> at the tag pinned in [`catalogue.version`](../catalogue.version). The exact wire for every event this
+> SDK sends is in the golden batches, [`telemetry_library/src/test/resources/golden/`](../telemetry_library/src/test/resources/golden/),
+> checked against the catalogue on every PR (`scripts/conform.sh`). Where this document disagrees, the
+> catalogue wins.
+
 > ## ⚠️ Stale — do not use as a backend contract
 >
 > This document was last updated **2026-03-23** against SDK **2.1.0** (`6a23c4e`). The SDK is now **2.2.2**.

@@ -44,7 +44,7 @@ class WireContractV3Test {
             .connectTimeout(1, TimeUnit.SECONDS)
             .readTimeout(1, TimeUnit.SECONDS)
             .build()
-        every { telemetryManager.recordEvent("http.request", capture(recorded)) } returns Unit
+        every { telemetryManager.emit(eq("http.request"), capture(recorded), any()) } returns Unit
         TraceManager.resetForTesting()
         TraceManager.clock = { 1_000L }
         TraceManager.traceSampleRate = 1.0

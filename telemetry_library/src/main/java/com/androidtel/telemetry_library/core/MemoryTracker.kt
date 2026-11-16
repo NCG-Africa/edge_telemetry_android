@@ -1,338 +1,121 @@
 package com.androidtel.telemetry_library.core
 
-import android.os.Build
+import android.app.ActivityManager
+import android.content.ComponentCallbacks2
+import android.content.Context
+import android.os.Debug
+import android.os.Environment
+import android.os.StatFs
 import com.androidtel.telemetry_library.core.log.TelemetryLog
 
 /**
- * Unified memory tracking interface that provides consistent memory telemetry
- * across all Android API levels with progressive enhancement.
+ * Memory and storage samples on the catalogue's names (processor #33, #145):
+ *  - `memory.usage`: the periodic sample. `memory.usage_mb` = the process's total PSS in MB.
+ *  - `memory.pressure`: the OS signal, `onTrimMemory`, with its level mapped to `normal|moderate|critical`.
+ *  - `storage.usage`: internal storage, MB.
  */
 interface MemoryTracker {
-    /**
-     * Record memory usage with appropriate detail level for device capabilities
-     */
     fun recordMemoryUsage()
-    
-    /**
-     * Record storage usage information
-     */
     fun recordStorageUsage()
-    
-    /**
-     * Get current memory pressure level
-     */
+    /** Forward of `ComponentCallbacks2.onTrimMemory`; emits `memory.pressure` for pressure levels. */
+    fun recordTrimMemory(level: Int)
+    /** The last trim level's catalogue pressure: `normal` until the OS says otherwise. */
     fun getCurrentMemoryPressure(): String
-    
-    /**
-     * Check if device is under memory pressure
-     */
     fun isUnderMemoryPressure(): Boolean
 }
 
-/**
- * Factory for creating appropriate memory tracker based on device capabilities
- */
 object MemoryTrackerFactory {
-    
-    private const val TAG = "MemoryTrackerFactory"
-    
-    /**
-     * Create memory tracker with appropriate implementation for device API level
-     */
-    fun createMemoryTracker(telemetryManager: TelemetryManager): MemoryTracker {
-        return try {
-            val capabilities = telemetryManager.getDeviceCapabilities()
-            val memoryCapabilityTracker = telemetryManager.getMemoryCapabilityTracker()
-            
-            when {
-                // Enhanced memory tracking (API 21+ with MemoryCapabilityTracker)
-                capabilities != null && memoryCapabilityTracker != null -> {
-                    TelemetryLog.d(TAG, "Creating enhanced memory tracker for API ${Build.VERSION.SDK_INT}")
-                    EnhancedMemoryTracker(telemetryManager, memoryCapabilityTracker)
-                }
-                
-                // Basic memory tracking (fallback for API 21+)
-                else -> {
-                    TelemetryLog.d(TAG, "Creating basic memory tracker for API ${Build.VERSION.SDK_INT}")
-                    BasicMemoryTracker(telemetryManager)
-                }
-            }
-        } catch (e: Exception) {
-            TelemetryLog.w(TAG, "Error creating memory tracker, using basic fallback: ${e.localizedMessage}")
-            BasicMemoryTracker(telemetryManager)
-        }
-    }
+    fun createMemoryTracker(telemetryManager: TelemetryManager): MemoryTracker =
+        ProcessMemoryTracker(telemetryManager, telemetryManager.applicationContext)
 }
 
-/**
- * Enhanced memory tracker using MemoryCapabilityTracker for detailed insights
- */
-class EnhancedMemoryTracker(
+internal class ProcessMemoryTracker(
     private val telemetryManager: TelemetryManager,
-    private val memoryCapabilityTracker: MemoryCapabilityTracker
+    private val context: Context,
+    // Seam: Debug.getPss() (kB). Robolectric returns 0.
+    private val pssKb: () -> Long = { Debug.getPss() }
 ) : MemoryTracker {
-    
-    companion object {
-        private const val TAG = "EnhancedMemoryTracker"
-    }
-    
-    override fun recordMemoryUsage() {
-        // Check if memory tracking is enabled
-        if (!telemetryManager.isMemoryTrackingEnabled()) {
-            return
-        }
-        
-        try {
-            val memorySummary = memoryCapabilityTracker.getMemoryUsageSummary()
-            val memoryInfo = memoryCapabilityTracker.getMemoryInfo()
-            val isUnderPressure = memoryCapabilityTracker.isUnderMemoryPressure()
-            
-            val pressureLevel = calculatePressureLevel(memorySummary, isUnderPressure)
-            
-            // Create standardized memory event
-            val memoryAttributes = createStandardizedMemoryEvent(
-                memorySummary, memoryInfo, pressureLevel, isUnderPressure, "enhanced"
-            )
-            
-            telemetryManager.recordEvent(
-                eventName = "memory_pressure",
-                attributes = memoryAttributes
-            )
-            
-            // Record primary memory metric
-            val heapUsedMb = memorySummary["heap_used_mb"] as? Long ?: 0L
-            telemetryManager.recordMetric(
-                metricName = "memory_usage",
-                value = heapUsedMb.toDouble(),
-                attributes = mapOf(
-                    "metric.unit" to "MB",
-                    "memory.type" to "heap",
-                    "memory.source" to "enhanced_tracker",
-                    "memory.pressure_level" to pressureLevel
-                )
-            )
-            
-            TelemetryLog.d(TAG, "Enhanced memory usage recorded: ${heapUsedMb}MB, pressure=$pressureLevel")
-            
-        } catch (e: Exception) {
-            TelemetryLog.w(TAG, "Error recording enhanced memory usage: ${e.localizedMessage}")
-        }
-    }
-    
-    override fun recordStorageUsage() {
-        // Check if storage tracking is enabled
-        if (!telemetryManager.isStorageTrackingEnabled()) {
-            return
-        }
-        
-        try {
-            val storageInfo = memoryCapabilityTracker.getStorageInfo()
-            
-            val storageAttributes = mutableMapOf<String, Any>(
-                "storage.api_level" to Build.VERSION.SDK_INT,
-                "storage.tracking_method" to "enhanced"
-            )
-            
-            // Add storage metrics
-            storageInfo["internal_total_bytes"]?.let { 
-                storageAttributes["storage.internal_total_mb"] = (it as Long) / (1024 * 1024)
-            }
-            storageInfo["internal_free_bytes"]?.let { 
-                storageAttributes["storage.internal_free_mb"] = (it as Long) / (1024 * 1024)
-            }
-            storageInfo["internal_usable_bytes"]?.let { 
-                storageAttributes["storage.internal_usable_mb"] = (it as Long) / (1024 * 1024)
-            }
-            
-            telemetryManager.recordEvent(
-                eventName = "storage_usage",
-                attributes = storageAttributes
-            )
-            
-        } catch (e: Exception) {
-            TelemetryLog.w(TAG, "Error recording storage usage: ${e.localizedMessage}")
-        }
-    }
-    
-    override fun getCurrentMemoryPressure(): String {
-        return try {
-            val memorySummary = memoryCapabilityTracker.getMemoryUsageSummary()
-            val isUnderPressure = memoryCapabilityTracker.isUnderMemoryPressure()
-            calculatePressureLevel(memorySummary, isUnderPressure)
-        } catch (e: Exception) {
-            TelemetryLog.w(TAG, "Error getting memory pressure: ${e.localizedMessage}")
-            "unknown"
-        }
-    }
-    
-    override fun isUnderMemoryPressure(): Boolean {
-        return try {
-            memoryCapabilityTracker.isUnderMemoryPressure()
-        } catch (e: Exception) {
-            TelemetryLog.w(TAG, "Error checking memory pressure: ${e.localizedMessage}")
-            false
-        }
-    }
-    
-    private fun calculatePressureLevel(memorySummary: Map<String, Any>, isUnderPressure: Boolean): String {
-        return try {
-            if (isUnderPressure || memorySummary["system_low_memory"] == true) {
-                return "high"
-            }
-            
-            val heapUsedMb = memorySummary["heap_used_mb"] as? Long ?: 0L
-            val heapMaxMb = memorySummary["heap_max_mb"] as? Long ?: 1L
-            val systemAvailableMb = memorySummary["system_available_mb"] as? Long ?: Long.MAX_VALUE
-            val memoryClassMb = memorySummary["memory_class_mb"] as? Int ?: 64
-            
-            val heapUsageRatio = heapUsedMb.toDouble() / heapMaxMb.toDouble()
-            val systemPressure = systemAvailableMb < memoryClassMb * 2
-            
-            when {
-                heapUsageRatio > 0.85 || systemPressure -> "high"
-                heapUsageRatio > 0.65 -> "moderate"
-                else -> "low"
-            }
-        } catch (e: Exception) {
-            "unknown"
-        }
-    }
-}
 
-/**
- * Basic memory tracker using Runtime for API 21+ fallback
- */
-class BasicMemoryTracker(
-    private val telemetryManager: TelemetryManager
-) : MemoryTracker {
-    
-    companion object {
-        private const val TAG = "BasicMemoryTracker"
-    }
-    
+    @Volatile
+    private var pressure = PRESSURE_NORMAL
+
     override fun recordMemoryUsage() {
-        // Check if memory tracking is enabled
-        if (!telemetryManager.isMemoryTrackingEnabled()) {
-            return
-        }
-        
+        if (!telemetryManager.isMemoryTrackingEnabled()) return
         try {
             val runtime = Runtime.getRuntime()
-            val usedMb = (runtime.totalMemory() - runtime.freeMemory()) / (1024.0 * 1024.0)
-            val maxMb = runtime.maxMemory() / (1024.0 * 1024.0)
-            val freeMb = runtime.freeMemory() / (1024.0 * 1024.0)
-            
-            val pressureLevel = when {
-                usedMb < maxMb * 0.5 -> "low"
-                usedMb < maxMb * 0.75 -> "moderate"
-                else -> "high"
+            val system = ActivityManager.MemoryInfo().also {
+                (context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).getMemoryInfo(it)
             }
-            
-            // Create standardized memory event
-            val memoryAttributes = createStandardizedMemoryEvent(
+            telemetryManager.emit(
+                "memory.usage",
                 mapOf(
-                    "heap_used_mb" to usedMb.toLong(),
-                    "heap_max_mb" to maxMb.toLong(),
-                    "heap_free_mb" to freeMb.toLong()
-                ),
-                emptyMap(),
-                pressureLevel,
-                pressureLevel == "high",
-                "basic"
-            )
-            
-            telemetryManager.recordEvent(
-                eventName = "memory_pressure",
-                attributes = memoryAttributes
-            )
-            
-            telemetryManager.recordMetric(
-                metricName = "memory_usage",
-                value = usedMb,
-                attributes = mapOf(
-                    "metric.unit" to "MB",
-                    "memory.type" to "heap",
-                    "memory.source" to "basic_tracker",
-                    "memory.pressure_level" to pressureLevel
+                    "memory.usage_mb" to usageMb(),
+                    "memory.source" to "pss",
+                    "memory.heap_used_mb" to mb(runtime.totalMemory() - runtime.freeMemory()),
+                    "memory.heap_max_mb" to mb(runtime.maxMemory()),
+                    "memory.system_available_mb" to mb(system.availMem),
+                    "memory.total_mb" to mb(system.totalMem)
                 )
             )
-            
-            TelemetryLog.d(TAG, "Basic memory usage recorded: ${usedMb.toInt()}MB/${maxMb.toInt()}MB")
-            
         } catch (e: Exception) {
-            TelemetryLog.e(TAG, "Error recording basic memory usage: ${e.localizedMessage}")
+            TelemetryLog.w(TAG, "Memory sample failed: ${e.localizedMessage}")
         }
     }
-    
-    override fun recordStorageUsage() {
-        // Basic storage tracking not implemented in fallback
-        TelemetryLog.d(TAG, "Storage tracking not available in basic mode")
-    }
-    
-    override fun getCurrentMemoryPressure(): String {
-        return try {
-            val runtime = Runtime.getRuntime()
-            val usedMb = (runtime.totalMemory() - runtime.freeMemory()) / (1024.0 * 1024.0)
-            val maxMb = runtime.maxMemory() / (1024.0 * 1024.0)
-            
-            when {
-                usedMb < maxMb * 0.5 -> "low"
-                usedMb < maxMb * 0.75 -> "moderate"
-                else -> "high"
-            }
-        } catch (e: Exception) {
-            "unknown"
-        }
-    }
-    
-    override fun isUnderMemoryPressure(): Boolean {
-        return getCurrentMemoryPressure() == "high"
-    }
-}
 
-/**
- * Create standardized memory event attributes across all implementations
- */
-private fun createStandardizedMemoryEvent(
-    memorySummary: Map<String, Any>,
-    memoryInfo: Map<String, Any>,
-    pressureLevel: String,
-    isUnderPressure: Boolean,
-    trackingMethod: String
-): Map<String, Any> {
-    
-    val attributes = mutableMapOf<String, Any>(
-        // Core attributes (always present)
-        "memory.pressure_level" to pressureLevel,
-        "memory.under_system_pressure" to isUnderPressure,
-        "memory.api_level" to Build.VERSION.SDK_INT,
-        "memory.tracking_method" to trackingMethod,
-        "memory.timestamp" to TelemetryTime.now()
-    )
-    
-    // Basic heap memory (available in all implementations)
-    memorySummary["heap_used_mb"]?.let { attributes["memory.heap_used_mb"] = it }
-    memorySummary["heap_max_mb"]?.let { attributes["memory.heap_max_mb"] = it }
-    memorySummary["heap_free_mb"]?.let { attributes["memory.heap_free_mb"] = it }
-    
-    // System memory (enhanced implementations)
-    memorySummary["system_available_mb"]?.let { attributes["memory.system_available_mb"] = it }
-    memorySummary["system_low_memory"]?.let { attributes["memory.system_low_memory"] = it }
-    memorySummary["memory_class_mb"]?.let { attributes["memory.app_memory_class_mb"] = it }
-    memorySummary["large_memory_class_mb"]?.let { attributes["memory.large_memory_class_mb"] = it }
-    
-    // Advanced memory info (API 16+)
-    memoryInfo["system_total_bytes"]?.let { 
-        attributes["memory.system_total_mb"] = (it as Long) / (1024 * 1024) 
+    override fun recordStorageUsage() {
+        if (!telemetryManager.isStorageTrackingEnabled()) return
+        try {
+            val stat = StatFs(Environment.getDataDirectory().path)
+            telemetryManager.emit(
+                "storage.usage",
+                mapOf(
+                    "storage.internal_total_mb" to mb(stat.totalBytes),
+                    "storage.internal_free_mb" to mb(stat.freeBytes),
+                    "storage.internal_usable_mb" to mb(stat.availableBytes)
+                )
+            )
+        } catch (e: Exception) {
+            TelemetryLog.w(TAG, "Storage sample failed: ${e.localizedMessage}")
+        }
     }
-    memoryInfo["memory_threshold_bytes"]?.let { 
-        attributes["memory.system_threshold_mb"] = (it as Long) / (1024 * 1024) 
+
+    override fun recordTrimMemory(level: Int) {
+        // UI_HIDDEN is "went to background", not memory pressure.
+        val mapped = TRIM_LEVELS[level] ?: return
+        pressure = mapped.second
+        if (!telemetryManager.isMemoryTrackingEnabled()) return
+        telemetryManager.emit(
+            "memory.pressure",
+            mapOf(
+                "memory.pressure_level" to mapped.second,
+                "memory.trim_level" to mapped.first,
+                "memory.usage_mb" to usageMb()
+            )
+        )
     }
-    
-    // Detailed memory breakdown (API 26+)
-    memoryInfo["native_heap_kb"]?.let { attributes["memory.native_heap_kb"] = it }
-    memoryInfo["total_pss_kb"]?.let { attributes["memory.total_pss_kb"] = it }
-    memoryInfo["process_total_pss_kb"]?.let { attributes["memory.process_pss_kb"] = it }
-    
-    return attributes
+
+    override fun getCurrentMemoryPressure(): String = pressure
+
+    override fun isUnderMemoryPressure(): Boolean = pressure != PRESSURE_NORMAL
+
+    private fun usageMb(): Double = pssKb() / 1024.0
+
+    private fun mb(bytes: Long): Double = bytes / 1_048_576.0
+
+    private companion object {
+        const val TAG = "MemoryTracker"
+        const val PRESSURE_NORMAL = "normal"
+
+        // Trim level -> (memory.trim_level, memory.pressure_level). Background levels are the
+        // process's place in the LRU list: near the front is normal, the end is about to be killed.
+        @Suppress("DEPRECATION")
+        val TRIM_LEVELS = mapOf(
+            ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE to ("running_moderate" to "moderate"),
+            ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW to ("running_low" to "moderate"),
+            ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL to ("running_critical" to "critical"),
+            ComponentCallbacks2.TRIM_MEMORY_BACKGROUND to ("background" to "normal"),
+            ComponentCallbacks2.TRIM_MEMORY_MODERATE to ("moderate" to "moderate"),
+            ComponentCallbacks2.TRIM_MEMORY_COMPLETE to ("complete" to "critical")
+        )
+    }
 }

@@ -13,6 +13,7 @@ import com.androidtel.telemetry_library.core.navigation.NavigationStackTracker
 import com.androidtel.telemetry_library.core.trace.TraceManager
 import com.androidtel.telemetry_library.core.models.EventAttributes
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
+import com.androidtel.telemetry_library.core.models.batchGson
 import com.androidtel.telemetry_library.core.models.TelemetryEvent
 import com.androidtel.telemetry_library.core.retry.CrashReplay
 import com.google.gson.Gson
@@ -32,17 +33,18 @@ import java.util.concurrent.atomic.AtomicBoolean
  *    thread and freeze it to `filesDir` (blocking write + fsync) BEFORE re-throwing. Replayed on the
  *    next `initialize()` and deleted only after a 2xx — survives an offline process death with no
  *    loss and no duplication.
- *  - **Normal batch** (`trackError` / `recordCrash`): enrich as `app.crash` and hand to the standard
- *    event sink — same batching, flush, and offline retry as every event.
+ *  - **Normal batch** (`trackError` / `recordCrash`): enrich as `app.error` (handled, the app kept
+ *    running) and hand to the standard event sink — same batching, flush, and offline retry as every
+ *    event.
  *
- * `is_fatal`/`handled` are native JSON bools; keys are D1-canonical (unprefixed).
+ * Keys are the catalogue's `error.*` (processor #30). Fatal vs handled is the event name, not a flag.
  */
 internal class CrashReportingService(
     private val context: Context,
     private val config: TelemetryConfig,
     private val httpClient: TelemetryHttpClient
 ) {
-    private val gson = Gson()
+    private val gson = batchGson
     private var breadcrumbManager: BreadcrumbManager? = null
 
     // Atomic so concurrent initialize() calls can't double-install the UncaughtExceptionHandler.
@@ -50,7 +52,7 @@ internal class CrashReportingService(
 
     // Enrichment + normal-batch sinks, injected from TelemetryManager at initialize().
     private var buildAttributesFn: ((Map<String, Any>) -> EventAttributes?)? = null
-    private var recordCrashEventFn: ((Map<String, Any>) -> Unit)? = null
+    private var recordErrorEventFn: ((Map<String, Any>) -> Unit)? = null
     private var recordHangEventFn: ((Map<String, Any>) -> Unit)? = null
 
     // trackError context. product_id no longer reaches the wire (D1) — setProductContext is retained
@@ -59,11 +61,11 @@ internal class CrashReportingService(
 
     fun initialize(
         buildAttributesFn: (Map<String, Any>) -> EventAttributes?,
-        recordCrashEventFn: (Map<String, Any>) -> Unit,
+        recordErrorEventFn: (Map<String, Any>) -> Unit,
         recordHangEventFn: (Map<String, Any>) -> Unit
     ) {
         this.buildAttributesFn = buildAttributesFn
-        this.recordCrashEventFn = recordCrashEventFn
+        this.recordErrorEventFn = recordErrorEventFn
         this.recordHangEventFn = recordHangEventFn
         breadcrumbManager = BreadcrumbManager()
 
@@ -99,11 +101,10 @@ internal class CrashReportingService(
     private fun freezeFatalCrash(thread: Thread, throwable: Throwable) {
         val attrs = buildCrashAttributes(
             throwable = throwable,
-            isFatal = true,
-            handled = false,
+            cause = CAUSE_UNHANDLED,
             extra = mapOf(
-                "crash.thread" to thread.name,
-                "crash.is_main_thread" to (thread.name == "main")
+                "error.thread" to thread.name,
+                "error.is_main_thread" to (thread.name == "main")
             ) + DeviceStateSnapshot.read(context)
         )
         val enriched = buildAttributesFn?.invoke(attrs) ?: return
@@ -134,8 +135,8 @@ internal class CrashReportingService(
     /**
      * ANR detected by the watchdog. Runs on the watchdog thread — off the blocked main thread — so it
      * builds a fully-enriched `app.anr` event and freezes it to its own slot on the durable `filesDir`
-     * rail BEFORE the system may kill the app for the same hang. `is_fatal:false`/`handled:false`: a
-     * watchdog fire isn't a crash and wasn't caught by app code. Session/user are frozen at detection
+     * rail BEFORE the system may kill the app for the same hang. The main thread's stack is the
+     * `error.stacktrace`; the all-thread dump rides `anr.threads`. Session/user are frozen at detection
      * time by the standard enrichment.
      *
      * ponytail: durable-only — freeze here, deliver on next init via [replayAnrIfAny]. Spec §5 also
@@ -144,13 +145,17 @@ internal class CrashReportingService(
      * delete the slot once that batch is acked, if surviving-process ANRs must report same-session.
      */
     fun freezeAnr(durationMs: Long, threads: List<ThreadDump>) {
-        val attrs = mapOf<String, Any>(
-            "is_fatal" to false,
-            "handled" to false,
+        val main = threads.firstOrNull { it.main }
+        val attrs = mutableMapOf<String, Any>(
+            "error.cause" to "anr",
+            "error.type" to "ANR",
+            "error.message" to "Main thread blocked for $durationMs ms",
             "anr.duration_ms" to durationMs,
-            "screen.name" to (NavigationStackTracker.currentScreen() ?: ""),
             "anr.threads" to threads
-        ) + DeviceStateSnapshot.read(context)
+        )
+        NavigationStackTracker.currentScreen()?.let { attrs["screen.name"] = it }
+        main?.let { attrs["error.stacktrace"] = it.stack; attrs["error.thread"] = it.name }
+        attrs += DeviceStateSnapshot.read(context)
         val enriched = buildAttributesFn?.invoke(attrs) ?: return
         val event = TelemetryEvent(
             type = "event",
@@ -173,18 +178,19 @@ internal class CrashReportingService(
     /**
      * Sub-5s main-thread stall detected by the watchdog. Runs on the watchdog thread. Unlike ANR, a
      * hang doesn't get the app killed (it's below the ANR line by definition), so it rides the normal
-     * batch — no `filesDir` persistence (spec §6). Main-thread stack only (§4). `is_fatal:false`.
+     * batch — no `filesDir` persistence (spec §6). Main-thread stack only (§4), as `error.stacktrace`.
      * Session/user are frozen at detection time by the standard enrichment on the sink.
      */
     fun recordHang(durationMs: Long, stack: String) {
         recordHangEventFn?.invoke(
             mapOf(
-                "is_fatal" to false,
-                "handled" to false,
+                "error.cause" to "hang",
+                "error.type" to "Hang",
+                "error.message" to "Main thread blocked for $durationMs ms",
                 "hang.duration_ms" to durationMs,
-                "screen.name" to (NavigationStackTracker.currentScreen() ?: ""),
-                "hang.stack" to stack
-            ) + DeviceStateSnapshot.read(context)
+                "error.stacktrace" to stack
+            ) + listOfNotNull(NavigationStackTracker.currentScreen()?.let { "screen.name" to it })
+                + DeviceStateSnapshot.read(context)
                 // Delta 11 - the watchdog detects from its OWN thread and can never read the main
                 // thread's carrier, so without this cross-thread annotation a hang carries no action at
                 // all -- and a hang is exactly where "what was the user doing" matters most.
@@ -227,22 +233,20 @@ internal class CrashReportingService(
         }
         val attrs = buildCrashAttributes(
             throwable = throwable,
-            isFatal = false,
-            handled = true,
+            cause = CAUSE_HANDLED,
             errorCode = errorCode,
             userAction = userAction,
             stackTraceOverride = stackTraceOverride,
             extra = attributes?.mapValues { it.value as Any } ?: emptyMap()
         )
-        recordCrashEventFn?.invoke(attrs) ?: TelemetryLog.w(TAG, "Crash event sink not wired")
+        recordErrorEventFn?.invoke(attrs) ?: TelemetryLog.w(TAG, "Error event sink not wired")
     }
 
-    // --- Canonical app.crash attribute set (D1: unprefixed, natively-typed) ---
+    // --- Catalogue app.crash / app.error attribute set (error.*, natively typed) ---
 
     internal fun buildCrashAttributes(
         throwable: Throwable,
-        isFatal: Boolean,
-        handled: Boolean,
+        cause: String,
         errorCode: String? = null,
         userAction: String? = null,
         stackTraceOverride: String? = null,
@@ -250,17 +254,16 @@ internal class CrashReportingService(
     ): Map<String, Any> {
         val stacktrace = stackTraceOverride ?: stackTraceOf(throwable)
         val attrs = mutableMapOf<String, Any>(
-            "message" to "${throwable.javaClass.name}: ${throwable.message ?: ""}".take(1000),
-            "stacktrace" to stacktrace.take(2000),
-            "exception_type" to throwable.javaClass.simpleName.take(255),
-            "cause" to (throwable.cause?.message ?: "unknown").take(255),
-            "error_context" to extractErrorContext(stacktrace).take(500),
-            "is_fatal" to isFatal,
-            "handled" to handled,
-            "crash.breadcrumbs" to (breadcrumbManager?.getBreadcrumbsAsJson() ?: "[]")
+            "error.message" to "${throwable.javaClass.name}: ${throwable.message ?: ""}".take(1000),
+            "error.stacktrace" to stacktrace.take(2000),
+            "error.type" to throwable.javaClass.simpleName.take(255),
+            "error.cause" to cause,
+            "error.breadcrumbs" to (breadcrumbManager?.getBreadcrumbsAsJson() ?: "[]")
         )
-        (userAction ?: lastUserAction)?.let { attrs["user_action"] = it.take(500) }
-        errorCode?.let { attrs["error_code"] = it.take(100) }
+        // The processor's error_context column is the screen at failure time (#30); absent when unknown.
+        NavigationStackTracker.currentScreen()?.let { attrs["screen.name"] = it }
+        (userAction ?: lastUserAction)?.let { attrs["error.user_action"] = it.take(500) }
+        errorCode?.let { attrs["error.code"] = it.take(100) }
         // Delta 11 - join keys for the action that was live at crash time. Applied here rather than at
         // the sink so the frozen-fatal rail (freezeFatalCrash, which builds its own event) carries them
         // too. A background-thread crash reads an empty carrier; this reference does not care which
@@ -304,22 +307,10 @@ internal class CrashReportingService(
         return sw.toString()
     }
 
-    private fun extractErrorContext(stackTrace: String): String {
-        return try {
-            val firstFrame = stackTrace.lines().firstOrNull { it.trim().startsWith("at ") } ?: return "unknown"
-            val atIndex = firstFrame.indexOf("at ")
-            if (atIndex == -1) return "unknown"
-            val methodPart = firstFrame.substring(atIndex + 3).trim()
-            val parenIndex = methodPart.indexOf("(")
-            val fullMethod = if (parenIndex > 0) methodPart.substring(0, parenIndex) else methodPart
-            val parts = fullMethod.split(".")
-            if (parts.size >= 2) "${parts[parts.size - 2]}.${parts[parts.size - 1]}" else fullMethod
-        } catch (e: Exception) {
-            "unknown"
-        }
-    }
-
     companion object {
         private const val TAG = "CrashReportingService"
+        // error.cause enum values (catalogue attributes.yaml).
+        const val CAUSE_UNHANDLED = "unhandled_exception"
+        const val CAUSE_HANDLED = "handled"
     }
 }
