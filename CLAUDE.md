@@ -85,8 +85,8 @@ edge_telemetry_android/
     ├── EVENT_SCHEMA_REFERENCE.md        # Wire format per event type
     ├── API_KEY_GUIDE.md                 # API key setup for consumers
     ├── MIGRATION_GUIDE_V2.md            # v1 → v2 consumer migration
-    ├── specs/                           # Per-feature design specs (tracked via GitHub issues, see wayfinder #29)
-    └── agents/issue-tracker.md          # Issue-tracker conventions for agent skills
+    └── specs/                           # Per-feature design specs (tracked via GitHub issues, see wayfinder #29)
+# Agent issue-tracker conventions: ../edge_telemetry_rum_home/docs/agents/issue-tracker.md (home repo)
 ```
 
 ## Architecture
