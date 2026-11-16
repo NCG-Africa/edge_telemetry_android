@@ -161,6 +161,22 @@ class TelemetryManagerIntegrationTest {
     }
 
     @Test
+    fun `a timeout rotation with an open task rotates once, the task in the old session`() {
+        val old = telemetryManager.getSessionId()
+        telemetryManager.startTask("checkout")
+        telemetryManager.drainForTesting()
+        idleBeyondTimeout()
+
+        telemetryManager.recordEvent("tap")
+
+        // memory.usage / storage.usage are sampled at each session start; not under test here.
+        val sent = telemetryManager.drainForTesting().filter { it.eventName !in setOf("memory.usage", "storage.usage") }
+        assertEquals(listOf("task.complete", "session.finalized", "session.started", "custom.event"), sent.map { it.eventName })
+        assertEquals(old, sent[0].attributes.session.sessionId)
+        assertEquals(old, sent[1].attributes.session.sessionId)
+    }
+
+    @Test
     fun `a manually ended session is not finalized again by a later timeout`() {
         val prefs = context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE)
         val ended = telemetryManager.getSessionId()

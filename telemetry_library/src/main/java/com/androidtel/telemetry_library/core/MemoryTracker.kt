@@ -83,7 +83,8 @@ internal class ProcessMemoryTracker(
         // UI_HIDDEN is "went to background", not memory pressure.
         val mapped = TRIM_LEVELS[level] ?: return
         pressure = mapped.second
-        if (!telemetryManager.isMemoryTrackingEnabled()) return
+        // BACKGROUND only clears the level: near the front of the LRU list is no pressure to report.
+        if (mapped.second == PRESSURE_NORMAL || !telemetryManager.isMemoryTrackingEnabled()) return
         telemetryManager.emit(
             "memory.pressure",
             mapOf(

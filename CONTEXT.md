@@ -15,11 +15,11 @@ A group of events sent to the collector in one HTTP POST (default cap 50, flush 
 _Avoid_: Bundle, chunk
 
 **Envelope**:
-The wire wrapper around one batch, closed at 8 keys (contract 4.0.0): it carries the batch's identity — `device_id`, `sdk`, `app` — once, so events never repeat it. Session and user context stay on each event.
+The wire wrapper around one batch, closed at 8 keys (contract 4.x): it carries the batch's identity — `device_id`, `sdk`, `app` — once, so events never repeat it. Session and user context stay on each event.
 _Avoid_: Payload, packet
 
 **Contract version**:
-The semver of the envelope shape shared by all SDKs (`contract_version`, currently `4.0.0`); independent of the SDK's own version.
+The semver of the envelope shape shared by all SDKs (`contract_version`, currently `4.2.0`, the event catalogue version pinned in `catalogue.version`); independent of the SDK's own version.
 
 **Collector**:
 The backend endpoint that receives batches.
@@ -29,9 +29,9 @@ _Avoid_: Server, backend API
 
 **Session**:
 A continuous period of app use, rotated after timeout (default 30min) or on explicit restart.
-The timeout runs from the last **user activity** (foreground, tap, navigation); the first event of
-any kind after it finalizes the session once and starts a new one. Passive events (http, memory,
-frames) never count as activity, so they can't keep a session alive.
+The timeout runs from the last **activity**: any event other than `session.*` (catalogue rule, #145).
+The first event after it finalizes the session once and starts a new one. A session also ends 4 h
+after it started, active or not (`session.reason` = `max_duration`).
 
 **Screen**:
 A user-visible destination — an Activity or a Compose navigation route.
@@ -46,6 +46,10 @@ _Avoid_: Trail, log entry
 **Crash**:
 An uncaught exception that terminates the process; captured with breadcrumbs and stack trace, persisted for next-launch delivery.
 _Avoid_: Fatal error, exception (use only for the Throwable itself)
+
+**Handled error**:
+A failure the app caught and survived (`trackError`, `recordCrash`); sent as `app.error`, never `app.crash`.
+_Avoid_: Non-fatal crash
 
 **Fingerprint**:
 A stable hash grouping crashes with the same root cause.

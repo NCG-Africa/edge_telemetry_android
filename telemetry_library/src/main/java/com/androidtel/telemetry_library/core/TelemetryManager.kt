@@ -34,6 +34,7 @@ import com.androidtel.telemetry_library.core.services.BatchProcessingService
 import com.androidtel.telemetry_library.core.models.DeviceInfo
 import com.androidtel.telemetry_library.core.models.EventAttributes
 import com.androidtel.telemetry_library.core.models.SessionInfo
+import com.androidtel.telemetry_library.core.models.TelemetryEvent
 import com.androidtel.telemetry_library.core.models.UserInfo
 import com.androidtel.telemetry_library.core.session.SessionManager
 import com.androidtel.telemetry_library.core.user.UserProfileManager
@@ -53,6 +54,7 @@ import java.io.PrintWriter
 import java.io.StringWriter
 import java.security.SecureRandom
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
@@ -129,7 +131,8 @@ class TelemetryManager private constructor(
     // fired by the lifecycle observer's first onResume. Null when screen tracking is off / late init.
     private var appStartTracker: AppStartTracker? = null
     // Tasks started and not yet ended; abandoned (session_end) when their session ends.
-    private val openTasks = java.util.concurrent.ConcurrentHashMap.newKeySet<TelemetryTask>()
+    private val openTasks = ConcurrentHashMap.newKeySet<TelemetryTask>()
+    private var rotating = false // guarded by sessionLock
 
     // Helper methods to check feature flags
     internal fun isMemoryTrackingEnabled(): Boolean = config.enableMemoryTracking
@@ -533,19 +536,26 @@ class TelemetryManager private constructor(
      * activity and refreshes last-active; backgrounding does not end a session.
      */
     private fun rotateIfInactive() = synchronized(sessionLock) {
+        // The rotation's own events (abandoned tasks, the finalize) must not start another rotation.
+        if (rotating) return@synchronized
         val reason = when {
             sessionService.hasSessionTimedOut() -> "timeout"
             sessionService.hasExceededMaxDuration() -> "max_duration"
             else -> null
         }
         if (reason != null) {
-            abandonOpenTasks()
-            // The envelope is still the old session's; a timeout's duration drops the idle gap.
-            if (sessionService.claimFinalize()) {
-                emit("session.finalized", mapOf(
-                    "session.reason" to reason,
-                    "session.duration_ms" to sessionService.getActiveDurationMs()
-                ))
+            rotating = true
+            try {
+                abandonOpenTasks()
+                // The envelope is still the old session's; a timeout's duration drops the idle gap.
+                if (sessionService.claimFinalize()) {
+                    emit("session.finalized", mapOf(
+                        "session.reason" to reason,
+                        "session.duration_ms" to sessionService.getActiveDurationMs()
+                    ))
+                }
+            } finally {
+                rotating = false
             }
             startNewSession()
             TelemetryLog.i("TelemetryManager", "Started new session: ${sessionService.getCurrentSessionId()}")
@@ -1189,7 +1199,7 @@ class TelemetryManager private constructor(
     internal fun getBreadcrumbManager(): BreadcrumbManager? = crashReportingService.getBreadcrumbManager()
 
     // Golden snapshot seams (#145): the queued events as recorded, and the ANR/hang rail.
-    internal fun drainForTesting(): List<com.androidtel.telemetry_library.core.models.TelemetryEvent> =
+    internal fun drainForTesting(): List<TelemetryEvent> =
         generateSequence { eventTrackingService.getEventQueue().poll() }.toList()
 
     internal fun crashReportingForTesting(): CrashReportingService = crashReportingService

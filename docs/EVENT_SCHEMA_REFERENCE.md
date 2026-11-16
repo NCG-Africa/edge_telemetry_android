@@ -42,7 +42,7 @@ This document provides a comprehensive reference for all telemetry events suppor
 
 ---
 
-## Batch Envelope (contract 4.0.0)
+## Batch Envelope (contract 4.2.0)
 
 Every POST is one `telemetry_batch` envelope, closed at exactly these 8 keys (#135). App, SDK and
 device identity live **here only** — events never repeat `app.*`, `sdk.*` or `device.id`, and any such
@@ -51,11 +51,11 @@ caller-supplied attribute is stripped before send.
 ```json
 {
   "type": "telemetry_batch",
-  "contract_version": "4.0.0",
+  "contract_version": "4.2.0",
   "timestamp": "2026-10-07T09:12:44.120Z",
   "batch_size": 13,
   "device_id": "device_1234567890_abc123_android",
-  "sdk": { "name": "android", "version": "4.0.0" },
+  "sdk": { "name": "android", "version": "4.1.0" },
   "app": {
     "name": "MyApp",
     "package_name": "com.example.myapp",
@@ -69,7 +69,7 @@ caller-supplied attribute is stripped before send.
 
 | Key | Notes |
 |-----|-------|
-| `contract_version` | Fixed `"4.0.0"`; independent of the SDK version |
+| `contract_version` | The catalogue version, `"4.2.0"`; independent of the SDK version |
 | `timestamp` | UTC with `Z`, stamped at **send** — a replayed (offline / crash) batch carries its send time |
 | `device_id` | Required. If the stored id can't be read, a UUIDv4 fallback (persisted once, else per process) |
 | `app.name`, `app.version`, `app.build_number` | Omitted when unknown — never `""` or `"unknown"` |

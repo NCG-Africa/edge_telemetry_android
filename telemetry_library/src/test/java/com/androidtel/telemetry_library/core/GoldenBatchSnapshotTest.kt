@@ -102,7 +102,7 @@ class GoldenBatchSnapshotTest {
     private fun recordEveryEvent(): List<TelemetryEvent> {
         tm.notifyActivityResumed() // app.start
         org.robolectric.Robolectric.buildActivity(android.app.Activity::class.java).create().get().let {
-            ScreenLoadTracker(tm).onCreated(it)
+            ScreenLoadTracker(tm).apply { onCreated(it); it.setContentView(android.view.View(it)); onStarted(it) }
             it.window.decorView.viewTreeObserver.dispatchOnDraw()
         }
         tm.recordComposeScreenView("checkout/{id}")

@@ -36,6 +36,7 @@ class TelemetryActivityLifecycleObserver(
 
     override fun onActivityStarted(activity: Activity) {
         TelemetryLog.d("TelemetryObserver", "Activity Started: ${activity.javaClass.simpleName}")
+        screenLoadTracker.onStarted(activity)
     }
 
     override fun onActivityResumed(activity: Activity) {

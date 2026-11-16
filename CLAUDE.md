@@ -67,6 +67,8 @@ edge_telemetry_android/
 │           ├── crash/                    # CrashFingerprinter, FatalCrashStore
 │           ├── anr/                      # AnrWatchdog (ANR + sub-5s hang detection)
 │           ├── exit/                     # ExitInfoReader, ApplicationExitHarvester (app.exit)
+│           ├── ScreenLoadTracker.kt      # screen.load (Activity create → first draw)
+│           ├── task/                     # TelemetryTask (startTask → task.complete)
 │           ├── startup/                  # AppStartTracker (cold-start timing)
 │           ├── interaction/              # UserInteractionTracker (tap/swipe → ui.interaction)
 │           ├── breadcrumbs/              # BreadcrumbManager (circular buffer, max 50)
