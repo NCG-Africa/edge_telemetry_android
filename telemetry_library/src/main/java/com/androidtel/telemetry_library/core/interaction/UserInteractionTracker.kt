@@ -107,7 +107,7 @@ class UserInteractionTracker(
             attrs["ui.name_source"] = ComposeSemanticsNamer.SOURCE_TRACK_TAP
         }
 
-        telemetryManager.recordEvent("ui.interaction", attrs)
+        telemetryManager.emit("ui.interaction", attrs)
         telemetryManager.addBreadcrumb("$type ${attrs["ui.target"]}", category = "ui")
     }
 

@@ -188,22 +188,21 @@ class AnrWatchdogTest {
             httpClient.sleep = {}
             repeat(3) { mockWebServer.enqueue(MockResponse().setResponseCode(503)) }
             runBlocking {
-                FatalCrashStore.replayOnce(filesDir, httpClient, Gson(), FatalCrashStore.ANR_FILE_NAME)
+                FatalCrashStore.replayOnce(filesDir, httpClient, fileName = FatalCrashStore.ANR_FILE_NAME)
             }
             assertTrue(FatalCrashStore.file(filesDir, FatalCrashStore.ANR_FILE_NAME).exists())
 
-            // 2xx: is_fatal:false / handled:false on the wire, file deleted.
+            // 2xx: on the wire with its int duration intact, file deleted.
             mockWebServer.enqueue(MockResponse().setResponseCode(200))
             runBlocking {
-                FatalCrashStore.replayOnce(filesDir, httpClient, Gson(), FatalCrashStore.ANR_FILE_NAME)
+                FatalCrashStore.replayOnce(filesDir, httpClient, fileName = FatalCrashStore.ANR_FILE_NAME)
             }
             val body = mockWebServer.takeRequest(5, TimeUnit.SECONDS)!!.body.readUtf8()
             val wire = JsonParser.parseString(body).asJsonObject
                 .getAsJsonArray("events").get(0).asJsonObject
             assertEquals("app.anr", wire.get("eventName").asString)
             val attrs = wire.getAsJsonObject("attributes")
-            assertFalse(attrs.get("is_fatal").asBoolean)
-            assertFalse(attrs.get("handled").asBoolean)
+            assertEquals("5000", attrs.get("anr.duration_ms").toString())
             assertFalse(FatalCrashStore.file(filesDir, FatalCrashStore.ANR_FILE_NAME).exists())
         } finally {
             httpClient.getOkHttpClient().release()
@@ -233,7 +232,7 @@ class AnrWatchdogTest {
                         eventCount = 1, metricCount = 0, screenCount = 0, visitedScreens = "",
                         isFirstSession = true, totalSessions = 1, networkType = "wifi"
                     ),
-                    customAttributes = mapOf("is_fatal" to false, "handled" to false, "anr.duration_ms" to 5000)
+                    customAttributes = mapOf("error.cause" to "anr", "anr.duration_ms" to 5000)
                 )
             )
         )

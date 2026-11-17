@@ -41,15 +41,13 @@ fun TrackComposeScreen(
         )
         
         // Track navigation event with standardized structure
-        telemetryManager.recordEvent(
+        telemetryManager.emit(
             "navigation",
             mapOf(
-                "navigation.from_screen" to "",
                 "navigation.to_screen" to finalScreenName,
                 "navigation.method" to "push",
                 "navigation.route_type" to "compose_route",
-                "navigation.has_arguments" to (additionalData != null),
-                "navigation.timestamp" to TelemetryTime.now()
+                "navigation.has_arguments" to (additionalData != null)
             )
         )
         

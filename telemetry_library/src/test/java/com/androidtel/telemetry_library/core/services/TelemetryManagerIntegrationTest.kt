@@ -115,14 +115,65 @@ class TelemetryManagerIntegrationTest {
     }
 
     @Test
-    fun `passive events do not count as activity`() {
+    fun `any event other than session_* counts as activity`() {
         val prefs = context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE)
-        val idleSince = System.currentTimeMillis() - 60_000
-        prefs.edit().putLong("last_active_timestamp", idleSince).commit()
+        prefs.edit().putLong("last_active_timestamp", System.currentTimeMillis() - 60_000).commit()
 
         telemetryManager.recordEvent("http.request", mapOf("http.status_code" to 200))
 
-        assertEquals(idleSince, prefs.getLong("last_active_timestamp", 0))
+        assertTrue(prefs.getLong("last_active_timestamp", 0) > System.currentTimeMillis() - 5_000)
+    }
+
+    @Test
+    fun `a session past the 4 h cap is finalized as max_duration and rotated`() {
+        // A session resumed within the idle timeout but started over 4 h ago.
+        val now = System.currentTimeMillis()
+        context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE).edit()
+            .putString("session_id", "session_old")
+            .putLong("session_start", now - 4 * 60 * 60 * 1000L - 1000)
+            .putLong("last_active_timestamp", now)
+            .commit()
+        TelemetryManager.resetForTesting()
+        // Resumes session_old; the first event (here the foreground at init) ends it.
+        telemetryManager = TelemetryManager.initialize(application, config)
+        telemetryManager.recordEvent("tap")
+
+        assertNotEquals("session_old", telemetryManager.getSessionId())
+        val finalized = telemetryManager.drainForTesting().single { it.eventName == "session.finalized" }
+        assertEquals("session_old", finalized.attributes.session.sessionId)
+        assertEquals("max_duration", finalized.attributes.customAttributes["session.reason"])
+    }
+
+    @Test
+    fun `a task still open when its session ends is abandoned with session_end, before the finalize`() {
+        telemetryManager.startTask("checkout")
+        telemetryManager.startTask("search").complete()
+        telemetryManager.drainForTesting()
+
+        telemetryManager.endCurrentSession()
+
+        val sent = telemetryManager.drainForTesting()
+        val task = sent.single { it.eventName == "task.complete" }.attributes.customAttributes
+        assertEquals("checkout", task["task.name"])
+        assertEquals("abandoned", task["task.outcome"])
+        assertEquals("session_end", task["task.abandon_source"])
+        assertEquals(listOf("task.complete", "session.finalized"), sent.map { it.eventName })
+    }
+
+    @Test
+    fun `a timeout rotation with an open task rotates once, the task in the old session`() {
+        val old = telemetryManager.getSessionId()
+        telemetryManager.startTask("checkout")
+        telemetryManager.drainForTesting()
+        idleBeyondTimeout()
+
+        telemetryManager.recordEvent("tap")
+
+        // memory.usage / storage.usage are sampled at each session start; not under test here.
+        val sent = telemetryManager.drainForTesting().filter { it.eventName !in setOf("memory.usage", "storage.usage") }
+        assertEquals(listOf("task.complete", "session.finalized", "session.started", "custom.event"), sent.map { it.eventName })
+        assertEquals(old, sent[0].attributes.session.sessionId)
+        assertEquals(old, sent[1].attributes.session.sessionId)
     }
 
     @Test

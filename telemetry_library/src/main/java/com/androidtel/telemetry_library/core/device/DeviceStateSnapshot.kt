@@ -43,10 +43,11 @@ internal object DeviceStateSnapshot {
         runCatching { powerManager?.isPowerSaveMode }
             .getOrNull()?.let { out["device.power_save"] = it }
 
-        // device.thermal_status (Int 0–6) — gated minSDK 29 (getCurrentThermalStatus), key absent below.
+        // device.thermal_status (catalogue string: none … shutdown) — gated minSDK 29
+        // (getCurrentThermalStatus), key absent below.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             runCatching { powerManager?.currentThermalStatus }
-                .getOrNull()?.let { out["device.thermal_status"] = it }
+                .getOrNull()?.let { THERMAL_STATUS.getOrNull(it) }?.let { out["device.thermal_status"] = it }
         }
 
         // device.orientation ("portrait" / "landscape"); UNDEFINED omitted rather than guessed.
@@ -60,4 +61,7 @@ internal object DeviceStateSnapshot {
 
         return out
     }
+
+    // PowerManager.THERMAL_STATUS_NONE (0) … THERMAL_STATUS_SHUTDOWN (6).
+    private val THERMAL_STATUS = listOf("none", "light", "moderate", "severe", "critical", "emergency", "shutdown")
 }

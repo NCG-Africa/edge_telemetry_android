@@ -1,7 +1,6 @@
 package com.androidtel.telemetry_library.core.exit
 
 import android.annotation.SuppressLint
-import android.app.ActivityManager.RunningAppProcessInfo
 import android.app.ApplicationExitInfo
 
 /**
@@ -30,9 +29,9 @@ internal data class ExitHarvestResult(
 /**
  * Pure harvest of the OS exit-reason buffer (spec: docs/specs/application-exit-info.md).
  *
- * Filters to the 8 abnormal reasons, applies the strict-`>` dedup watermark, maps reason/importance
+ * Filters to the 8 abnormal reasons, applies the strict-`>` dedup watermark, maps the reason
  * ints to string enums, caps the trace, and returns one `app.exit` attribute map per surviving
- * record plus the advanced watermark. No Android runtime touched — the reason/importance references
+ * record plus the advanced watermark. No Android runtime touched — the reason references
  * below are compile-time int constants, so this is plain-JUnit testable.
  */
 internal object ApplicationExitHarvester {
@@ -57,17 +56,6 @@ internal object ApplicationExitHarvester {
         ApplicationExitInfo.REASON_PERMISSION_CHANGE to "permission_change",
     )
 
-    @SuppressLint("InlinedApi") // same rationale as REASON_ENUM — inlined ints, gated at the reader
-    private val IMPORTANCE_ENUM: Map<Int, String> = mapOf(
-        RunningAppProcessInfo.IMPORTANCE_FOREGROUND to "foreground",
-        RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE to "foreground_service",
-        RunningAppProcessInfo.IMPORTANCE_VISIBLE to "visible",
-        RunningAppProcessInfo.IMPORTANCE_PERCEPTIBLE to "perceptible",
-        RunningAppProcessInfo.IMPORTANCE_SERVICE to "service",
-        RunningAppProcessInfo.IMPORTANCE_CACHED to "cached",
-        RunningAppProcessInfo.IMPORTANCE_GONE to "gone",
-    )
-
     fun harvest(records: List<ExitRecord>, watermark: Long?): ExitHarvestResult {
         val surviving = records.filter { r ->
             REASON_ENUM.containsKey(r.reasonCode) && (watermark == null || r.timestamp > watermark)
@@ -80,7 +68,7 @@ internal object ApplicationExitHarvester {
 
     private fun toAttributes(r: ExitRecord): Map<String, Any> = buildMap {
         put("exit.reason", REASON_ENUM.getValue(r.reasonCode))
-        put("exit.importance", IMPORTANCE_ENUM[r.importanceCode] ?: "unknown_${r.importanceCode}")
+        put("exit.importance", r.importanceCode) // catalogue int: the RunningAppProcessInfo code
         r.description?.let { put("exit.description", it) }
         put("exit.status", r.status)
         // pss/rss are already KB from the OS; spec types these Int (KB comfortably fits Int).

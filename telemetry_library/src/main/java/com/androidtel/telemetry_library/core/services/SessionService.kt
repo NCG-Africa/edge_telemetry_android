@@ -185,7 +185,10 @@ internal class SessionService(
         return elapsed >= config.sessionTimeoutMs
     }
     
-    /** Mark user activity — the foreground inactivity timeout measures from here (#143). */
+    /** The catalogue's hard cap (processor #39): a session ends 4 h after it started, active or not. */
+    fun hasExceededMaxDuration(): Boolean = System.currentTimeMillis() - sessionStartTime >= MAX_DURATION_MS
+
+    /** Mark activity — any event other than session.* (processor #39); the idle timeout measures from here. */
     fun updateLastActiveTimestamp() {
         prefs.edit().putLong("last_active_timestamp", System.currentTimeMillis()).apply()
     }
@@ -268,6 +271,7 @@ internal class SessionService(
     fun getEnhancedSessionManager(): SessionManager? = enhancedSessionManager
     
     companion object {
+        const val MAX_DURATION_MS = 4 * 60 * 60 * 1000L
         private const val TAG = "SessionService"
         private const val KEY_EVENT_COUNT = "session_event_count"
         private const val KEY_METRIC_COUNT = "session_metric_count"

@@ -3,6 +3,7 @@ package com.androidtel.telemetry_library.core
 
 import android.content.Context
 import com.androidtel.telemetry_library.core.models.TelemetryBatch
+import com.androidtel.telemetry_library.core.models.batchGson
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
@@ -17,7 +18,7 @@ import kotlinx.coroutines.withContext
 // depth becomes real: wire Room properly (@Entity per envelope, DELETE ... ORDER BY seq LIMIT).
 class OfflineBatchStorage(context: Context) {
     private val prefs = context.getSharedPreferences("telemetry_batches", Context.MODE_PRIVATE)
-    private val gson = Gson()
+    private val gson = batchGson
     private val batchListType = object : TypeToken<List<TelemetryBatch>>() {}.type
 
     // Serializes all mutations. storeBatch/removeBatch/clear do read-modify-write of the whole blob;

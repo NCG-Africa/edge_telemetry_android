@@ -120,7 +120,7 @@ class EnvelopeReplayTest {
             setOf("type", "contract_version", "timestamp", "batch_size", "device_id", "sdk", "app", "events"),
             env.keySet()
         )
-        assertEquals("4.0.0", env.get("contract_version").asString)
+        assertEquals("4.2.0", env.get("contract_version").asString)
         assertEquals("device_legacy_1", env.get("device_id").asString)
         assertEquals("android", env.getAsJsonObject("sdk").get("name").asString)
         assertEquals(BuildConfig.SDK_VERSION, env.getAsJsonObject("sdk").get("version").asString)

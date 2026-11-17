@@ -1,5 +1,14 @@
 # Event Schema Reference
 
+> ## The event catalogue is the contract
+>
+> Event names, keys, types and units are defined by the processor's event catalogue
+> ([`docs/catalogue/`](https://github.com/NCG-Africa/edge_telemetry_processor_go/tree/main/docs/catalogue))
+> at the ref pinned in [`catalogue.version`](../catalogue.version). The exact wire for every event this
+> SDK sends is in the golden batches, [`telemetry_library/src/test/resources/golden/`](../telemetry_library/src/test/resources/golden/),
+> checked against the catalogue before every release (`scripts/conform.sh`). Where this document disagrees, the
+> catalogue wins.
+
 > ## ⚠️ Stale — do not use as a backend contract
 >
 > This document was last updated **2026-03-23** against SDK **2.1.0** (`6a23c4e`). The SDK is now **2.2.2**.
@@ -33,7 +42,7 @@ This document provides a comprehensive reference for all telemetry events suppor
 
 ---
 
-## Batch Envelope (contract 4.0.0)
+## Batch Envelope (contract 4.2.0)
 
 Every POST is one `telemetry_batch` envelope, closed at exactly these 8 keys (#135). App, SDK and
 device identity live **here only** — events never repeat `app.*`, `sdk.*` or `device.id`, and any such
@@ -42,11 +51,11 @@ caller-supplied attribute is stripped before send.
 ```json
 {
   "type": "telemetry_batch",
-  "contract_version": "4.0.0",
+  "contract_version": "4.2.0",
   "timestamp": "2026-10-07T09:12:44.120Z",
   "batch_size": 13,
   "device_id": "device_1234567890_abc123_android",
-  "sdk": { "name": "android", "version": "4.0.0" },
+  "sdk": { "name": "android", "version": "4.1.0" },
   "app": {
     "name": "MyApp",
     "package_name": "com.example.myapp",
@@ -60,7 +69,7 @@ caller-supplied attribute is stripped before send.
 
 | Key | Notes |
 |-----|-------|
-| `contract_version` | Fixed `"4.0.0"`; independent of the SDK version |
+| `contract_version` | The catalogue version, `"4.2.0"`; independent of the SDK version |
 | `timestamp` | UTC with `Z`, stamped at **send** — a replayed (offline / crash) batch carries its send time |
 | `device_id` | Required. If the stored id can't be read, a UUIDv4 fallback (persisted once, else per process) |
 | `app.name`, `app.version`, `app.build_number` | Omitted when unknown — never `""` or `"unknown"` |

@@ -10,7 +10,7 @@ plugins {
 
 // Single source of truth for the SDK version. Surfaces in BuildConfig.SDK_VERSION (used by the
 // network transport for the User-Agent and X-SDK-Version headers) and the JitPack publication.
-val sdkVersion = "4.0.1"
+val sdkVersion = "4.1.0"
 
 detekt {
     buildUponDefaultConfig = true
@@ -70,6 +70,8 @@ android {
             // real Android behavior should use Robolectric explicitly.
             isReturnDefaultValues = true
             isIncludeAndroidResources = true
+            // -PupdateGoldens rewrites the golden batches (GoldenBatchSnapshotTest, #145).
+            all { if (project.hasProperty("updateGoldens")) it.systemProperty("updateGoldens", "true") }
         }
     }
 

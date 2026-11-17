@@ -76,7 +76,7 @@ class TelemetryInterceptor(
             // (tap → A takes 4 s → B fires on A's success) must keep both calls under one root.
             decision?.root?.touch(TraceManager.clock())
 
-            telemetryManager.recordEvent(eventName = "http.request", attributes = attributes)
+            telemetryManager.emit(eventName = "http.request", attributes = attributes)
         }
     }
     

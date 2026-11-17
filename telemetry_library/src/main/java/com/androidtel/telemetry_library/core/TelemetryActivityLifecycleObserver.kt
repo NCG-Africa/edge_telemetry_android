@@ -16,12 +16,14 @@ class TelemetryActivityLifecycleObserver(
 
     private val screenTimingTracker = ScreenTimingTracker()
     private val navigationTracker = NavigationStackTracker()
+    private val screenLoadTracker = ScreenLoadTracker(telemetryManager)
     private val interactionTracker = UserInteractionTracker(telemetryManager, navigationTracker::getCurrentScreen)
     // Unified performance tracker - automatically selects appropriate implementation
     private val performanceTracker: PerformanceTracker = PerformanceTrackerFactory.createPerformanceTracker(telemetryManager)
 
     override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
         TelemetryLog.d("TelemetryObserver", "Activity Created: ${activity.javaClass.simpleName}")
+        screenLoadTracker.onCreated(activity)
 
         // Register Fragment observer
         if (activity is FragmentActivity) {
@@ -34,6 +36,7 @@ class TelemetryActivityLifecycleObserver(
 
     override fun onActivityStarted(activity: Activity) {
         TelemetryLog.d("TelemetryObserver", "Activity Started: ${activity.javaClass.simpleName}")
+        screenLoadTracker.onStarted(activity)
     }
 
     override fun onActivityResumed(activity: Activity) {
@@ -62,17 +65,10 @@ class TelemetryActivityLifecycleObserver(
 
         // Track navigation with proper structure
         val navEvent = navigationTracker.push(screenName)
-        val navAttributes = mutableMapOf<String, Any>(
-            "navigation.from_screen" to (navEvent.fromScreen ?: ""),
-            "navigation.to_screen" to navEvent.toScreen,
-            "navigation.method" to navEvent.method.toLowerCaseString(),
-            "navigation.route_type" to detectRouteType(activity),
-            "navigation.has_arguments" to hasIntentExtras(activity),
-            "navigation.timestamp" to navEvent.timestamp
-        )
+        val navAttributes = navEvent.toAttributes(detectRouteType(activity), hasIntentExtras(activity)).toMutableMap()
         // Child of a recent interaction (tap→nav) else a new trace root (#59).
         TraceManager.onNavigation()?.let { navAttributes.putAll(it) }
-        telemetryManager.recordEvent(eventName = "navigation", attributes = navAttributes)
+        telemetryManager.emit(eventName = "navigation", attributes = navAttributes)
     }
 
     override fun onActivityPaused(activity: Activity) {
@@ -125,13 +121,9 @@ class TelemetryActivityLifecycleObserver(
         }
     }
 
-    private fun getScreenName(activity: Activity): String {
-        return if (activity.title.isNotEmpty()) {
-            activity.title.toString()
-        } else {
-            activity.javaClass.simpleName
-        }
-    }
+    // The class name, never the title: a title is often the app label or live content, and a screen
+    // name must be a template (processor #31).
+    private fun getScreenName(activity: Activity): String = activity.javaClass.simpleName
 
     private fun detectRouteType(activity: Activity): String {
         return when {

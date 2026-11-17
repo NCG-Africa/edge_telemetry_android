@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: converge on the event catalogue 4.2 (#145)
+
+Wire changes. The processor reads the old names through aliases, so older builds keep working.
+
+- **Crashes** use the catalogue's `error.*` keys (`error.type`, `error.message`, `error.stacktrace`,
+  `error.cause`, `error.code`, `error.breadcrumbs`, `error.thread`, `error.user_action`); `screen.name`
+  is the screen at failure time. `is_fatal`, `handled` and `error_context` are gone: the event name says it.
+- **Handled errors** (`trackError`, `recordCrash`) are sent as `app.error`; `app.crash` is only an
+  uncaught crash. ANR and hang carry the main thread's stack as `error.stacktrace`.
+- **`recordEvent` / `recordMetric` are wrapped**: a host event is sent as `custom.event` with its name in
+  `event.name`, a host metric as `custom.metric` with `metric.name`.
+- **New task API**: `startTask(name)` → `complete()` / `fail(reason)` / `abandon()` sends one
+  `task.complete`. A task still open when its session ends is abandoned (`session_end`).
+- **New `screen.load`**: an Activity's creation to its first draw (`screen.load.first_frame_ms`).
+- **Frames**: every window with a frame is sent (not only slow ones), slow = over the budget for the
+  display's refresh rate, frozen = ≥700 ms, stamped at the window's start, int `frame.window_duration_ms`.
+- **Memory**: `memory.usage` (`memory.usage_mb` = total PSS in MB) replaces `memory_usage` /
+  `memory_pressure` samples; `memory.pressure` is now the OS `onTrimMemory` signal with
+  `memory.pressure_level` `normal|moderate|critical` and `memory.trim_level`.
+- **Renamed**: `storage_usage` → `storage.usage` (MB as floats), `telemetry.capabilities_initialized` →
+  `sdk.capabilities` (`capabilities.device|network|memory`).
+- **Sessions**: every event except `session.*` is activity; a session also ends 4 h after it started
+  (`session.reason` = `max_duration`).
+- **Navigation**: the first screen is `navigation.method` = `initial`; no `navigation.from_screen` when
+  there is none; `navigation.timestamp` dropped (the event timestamp is the time). Activity screen names
+  are the class name, never the title. `screen.timestamp` and `user.profile_updated_at` dropped.
+- **Types**: `device.android_sdk` is an int, `device.thermal_status` a name (`none` … `shutdown`),
+  `exit.importance` the raw int code. `contract_version` is `4.2.0`.
+- Removed the unused `TelemetryMemoryUsage` class.
+
+### Fixed
+
+- **Replayed batches kept ints as ints.** Offline-stored and frozen crash/ANR batches were read back with
+  Gson's default, so every number went out as a double (`5000.0`).
+
+### Added
+
+- Golden batches and the conformance check: `GoldenBatchSnapshotTest`, and `scripts/conform.sh` (run by
+  hand before each release) against the processor ref in `catalogue.version`.
+
 ### 🐛 Fixed (#143)
 
 - **`session.finalized` reports the finalized session's own data.** A timed-out cold start now sends
@@ -15,9 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **No session is finalized twice.** A persisted finalized-id claim covers manual end, warm timeout
   and cold start; the decided session is also persisted at init and on rotation, so a process that
   dies before backgrounding can't resume a stale id.
-- **30-min inactivity timeout.** The first event after `sessionTimeoutMs` with no user activity
-  (foreground, tap, navigation) finalizes the idle session and starts a new one. Passive events (http,
-  memory, frames) don't count as activity, so they can't keep a session alive.
+- **30-min inactivity timeout.** The first event after `sessionTimeoutMs` with no activity finalizes
+  the idle session and starts a new one (activity is any event other than `session.*`, #145).
 - **Offline storage is sent before live events**, so a session's stored events can't arrive after
   its finalize. At the 200-envelope cap a live batch is sent rather than parked, so nothing stored is
   evicted to make room for it.

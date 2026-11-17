@@ -60,7 +60,7 @@ class UnifiedEnvelopeTest {
             json.keySet()
         )
         assertEquals("telemetry_batch", json.get("type").asString)
-        assertEquals("4.0.0", json.get("contract_version").asString)
+        assertEquals("4.2.0", json.get("contract_version").asString)
         assertEquals(1, json.get("batch_size").asInt)
         assertEquals("test_device_123", json.get("device_id").asString)
 

@@ -1,12 +1,19 @@
 package com.androidtel.telemetry_library.core.models
 
+import com.google.gson.Gson
+import com.google.gson.GsonBuilder
+import com.google.gson.ToNumberPolicy
 import java.util.UUID
 
-// Contract version of the batch envelope (#135). Its own constant, not derived from SDK_VERSION —
-// the two coincide only at 4.0.0.
-internal const val CONTRACT_VERSION = "4.0.0"
+// Reads stored batches back (offline store, frozen crash/ANR). Gson's default turns every number in
+// customAttributes into a Double, so a replayed 5000 went out as 5000.0 and failed int keys (#145).
+internal val batchGson: Gson = GsonBuilder().setObjectToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE).create()
 
-// Contract 4.0.0 batch envelope (#135): closed at exactly these 8 keys. Identity (device_id, sdk,
+// The event catalogue version this SDK conforms to (#145): checked against the ref in catalogue.version.
+// Its own constant, not derived from SDK_VERSION.
+internal const val CONTRACT_VERSION = "4.2.0"
+
+// Contract 4.x batch envelope (#135): closed at exactly these 8 keys. Identity (device_id, sdk,
 // app) lives here once per batch, never on events. Gson drops nulls, so an unknown app.name /
 // version / build_number is omitted, never sent as "" (R15).
 data class TelemetryDataOut(

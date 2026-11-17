@@ -186,7 +186,7 @@ class TelemetryHttpClient(
         flat["device.model"] = attrs.device.model
         flat["device.manufacturer"] = attrs.device.manufacturer
         flat["device.brand"] = attrs.device.brand
-        flat["device.android_sdk"] = attrs.device.androidSdk
+        flat["device.android_sdk"] = attrs.device.androidSdk.toIntOrNull() // catalogue int (#145)
         flat["device.android_release"] = attrs.device.androidRelease
         flat["device.fingerprint"] = attrs.device.fingerprint
         flat["device.hardware"] = attrs.device.hardware

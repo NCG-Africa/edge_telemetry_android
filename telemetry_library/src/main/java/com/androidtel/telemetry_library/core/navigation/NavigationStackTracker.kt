@@ -18,7 +18,7 @@ class NavigationStackTracker {
             NavigationEvent(
                 fromScreen = fromScreen,
                 toScreen = screenName,
-                method = NavigationMethod.PUSH,
+                method = if (fromScreen == null) NavigationMethod.INITIAL else NavigationMethod.PUSH,
                 timestamp = TelemetryTime.now()
             )
         }
@@ -78,10 +78,20 @@ data class NavigationEvent(
     val toScreen: String,
     val method: NavigationMethod,
     val timestamp: String
-)
+) {
+    /** The catalogue `navigation` keys (processor #31). The event's own timestamp is the time. */
+    fun toAttributes(routeType: String, hasArguments: Boolean): Map<String, Any> = buildMap {
+        fromScreen?.let { put("navigation.from_screen", it) }
+        put("navigation.to_screen", toScreen)
+        put("navigation.method", method.toLowerCaseString())
+        put("navigation.route_type", routeType)
+        put("navigation.has_arguments", hasArguments)
+    }
+}
 
 enum class NavigationMethod {
-    PUSH, POP, REPLACE;
+    // The catalogue's navigation.method enum: push, pop, replace, tab, deep_link, initial, unknown.
+    PUSH, POP, REPLACE, INITIAL;
     
     fun toLowerCaseString(): String = name.lowercase()
 }
