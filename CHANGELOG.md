@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed: converge on the event catalogue, `catalogue-v4.2` (#145)
+### Changed: converge on the event catalogue 4.2 (#145)
 
 Wire changes. The processor reads the old names through aliases, so older builds keep working.
 
@@ -45,7 +45,7 @@ Wire changes. The processor reads the old names through aliases, so older builds
 ### Added
 
 - Golden batches and the conformance check: `GoldenBatchSnapshotTest`, and `scripts/conform.sh` (run by
-  hand before each release) against the tag in `catalogue.version`.
+  hand before each release) against the processor ref in `catalogue.version`.
 
 ### 🐛 Fixed (#143)
 

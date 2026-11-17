@@ -33,8 +33,8 @@ import java.io.File
 /**
  * Golden batches (#145, processor #40): every catalogue event this SDK emits, recorded through the
  * real emitters and serialized by the real transport, one batch per event plus `batch.json`.
- * CI runs the processor's `cmd/conform` on `src/test/resources/golden` at the tag pinned in
- * `catalogue.version`.
+ * `scripts/conform.sh` runs the processor's `cmd/conform` on `src/test/resources/golden` at the ref
+ * in `catalogue.version`.
  *
  * Values that change per run (ids, timestamps, durations, device reads) are normalized to a fixed
  * value of the same JSON type, so the snapshot pins names, keys and types. Regenerate with

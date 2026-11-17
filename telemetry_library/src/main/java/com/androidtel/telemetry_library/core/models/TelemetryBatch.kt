@@ -9,7 +9,7 @@ import java.util.UUID
 // customAttributes into a Double, so a replayed 5000 went out as 5000.0 and failed int keys (#145).
 internal val batchGson: Gson = GsonBuilder().setObjectToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE).create()
 
-// The event catalogue version this SDK conforms to (#145): the tag pinned in catalogue.version.
+// The event catalogue version this SDK conforms to (#145): checked against the ref in catalogue.version.
 // Its own constant, not derived from SDK_VERSION.
 internal const val CONTRACT_VERSION = "4.2.0"
 
