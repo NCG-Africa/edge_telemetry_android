@@ -44,8 +44,8 @@ Wire changes. The processor reads the old names through aliases, so older builds
 
 ### Added
 
-- Golden batches and the conformance gate: `GoldenBatchSnapshotTest`, `scripts/conform.sh`, CI on every
-  PR and release against the tag in `catalogue.version`.
+- Golden batches and the conformance check: `GoldenBatchSnapshotTest`, and `scripts/conform.sh` (run by
+  hand before each release) against the tag in `catalogue.version`.
 
 ### 🐛 Fixed (#143)
 

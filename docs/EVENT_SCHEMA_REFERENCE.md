@@ -6,7 +6,7 @@
 > ([`docs/catalogue/`](https://github.com/NCG-Africa/edge_telemetry_processor_go/tree/catalogue-v4.2/docs/catalogue))
 > at the tag pinned in [`catalogue.version`](../catalogue.version). The exact wire for every event this
 > SDK sends is in the golden batches, [`telemetry_library/src/test/resources/golden/`](../telemetry_library/src/test/resources/golden/),
-> checked against the catalogue on every PR (`scripts/conform.sh`). Where this document disagrees, the
+> checked against the catalogue before every release (`scripts/conform.sh`). Where this document disagrees, the
 > catalogue wins.
 
 > ## ⚠️ Stale — do not use as a backend contract

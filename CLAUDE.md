@@ -255,7 +255,7 @@ tm.setLastUserAction("submit_payment")
 Every event name, key, type and unit comes from the processor's catalogue (`docs/catalogue/` in
 `edge_telemetry_processor_go`) at the tag in `catalogue.version`. `GoldenBatchSnapshotTest` records each
 event through the real emitters into `telemetry_library/src/test/resources/golden/`; `scripts/conform.sh`
-runs the processor's `cmd/conform` on them (CI: `.github/workflows/conform.yml`, every PR and release).
+runs the processor's `cmd/conform` on them. Not in CI: run it by hand before every release.
 A new event or key needs a catalogue PR first (processor CODEOWNERS), then a pin bump here. Regenerate
 goldens with `-PupdateGoldens`.
 
