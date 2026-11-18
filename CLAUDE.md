@@ -87,8 +87,8 @@ edge_telemetry_android/
     ├── EVENT_SCHEMA_REFERENCE.md        # Wire format per event type
     ├── API_KEY_GUIDE.md                 # API key setup for consumers
     ├── MIGRATION_GUIDE_V2.md            # v1 → v2 consumer migration
-    └── specs/                           # Per-feature design specs (tracked via GitHub issues, see wayfinder #29)
-# Agent issue-tracker conventions: ../edge_telemetry_rum_home/docs/agents/issue-tracker.md (home repo)
+    ├── specs/                           # Per-feature design specs (tracked via GitHub issues, see wayfinder #29)
+    └── agents/                          # Agent skill config: issue tracker, triage labels, domain docs
 ```
 
 ## Architecture
@@ -270,3 +270,17 @@ goldens with `-PupdateGoldens`.
 - Payload format is Flask-compatible JSON matching the backend collector
 - Permission required: `ACCESS_NETWORK_STATE` (declared in library manifest)
 - Publishing: JitPack via `maven-publish` plugin, release variant with sources + javadoc
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on `NCG-Africa/edge_telemetry_android` via `gh`; external PRs are not a triage surface. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` + `docs/adr/` at repo root, created lazily. See `docs/agents/domain.md`.
