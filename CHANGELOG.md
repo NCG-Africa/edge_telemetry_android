@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: stable goldens (#151)
+
+- `GoldenBatchSnapshotTest` now only dumps the raw batch to the gitignored
+  `telemetry_library/build/golden-raw/`; `scripts/conform.sh` checks it against the catalogue and
+  compares its derived shape (event, key, JSON type; no values) with the committed
+  `telemetry_library/src/test/shape.txt` (`-update` rewrites it). The host and the SDK version no
+  longer break the check. Pin: `catalogue-v4.6` (was `main`).
+- Removed: the committed golden JSON (`src/test/resources/golden/`), its normalizer and `-PupdateGoldens`.
+
 ### Changed: converge on the event catalogue 4.2 (#145)
 
 Wire changes. The processor reads the old names through aliases, so older builds keep working.

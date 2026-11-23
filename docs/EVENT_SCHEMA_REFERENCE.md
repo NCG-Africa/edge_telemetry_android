@@ -4,8 +4,8 @@
 >
 > Event names, keys, types and units are defined by the processor's event catalogue
 > ([`docs/catalogue/`](https://github.com/NCG-Africa/edge_telemetry_processor_go/tree/main/docs/catalogue))
-> at the ref pinned in [`catalogue.version`](../catalogue.version). The exact wire for every event this
-> SDK sends is in the golden batches, [`telemetry_library/src/test/resources/golden/`](../telemetry_library/src/test/resources/golden/),
+> at the tag pinned in [`catalogue.version`](../catalogue.version). The keys and types of every event this
+> SDK sends are in [`telemetry_library/src/test/shape.txt`](../telemetry_library/src/test/shape.txt),
 > checked against the catalogue before every release (`scripts/conform.sh`). Where this document disagrees, the
 > catalogue wins.
 

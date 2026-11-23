@@ -253,12 +253,24 @@ tm.setLastUserAction("submit_payment")
 ## Event catalogue (conformance gate)
 
 Every event name, key, type and unit comes from the processor's catalogue (`docs/catalogue/` in
-`edge_telemetry_processor_go`) at the ref in `catalogue.version`
-(`main` between releases, the release tag once one is cut). `GoldenBatchSnapshotTest` records each
-event through the real emitters into `telemetry_library/src/test/resources/golden/`; `scripts/conform.sh`
-runs the processor's `cmd/conform` on them. Not in CI: run it by hand before every release.
-A new event or key needs a catalogue PR first (processor CODEOWNERS), then a pin bump here. Regenerate
-goldens with `-PupdateGoldens`.
+`edge_telemetry_processor_go`) at the tag in `catalogue.version` (always a `catalogue-v*` tag).
+`GoldenBatchSnapshotTest` records each event through the real emitters and dumps the raw batch to the
+gitignored `telemetry_library/build/golden-raw/`; `scripts/conform.sh` runs the processor's `cmd/conform`
+on it: catalogue check, then the derived shape (event, key, JSON type; never a value) must equal the
+committed `telemetry_library/src/test/shape.txt`. Not in CI: run it by hand before every release.
+A new event or key needs a catalogue PR first (processor CODEOWNERS) and a `catalogue-v*` tag. A key
+that shows up only by timing is a test-input bug: fix the input, don't widen the shape.
+
+```bash
+./gradlew :telemetry_library:testDebugUnitTest --tests '*GoldenBatchSnapshotTest*'  # dump the raw batch
+scripts/conform.sh            # raw batch vs the pinned catalogue + shape.txt (needs go)
+scripts/conform.sh -update    # intended wire change: rewrite shape.txt, commit the diff
+PROCESSOR_DIR=../edge_telemetry_processor_go scripts/conform.sh  # dev: untagged catalogue change (pin untouched)
+```
+
+Release checklist: (1) is the catalogue change this release needs tagged (`catalogue-v*` on the
+processor)? If not, tag it first. (2) Bump `catalogue.version` to that tag (only here, never in a
+feature PR). (3) Run the golden test, then `scripts/conform.sh`; it must pass.
 
 ## Conventions
 
