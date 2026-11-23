@@ -70,8 +70,8 @@ android {
             // real Android behavior should use Robolectric explicitly.
             isReturnDefaultValues = true
             isIncludeAndroidResources = true
-            // -PupdateGoldens rewrites the golden batches (GoldenBatchSnapshotTest, #145).
-            all { if (project.hasProperty("updateGoldens")) it.systemProperty("updateGoldens", "true") }
+            // GoldenBatchSnapshotTest dumps here (#151); declared so Gradle never skips the test with a stale dump.
+            all { it.outputs.dir("build/golden-raw") }
         }
     }
 

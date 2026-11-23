@@ -19,7 +19,7 @@ The wire wrapper around one batch, closed at 8 keys (contract 4.x): it carries t
 _Avoid_: Payload, packet
 
 **Contract version**:
-The semver of the envelope shape shared by all SDKs (`contract_version`, currently `4.2.0`, the event catalogue version pinned in `catalogue.version`); independent of the SDK's own version.
+The semver of the envelope shape shared by all SDKs (`contract_version`, currently `4.2.0`, set in `TelemetryBatch.kt`; the catalogue this SDK is checked against is the `catalogue-v*` tag in `catalogue.version`); independent of the SDK's own version.
 
 **Collector**:
 The backend endpoint that receives batches.

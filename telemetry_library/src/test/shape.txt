@@ -1,0 +1,217 @@
+app.anr event anr.duration_ms number
+app.anr event anr.threads array
+app.anr event device.battery_charging bool
+app.anr event device.orientation string
+app.anr event device.power_save bool
+app.anr event device.thermal_status string
+app.anr event error.cause string
+app.anr event error.message string
+app.anr event error.type string
+app.anr event user.email string
+app.anr event user.name string
+app.anr event user.phone string
+app.crash event device.battery_charging bool
+app.crash event device.orientation string
+app.crash event device.power_save bool
+app.crash event device.thermal_status string
+app.crash event error.breadcrumbs string
+app.crash event error.cause string
+app.crash event error.is_main_thread bool
+app.crash event error.message string
+app.crash event error.stacktrace string
+app.crash event error.thread string
+app.crash event error.type string
+app.crash event error.user_action string
+app.crash event rum.action.id string
+app.crash event trace.id string
+app.crash event trace.root_type string
+app.crash event user.email string
+app.crash event user.name string
+app.crash event user.phone string
+app.error event error.breadcrumbs string
+app.error event error.cause string
+app.error event error.code string
+app.error event error.message string
+app.error event error.stacktrace string
+app.error event error.type string
+app.error event error.user_action string
+app.error event rum.action.id string
+app.error event trace.id string
+app.error event trace.root_type string
+app.error event user.email string
+app.error event user.name string
+app.error event user.phone string
+app.exit event exit.description string
+app.exit event exit.importance number
+app.exit event exit.pss_kb number
+app.exit event exit.reason string
+app.exit event exit.rss_kb number
+app.exit event exit.status number
+app.exit event exit.timestamp number
+app.exit event exit.trace string
+app.exit event user.email string
+app.exit event user.name string
+app.exit event user.phone string
+app.hang event device.battery_charging bool
+app.hang event device.orientation string
+app.hang event device.power_save bool
+app.hang event device.thermal_status string
+app.hang event error.cause string
+app.hang event error.message string
+app.hang event error.stacktrace string
+app.hang event error.type string
+app.hang event hang.duration_ms number
+app.hang event rum.action.id string
+app.hang event trace.id string
+app.hang event trace.root_type string
+app.hang event user.email string
+app.hang event user.name string
+app.hang event user.phone string
+app.start event app.start.duration_ms number
+app.start event app.start.type string
+app.start event rum.action.id string
+app.start event span.id string
+app.start event span.start_time string
+app.start event trace.id string
+app.start event trace.root_type string
+common device.android_release string
+common device.android_sdk number
+common device.brand string
+common device.cpu_abi string
+common device.cpu_cores number
+common device.dark_mode bool
+common device.fingerprint string
+common device.hardware string
+common device.locale string
+common device.low_ram bool
+common device.manufacturer string
+common device.model string
+common device.platform string
+common device.platform_version string
+common device.product string
+common device.screen_density number
+common device.screen_height_px number
+common device.screen_width_px number
+common device.timezone string
+common network.type string
+common session.duration_ms number
+common session.event_count number
+common session.id string
+common session.is_first_session bool
+common session.metric_count number
+common session.screen_count number
+common session.start_time string
+common session.total_sessions number
+common session.visited_screens string
+common user.id string
+custom.event event event.name string
+custom.event event user.email string
+custom.event event user.name string
+custom.event event user.phone string
+custom.metric metric metric.name string
+custom.metric metric user.email string
+custom.metric metric user.name string
+custom.metric metric user.phone string
+envelope app.build_number string
+envelope app.name string
+envelope app.package_name string
+envelope app.platform string
+envelope app.version string
+envelope batch_size number
+envelope contract_version string
+envelope device_id string
+envelope sdk.name string
+envelope sdk.version string
+envelope timestamp string
+envelope type string
+frame.summary event display.refresh_rate number
+frame.summary event frame.frozen_frames number
+frame.summary event frame.max_build_duration_ms number
+frame.summary event frame.max_raster_duration_ms number
+frame.summary event frame.max_total_duration_ms number
+frame.summary event frame.slow_frame_rate number
+frame.summary event frame.slow_frames number
+frame.summary event frame.total_frames number
+frame.summary event frame.window_duration_ms number
+frame.summary event screen.name string
+frame.summary event user.email string
+frame.summary event user.name string
+frame.summary event user.phone string
+http.request event http.duration_ms number
+http.request event http.method string
+http.request event http.response_size number
+http.request event http.status_code number
+http.request event http.success bool
+http.request event http.url string
+http.request event parent.span.id string
+http.request event rum.action.id string
+http.request event span.duration_ms number
+http.request event span.id string
+http.request event span.start_time string
+http.request event trace.id string
+http.request event trace.root_type string
+http.request event traceparent.outcome string
+http.request event user.email string
+http.request event user.name string
+http.request event user.phone string
+memory.pressure event memory.pressure_level string
+memory.pressure event memory.trim_level string
+memory.pressure event memory.usage_mb number
+memory.pressure event user.email string
+memory.pressure event user.name string
+memory.pressure event user.phone string
+memory.usage event memory.heap_max_mb number
+memory.usage event memory.heap_used_mb number
+memory.usage event memory.source string
+memory.usage event memory.system_available_mb number
+memory.usage event memory.total_mb number
+memory.usage event memory.usage_mb number
+memory.usage event user.email string
+memory.usage event user.name string
+memory.usage event user.phone string
+navigation event navigation.has_arguments bool
+navigation event navigation.method string
+navigation event navigation.route_type string
+navigation event navigation.to_screen string
+navigation event parent.span.id string
+navigation event rum.action.id string
+navigation event span.id string
+navigation event span.start_time string
+navigation event trace.id string
+navigation event trace.root_type string
+screen.duration event screen.duration_ms number
+screen.duration event screen.exit_method string
+screen.duration event screen.name string
+screen.load event screen.load.first_frame_ms number
+screen.load event screen.name string
+sdk.capabilities event capabilities.device object
+sdk.capabilities event capabilities.memory object
+sdk.capabilities event capabilities.network object
+session.finalized event session.reason string
+session.finalized event user.email string
+session.finalized event user.name string
+session.finalized event user.phone string
+storage.usage event storage.internal_free_mb number
+storage.usage event storage.internal_total_mb number
+storage.usage event storage.internal_usable_mb number
+storage.usage event user.email string
+storage.usage event user.name string
+storage.usage event user.phone string
+task.complete event span.duration_ms number
+task.complete event task.name string
+task.complete event task.outcome string
+task.complete event user.email string
+task.complete event user.name string
+task.complete event user.phone string
+ui.interaction event ui.name_source string
+ui.interaction event ui.screen string
+ui.interaction event ui.target string
+ui.interaction event ui.type string
+ui.interaction event ui.x number
+ui.interaction event ui.y number
+ui.interaction event user.email string
+ui.interaction event user.name string
+ui.interaction event user.phone string
+user.profile.update event user.email string
+user.profile.update event user.name string
+user.profile.update event user.phone string
